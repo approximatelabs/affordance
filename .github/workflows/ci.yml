@@ -18,10 +18,18 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
 jobs:
-  # Every test that needs no reference data, and the TSX lint of the shipped views.
+  # Every test that needs no reference data, in two halves that run at the same time: half `a`
+  # runs the tests of the four slowest test files, half `b` every other test (and the TSX lint
+  # of the shipped views). The filters are name filters, so each test runs in exactly one half.
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        half: [a, b]
+    env:
+      SLOW: hardening:: group_commit:: runtime_http:: model_bindings::
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -33,9 +41,30 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: test
-      - run: cargo test --profile ci --locked --lib --bins --tests -- --test-threads=8
-      - run: cargo run --profile ci --locked --bin affordance -- lint
-  # Formatting, clippy on every feature set, the docs and the package's file list.
+          save-if: ${{ matrix.half == 'a' }}
+      - name: Tests (half ${{ matrix.half }})
+        run: |
+          if [ "${{ matrix.half }}" = a ]; then filters=($SLOW); else filters=(); for f in $SLOW; do filters+=(--skip "$f"); done; fi
+          cargo test --profile ci --locked --lib --bins --tests -- --test-threads=8 "${filters[@]}"
+      - if: matrix.half == 'b'
+        run: cargo run --profile ci --locked --bin affordance -- lint
+  # Clippy on every feature: the longest of the checks, so a job of its own.
+  clippy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust 1.90
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal --component clippy
+          rustup default 1.90.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: clippy
+      - run: cargo clippy --locked --all-features --all-targets -- -D warnings
+  # Formatting, clippy with no default features, the docs and the package's file list.
   lint:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -47,18 +76,15 @@ jobs:
         run: |
           rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy
           rustup default 1.90.0
-      - name: ripgrep
-        run: command -v rg || (sudo apt-get update && sudo apt-get install -y ripgrep)
       - run: cargo fmt --all --check
+      - run: ./tools/check-package.sh
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: lint
-      - run: cargo clippy --locked --all-features --all-targets -- -D warnings
       - run: cargo clippy --locked --no-default-features --all-targets -- -D warnings
       - run: cargo doc --locked --no-deps --all-features
         env:
           RUSTDOCFLAGS: "-D warnings"
-      - run: ./tools/check-package.sh
   # The minimum supported Rust version still builds.
   msrv:
     runs-on: ubuntu-24.04
