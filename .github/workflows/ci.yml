@@ -135,7 +135,9 @@ jobs:
       - name: Tests (shard ${{ matrix.shard }})
         run: |
           case "${{ matrix.shard }}" in
-            1) filters=($SHARD_1) ;;
+            # The bulk-allocation test copies gigabytes to check limits in Affordance's own code,
+            # the same on every system; Linux runs it, and on macOS it alone is over a minute.
+            1) filters=($SHARD_1 --skip hardening::bulk_allocations_throw_range_errors_instead_of_aborting) ;;
             2) filters=($SHARD_2) ;;
             *) filters=(); for f in $SHARD_1 $SHARD_2; do filters+=(--skip "$f"); done ;;
           esac
