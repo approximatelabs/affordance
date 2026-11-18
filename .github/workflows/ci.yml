@@ -18,18 +18,20 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
 jobs:
-  # Every test that needs no reference data, in two halves that run at the same time: half `a`
-  # runs the tests of the four slowest test files, half `b` every other test (and the TSX lint
-  # of the shipped views). The filters are name filters, so each test runs in exactly one half.
+  # Every test that needs no reference data, in three shards that run at the same time: shards 1
+  # and 2 run the tests of two of the four slowest test files each, shard 3 every other test
+  # (and the TSX lint of the shipped views). The filters are name filters, so each test runs in
+  # exactly one shard.
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        half: [a, b]
+        shard: [1, 2, 3]
     env:
-      SLOW: "hardening:: group_commit:: runtime_http:: model_bindings::"
+      SHARD_1: "hardening:: group_commit::"
+      SHARD_2: "runtime_http:: model_bindings::"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -41,12 +43,16 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: test
-          save-if: ${{ matrix.half == 'a' }}
-      - name: Tests (half ${{ matrix.half }})
+          save-if: ${{ matrix.shard == 1 }}
+      - name: Tests (shard ${{ matrix.shard }})
         run: |
-          if [ "${{ matrix.half }}" = a ]; then filters=($SLOW); else filters=(); for f in $SLOW; do filters+=(--skip "$f"); done; fi
+          case "${{ matrix.shard }}" in
+            1) filters=($SHARD_1) ;;
+            2) filters=($SHARD_2) ;;
+            *) filters=(); for f in $SHARD_1 $SHARD_2; do filters+=(--skip "$f"); done ;;
+          esac
           cargo test --profile ci --locked --lib --bins --tests -- --test-threads=8 "${filters[@]}"
-      - if: matrix.half == 'b'
+      - if: matrix.shard == 3
         run: cargo run --profile ci --locked --bin affordance -- lint
   # Clippy on every feature: the longest of the checks, so a job of its own.
   clippy:
@@ -101,8 +107,8 @@ jobs:
         with:
           shared-key: msrv
       - run: cargo check --locked --all-targets
-  # macOS: the command builds and the tests that need no reference data pass, in the same two
-  # halves as on Linux. Every test binary runs even after one fails, so one run shows everything
+  # macOS: the command builds and the tests that need no reference data pass, in the same three
+  # shards as on Linux. Every test binary runs even after one fails, so one run shows everything
   # that differs here.
   macos:
     runs-on: macos-15
@@ -110,9 +116,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        half: [a, b]
+        shard: [1, 2, 3]
     env:
-      SLOW: "hardening:: group_commit:: runtime_http:: model_bindings::"
+      SHARD_1: "hardening:: group_commit::"
+      SHARD_2: "runtime_http:: model_bindings::"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -124,8 +131,12 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: macos
-          save-if: ${{ matrix.half == 'a' }}
-      - name: Tests (half ${{ matrix.half }})
+          save-if: ${{ matrix.shard == 1 }}
+      - name: Tests (shard ${{ matrix.shard }})
         run: |
-          if [ "${{ matrix.half }}" = a ]; then filters=($SLOW); else filters=(); for f in $SLOW; do filters+=(--skip "$f"); done; fi
+          case "${{ matrix.shard }}" in
+            1) filters=($SHARD_1) ;;
+            2) filters=($SHARD_2) ;;
+            *) filters=(); for f in $SHARD_1 $SHARD_2; do filters+=(--skip "$f"); done ;;
+          esac
           cargo test --profile ci --locked --lib --bins --tests --no-fail-fast -- --test-threads=8 "${filters[@]}"
