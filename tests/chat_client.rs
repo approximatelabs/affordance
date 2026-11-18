@@ -104,9 +104,11 @@ fn concurrent_requests_do_not_share_a_spending_ledger() {
     let url = format!("http://{}", listener.local_addr().unwrap());
     listener.set_nonblocking(true).unwrap();
     let peer = std::thread::spawn(move || {
-        let until = Instant::now() + Duration::from_millis(500);
+        // Every request is held open until all four have arrived, so all four are in flight at
+        // once (30 s is only the limit for a broken run).
+        let until = Instant::now() + Duration::from_secs(30);
         let mut streams = vec![];
-        while Instant::now() < until {
+        while streams.len() < 4 && Instant::now() < until {
             match listener.accept() {
                 Ok((mut s, _)) => {
                     // On macOS an accepted socket inherits the listener's non-blocking mode.

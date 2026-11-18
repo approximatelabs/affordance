@@ -1,5 +1,9 @@
 # The gate for pull requests and main. Actions are pinned to commit SHAs; nothing here has
 # write access or secrets.
+#
+# The jobs run side by side and each compiles once. The tests are built in the `ci` profile
+# (Cargo.toml): Affordance's own code built fast, its dependencies optimized. Compiled
+# dependencies are kept between runs (rust-cache), so a run recompiles only what changed.
 name: ci
 on:
   pull_request:
@@ -12,38 +16,22 @@ concurrency:
   cancel-in-progress: true
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
 jobs:
-  # tools/check-engine.sh: every test that needs no reference data, both feature sets, fmt,
-  # clippy, docs, the TSX lint and the package check.
-  gate:
+  # Every test that needs no reference data, in three shards that run at the same time: shards 1
+  # and 2 run the tests of two of the four slowest test files each, shard 3 every other test
+  # (and the TSX lint of the shipped views). The filters are name filters, so each test runs in
+  # exactly one shard.
+  test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Rust 1.90
-        run: |
-          rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy
-          rustup default 1.90.0
-      - name: ripgrep
-        run: command -v rg || (sudo apt-get update && sudo apt-get install -y ripgrep)
-      - run: ./tools/check-engine.sh
-  # The minimum supported Rust version still builds.
-  msrv:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - run: |
-          rustup toolchain install 1.89.0 --profile minimal
-          cargo +1.89.0 check --locked --all-targets
-  # macOS: the command builds and the tests that need no reference data pass.
-  macos:
-    runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      SHARD_1: "hardening:: group_commit::"
+      SHARD_2: "runtime_http:: model_bindings::"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -52,5 +40,105 @@ jobs:
         run: |
           rustup toolchain install 1.90.0 --profile minimal
           rustup default 1.90.0
-      # Every test binary runs even after one fails, so one run shows everything that differs here.
-      - run: cargo test --release --locked --no-fail-fast -- --test-threads=2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: test
+          save-if: ${{ matrix.shard == 1 }}
+      - name: Tests (shard ${{ matrix.shard }})
+        run: |
+          case "${{ matrix.shard }}" in
+            1) filters=($SHARD_1) ;;
+            2) filters=($SHARD_2) ;;
+            *) filters=(); for f in $SHARD_1 $SHARD_2; do filters+=(--skip "$f"); done ;;
+          esac
+          cargo test --profile ci --locked --lib --bins --tests -- --test-threads=8 "${filters[@]}"
+      - if: matrix.shard == 3
+        run: cargo run --profile ci --locked --bin affordance -- lint
+  # Clippy on every feature: the longest of the checks, so a job of its own.
+  clippy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust 1.90
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal --component clippy
+          rustup default 1.90.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: clippy
+      - run: cargo clippy --locked --all-features --all-targets -- -D warnings
+  # Formatting, clippy with no default features, the docs and the package's file list.
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust 1.90
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.90.0
+      - run: cargo fmt --all --check
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: lint
+      - run: cargo clippy --locked --no-default-features --all-targets -- -D warnings
+      - run: cargo doc --locked --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+      # After a cargo step, so the dependencies it lists offline are downloaded.
+      - run: ./tools/check-package.sh
+  # The minimum supported Rust version still builds.
+  msrv:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          rustup default 1.89.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: msrv
+      - run: cargo check --locked --all-targets
+  # macOS: the command builds and the tests that need no reference data pass, in the same three
+  # shards as on Linux. Every test binary runs even after one fails, so one run shows everything
+  # that differs here.
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      SHARD_1: "hardening:: group_commit::"
+      SHARD_2: "runtime_http:: model_bindings::"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust 1.90
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal
+          rustup default 1.90.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: macos
+          save-if: ${{ matrix.shard == 1 }}
+      - name: Tests (shard ${{ matrix.shard }})
+        run: |
+          case "${{ matrix.shard }}" in
+            # The bulk-allocation test copies gigabytes to check limits in Affordance's own code,
+            # the same on every system; Linux runs it, and on macOS it alone is over a minute.
+            1) filters=($SHARD_1 --skip hardening::bulk_allocations_throw_range_errors_instead_of_aborting) ;;
+            2) filters=($SHARD_2) ;;
+            *) filters=(); for f in $SHARD_1 $SHARD_2; do filters+=(--skip "$f"); done ;;
+          esac
+          cargo test --profile ci --locked --lib --bins --tests --no-fail-fast -- --test-threads=8 "${filters[@]}"

@@ -118,3 +118,14 @@ path = "tests/suite.rs"
 [[test]]
 name = "closures_freed"
 path = "tests/closures_freed.rs"
+
+# The test build in CI: Affordance's own code built fast, its dependencies optimized (they are
+# built once and cached). Release builds are unchanged.
+[profile.ci]
+inherits = "dev"
+opt-level = 0
+debug = false
+incremental = false
+
+[profile.ci.package."*"]
+opt-level = 3
