@@ -50,27 +50,29 @@ cargo install affordance
 ```
 
 Or run it without installing anything, with [uv](https://docs.astral.sh/uv/) (Python's package
-runner). Put `uvx` in front of each `affordance` command below:
+runner): put `uvx` in front of each `affordance` command below, as in `uvx affordance render`.
+
+Save the app above as `hello.tsx` and render it. This needs no model:
 
 ```sh
-uvx affordance init my-agent
+echo '{"name":"world"}' | affordance render hello.tsx --state -
 ```
 
-The examples are in this repository:
-
-```sh
-git clone https://github.com/approximatelabs/affordance && cd affordance
+```text
+ids     [15496, 11, 995, 0, 685, 70, 2871, 60]
+text    Hello, world! [greet]
+span        0..4     label      greeting
+span        4..8     affordance greet
+span        4..8     action     greet(name)
+span        0..8     box
 ```
 
-Render the app above (no model, no Python):
+The first four token IDs are the greeting and the last four are ` [greet]`. The spans say what
+each range is: IDs 4 to 8 are the `greet` action, which the model can call as a tool with a
+`name`. With no `--tokenizer`, `render` uses GPT-2's.
 
-```sh
-echo '{"name":"world"}' | affordance render views/demo/hello.tsx --state -
-```
-
-It prints `Hello, world! [greet]` and its spans: which IDs are text and which are the `greet`
-action. Then write and run a first agent, against a local model server (llama.cpp, Ollama or
-vLLM) or a hosted API, with a shell on your machine:
+Then write and run a first agent, against a local model server (llama.cpp, Ollama or vLLM) or a
+hosted API, with a shell on your machine:
 
 ```sh
 affordance init my-agent && cd my-agent
@@ -99,7 +101,13 @@ export default function Main({ task }) {
 }
 ```
 
-Or serve an app over HTTP. [`views/demo/memory_server`](views/demo/memory_server) puts a chat
+The other examples are in this repository:
+
+```sh
+git clone https://github.com/approximatelabs/affordance && cd affordance
+```
+
+Serve an app over HTTP. [`views/demo/memory_server`](views/demo/memory_server) puts a chat
 model with a memory longer than its context behind an OpenAI-compatible endpoint:
 
 ```sh
