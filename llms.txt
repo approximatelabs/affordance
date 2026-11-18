@@ -1,0 +1,32 @@
+# Affordance
+
+> A browser for models. Apps are TSX views of state; Affordance renders them into the exact token ids a model reads, exposes the actions still visible after layout as its tools, and runs many agents with journals that replay exactly. Rust library and one command, `affordance` (`run` a deployment in `affordance.yaml`, `serve` it over HTTP, `host` it for a frontend over stdio, `init`, `render`, `test`, `lint`).
+
+An app renders its state; the model's reply names a visible action (`<aff>`); its handler changes the state; the next render follows. The app owns its loop, tools and context policy. The runtime owns rendering, layout under a token budget, effects (model calls, machine commands, timers, messages), journals and recovery.
+
+## Start
+
+- [README](README.md): what it is, a complete app, the first commands
+- [Getting started](docs/GETTING_STARTED.md): install the command, render an app, write and run a first agent
+- [A first agent](examples/first_agent/README.md): a complete agent against a local or hosted model, with a shell
+
+## Specifications
+
+- [Public contracts](spec/CONTRACTS.md): what is stable and who owns what
+- [Design](docs/DESIGN.md): why the engine is shaped like a browser, and how to tell where a feature belongs, through decisions that were made
+- [Language and layout](spec/LANGUAGE.md): the TSX subset, built-in elements, token style sheets
+- [Harness](spec/HARNESS.md): instances, `harness.*`, effects, journals, replay and recovery
+
+## Guides
+
+- [Writing and running agents](docs/RUNTIME.md): deployments, machines, capabilities, resume
+- [Model bindings](docs/MODEL_BINDINGS.md): SGLang, vLLM, OpenAI-compatible, Anthropic and OpenAI APIs
+- [Conversation and context libraries](docs/MIDDLE_LAYER.md): logs, turn strategies, folding
+- [Reply parsing](docs/REPLY_PARSING.md)
+- [Fetch, HTTP and MCP](docs/HTTP_AND_MCP.md)
+- [Embedding the engine](docs/HARNESS_GUIDE.md): the Rust API for another host
+
+## Contributing
+
+- [AGENTS.md](AGENTS.md): layout, checks and invariants for changing the code
+- [Contributing](CONTRIBUTING.md) and [development](docs/DEVELOPING.md)

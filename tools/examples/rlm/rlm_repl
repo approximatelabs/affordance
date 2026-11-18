@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""A persistent Python REPL for a Recursive Language Model, run on the agent's machine.
+
+The REPL is a daemon (one per $HOME) holding the globals between calls. Its globals start with
+`context` (the input, loaded from a file, never shown to the root model whole), `answer`
+({"content": "", "ready": False}), and `llm_batch(prompts)` / `llm_query(prompt)` for sub-LLM calls.
+The daemon makes no model calls itself: `llm_batch` parks the running cell and the call returns
+the prompts; the harness answers them (its own model calls) and `resume`s the cell with the replies.
+
+  rlm_repl start FILE   start the daemon with `context` loaded from FILE (JSON if it parses, else text)
+  rlm_repl exec         run the code on stdin
+  rlm_repl resume       answer a parked llm_batch with the JSON list of replies on stdin
+  rlm_repl stop         stop the daemon (its globals are gone)
+
+`exec` and `resume` print one JSON line: {"status": "llm", "prompts": [...]} when the cell is parked,
+else {"status": "done", "output": "...", "answer": {...}} (output capped at RLM_MAX_OUTPUT chars).
+"""
+import ast, contextlib, io, json, os, queue, socket, sys, threading, time, traceback
+
+HOME = os.path.expanduser("~")
+DIR = os.path.join(HOME, ".rlm")
+SOCK = os.path.join(DIR, "sock")
+MAX_OUTPUT = int(os.environ.get("RLM_MAX_OUTPUT", "8192"))
+
+
+def clip(s):
+    if len(s) <= MAX_OUTPUT:
+        return s
+    return s[:MAX_OUTPUT] + f"\n[... output truncated: {len(s) - MAX_OUTPUT} more characters. Print less, or slice.]"
+
+
+def serve(path):
+    with open(path) as f:
+        text = f.read()
+    try:
+        context = json.loads(text)
+    except ValueError:
+        context = text
+    events, replies = queue.Queue(), queue.Queue()
+    running = threading.Event()
+
+    def llm_batch(prompts):
+        prompts = [str(p) for p in prompts]
+        if not prompts:
+            return []
+        events.put({"status": "llm", "prompts": prompts})
+        return replies.get()
+
+    def llm_query(prompt):
+        return llm_batch([prompt])[0]
+
+    env = {"__name__": "__rlm__", "context": context, "answer": {"content": "", "ready": False},
+           "llm_batch": llm_batch, "llm_query": llm_query}
+
+    def run(code):
+        out = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+                try:
+                    # A last bare expression is shown, as in a notebook.
+                    mod = ast.parse(code)
+                    last = ast.Expression(mod.body.pop().value) if mod.body and isinstance(mod.body[-1], ast.Expr) else None
+                    exec(compile(mod, "<cell>", "exec"), env)
+                    if last is not None:
+                        v = eval(compile(last, "<cell>", "eval"), env)
+                        if v is not None:
+                            print(repr(v))
+                except Exception as e:
+                    # The traceback starts in the cell, not in this daemon.
+                    tb = e.__traceback__
+                    while tb is not None and tb.tb_frame.f_code.co_filename != "<cell>":
+                        tb = tb.tb_next
+                    traceback.print_exception(type(e), e, tb)
+        finally:
+            running.clear()
+            a = env.get("answer")
+            a = a if isinstance(a, dict) else {"content": str(a), "ready": False}
+            events.put({"status": "done", "output": clip(out.getvalue()),
+                        "answer": {"content": str(a.get("content", "")), "ready": bool(a.get("ready"))}})
+
+    os.makedirs(DIR, exist_ok=True)
+    if os.path.exists(SOCK):
+        os.unlink(SOCK)
+    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    srv.bind(SOCK)
+    srv.listen(4)
+    while True:
+        conn, _ = srv.accept()
+        with conn:
+            req = json.loads(conn.makefile().readline())
+            if req["op"] == "exec":
+                if running.is_set():
+                    conn.sendall(b'{"status": "error", "error": "a cell is parked on llm_batch; resume it first"}\n')
+                    continue
+                running.set()
+                threading.Thread(target=run, args=(req["code"],), daemon=True).start()
+            elif req["op"] == "resume":
+                if not running.is_set():
+                    conn.sendall(b'{"status": "error", "error": "no cell is waiting for replies"}\n')
+                    continue
+                replies.put([str(r) for r in req["replies"]])
+            elif req["op"] == "ping":
+                conn.sendall(b'{"status": "ok"}\n')
+                continue
+            elif req["op"] == "stop":
+                conn.sendall(b'{"status": "ok"}\n')
+                os.unlink(SOCK)
+                os._exit(0)
+            conn.sendall((json.dumps(events.get()) + "\n").encode())
+
+
+def ask(req):
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    s.connect(SOCK)
+    s.sendall((json.dumps(req) + "\n").encode())
+    print(s.makefile().readline().strip())
+
+
+def alive():
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(SOCK)
+        s.sendall(b'{"op": "ping"}\n')
+        return s.makefile().readline().strip() != ""
+    except OSError:
+        return False
+
+
+def main():
+    op = sys.argv[1] if len(sys.argv) > 1 else ""
+    if op == "start":
+        if alive():
+            print('{"status": "ok", "started": false}')
+            return
+        if os.fork() == 0:
+            os.setsid()
+            if os.fork() == 0:
+                fd = os.open(os.devnull, os.O_RDWR)
+                for i in (0, 1, 2):
+                    os.dup2(fd, i)
+                serve(sys.argv[2])
+            os._exit(0)
+        for _ in range(200):
+            if alive():
+                print('{"status": "ok", "started": true}')
+                return
+            time.sleep(0.05)
+        print('{"status": "error", "error": "the REPL did not start"}')
+    elif op == "exec":
+        ask({"op": "exec", "code": sys.stdin.read()})
+    elif op == "stop":
+        if alive():
+            ask({"op": "stop"})
+    elif op == "resume":
+        ask({"op": "resume", "replies": json.load(sys.stdin)})
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()

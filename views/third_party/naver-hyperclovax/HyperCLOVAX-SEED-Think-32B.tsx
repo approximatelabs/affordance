@@ -1,0 +1,222 @@
+// Converted from the chat template of naver-hyperclovax/HyperCLOVAX-SEED-Think-32B by tools/jinja2tsx.py. Regenerate it; do not edit.
+import { J } from "../../common/jinja.tsx";
+
+export default function Main(ctx) {
+  const out = [];
+  let ns_img_0 = ctx["ns_img"];
+  let ns_vid_0 = ctx["ns_vid"];
+  let ns_0 = ctx["ns"];
+  let tools_0 = ctx["tools"] ?? null;
+  let messages_0 = ctx["messages"];
+  let content_0 = ctx["content"];
+  let reasoning_content_0 = ctx["reasoning_content"];
+  let image_id_0 = ctx["image_id"];
+  let mime_type_0 = ctx["mime_type"];
+  let video_id_0 = ctx["video_id"];
+  let _args_0 = ctx["_args"];
+  let add_generation_prompt_0 = ctx["add_generation_prompt"];
+  let skip_reasoning_0 = ctx["skip_reasoning"];
+  ns_img_0 = J.call(J.namespace, J.kw({"count": 0}));
+  ns_vid_0 = J.call(J.namespace, J.kw({"count": 0}));
+  if (J.t(tools_0)) {
+    out.push(J.str("<|im_start|>system\n"));
+    if (J.t((J.eq(J.attr(J.item(messages_0, 0), "role"), "system")))) {
+      if (J.t(J.test("string", J.attr(J.item(messages_0, 0), "content")))) {
+        if (J.t(J.attr(J.item(messages_0, 0), "content"))) {
+          out.push(J.str(J.add(J.attr(J.item(messages_0, 0), "content"), "\n\n")));
+        }
+      } else if (J.t(J.test("sequence", J.attr(J.item(messages_0, 0), "content")))) {
+        {
+          let _items1 = J.iter(J.attr(J.item(messages_0, 0), "content"));
+          const _loop1 = J.loop(_items1);
+          for (let _i1 = 0; _i1 < _items1.length; _i1++) {
+            _loop1.index0 = _i1; const _it1 = _items1[_i1]; let content_part_1 = _it1;
+            if (J.t((J.eq(J.attr(content_part_1, "type"), "text")))) {
+              out.push(J.str(J.add(J.attr(content_part_1, "text"), "\n\n")));
+            }
+          }
+        }
+      }
+    }
+    out.push(J.str("# Tools\n\n"), J.str("You may call one or more functions to assist with the user query.\n\n"), J.str("You are provided with function signatures within <tools></tools> XML tags:\n"), J.str("<tools>\n"));
+    {
+      let _items2 = J.iter(tools_0);
+      const _loop2 = J.loop(_items2);
+      for (let _i2 = 0; _i2 < _items2.length; _i2++) {
+        _loop2.index0 = _i2; const _it2 = _items2[_i2]; let tool_2 = _it2;
+        out.push(J.str(J.filter("tojson", tool_2, J.kw({"ensure_ascii": false}))));
+      }
+    }
+    out.push(J.str("\n</tools>\n\n"), J.str("For each function call, output the function name and arguments within the following XML format:\n"), J.str("<tool_call>{function-name}\n"), J.str("<arg_key>{arg-key-1}</arg_key>\n"), J.str("<arg_value>{arg-value-1}</arg_value>\n"), J.str("<arg_key>{arg-key-2}</arg_key>\n"), J.str("<arg_value>{arg-value-2}</arg_value>\n"), J.str("...\n"), J.str("</tool_call><|im_end|>\n"));
+  } else {
+    if (J.t((J.eq(J.attr(J.item(messages_0, 0), "role"), "system")))) {
+      out.push(J.str("<|im_start|>system\n"));
+      if (J.t(J.test("string", J.attr(J.item(messages_0, 0), "content")))) {
+        out.push(J.str(J.attr(J.item(messages_0, 0), "content")));
+      } else if (J.t(J.test("sequence", J.attr(J.item(messages_0, 0), "content")))) {
+        {
+          let _items3 = J.iter(J.attr(J.item(messages_0, 0), "content"));
+          const _loop3 = J.loop(_items3);
+          for (let _i3 = 0; _i3 < _items3.length; _i3++) {
+            _loop3.index0 = _i3; const _it3 = _items3[_i3]; let content_part_3 = _it3;
+            if (J.t((J.eq(J.attr(content_part_3, "type"), "text")))) {
+              out.push(J.str(J.attr(content_part_3, "text")));
+            }
+          }
+        }
+      }
+      if (J.t(J.attr(J.item(messages_0, 0), "content"))) {
+        out.push(J.str("\n"));
+      }
+      out.push(J.str("<|im_end|>\n"));
+    }
+  }
+  ns_0 = J.call(J.namespace, J.kw({"last_user_index": J.neg(1)}));
+  {
+    let _items4 = J.iter(messages_0);
+    const _loop4 = J.loop(_items4);
+    for (let _i4 = 0; _i4 < _items4.length; _i4++) {
+      _loop4.index0 = _i4; const _it4 = _items4[_i4]; let m_4 = _it4;
+      if (J.t((J.eq(J.attr(m_4, "role"), "user")))) {
+        J.setattr(ns_0, "last_user_index", J.attr(_loop4, "index0"));
+      }
+    }
+  }
+  {
+    let _items5 = J.iter(messages_0);
+    const _loop5 = J.loop(_items5);
+    for (let _i5 = 0; _i5 < _items5.length; _i5++) {
+      _loop5.index0 = _i5; const _it5 = _items5[_i5]; let message_5 = _it5;
+      let content_6 = content_0;
+      let reasoning_content_7 = reasoning_content_0;
+      content_6 = J.attr(message_5, "content");
+      if (J.t(((v) => J.t(v) ? !J.t(J.attr(_loop5, "first")) : v)((J.eq(J.attr(message_5, "role"), "system"))))) {
+        out.push(J.str(J.add(J.add("<|im_start|>", J.attr(message_5, "role")), "\n")));
+        if (J.t(J.test("string", content_6))) {
+          out.push(J.str(content_6));
+        } else if (J.t(J.test("sequence", content_6))) {
+          {
+            let _items6 = J.iter(content_6);
+            const _loop6 = J.loop(_items6);
+            for (let _i6 = 0; _i6 < _items6.length; _i6++) {
+              _loop6.index0 = _i6; const _it6 = _items6[_i6]; let content_part_8 = _it6;
+              if (J.t((J.eq(J.attr(content_part_8, "type"), "text")))) {
+                out.push(J.str(J.attr(content_part_8, "text")));
+              }
+            }
+          }
+        }
+        out.push(J.str(J.add("<|im_end|>", "\n")));
+      } else if (J.t((J.eq(J.attr(message_5, "role"), "user")))) {
+        out.push(J.str("<|im_start|>user\n"));
+        if (J.t(J.test("string", J.item(message_5, "content")))) {
+          out.push(J.str(J.add(J.item(message_5, "content"), "<|im_end|>\n")));
+        } else if (J.t(J.test("sequence", J.item(message_5, "content")))) {
+          {
+            let _items7 = J.iter(J.item(message_5, "content"));
+            const _loop7 = J.loop(_items7);
+            for (let _i7 = 0; _i7 < _items7.length; _i7++) {
+              _loop7.index0 = _i7; const _it7 = _items7[_i7]; let content_9 = _it7;
+              let image_id_10 = image_id_0;
+              let mime_type_11 = mime_type_0;
+              let video_id_12 = video_id_0;
+              if (J.t(!J.t(J.attr(_loop7, "first")))) {
+                out.push(J.str("\n"));
+              }
+              if (J.t(((v) => J.t(v) ? v : (J.has("image_url", content_9)))(((v) => J.t(v) ? v : (J.has("image", content_9)))((J.eq(J.item(content_9, "type"), "image")))))) {
+                image_id_10 = J.mod("image_%02d", J.attr(ns_img_0, "count"));
+                J.setattr(ns_img_0, "count", J.add(J.attr(ns_img_0, "count"), 1));
+                mime_type_11 = J.call(J.attr(content_9, "get"), "mime_type", "image/jpeg");
+                out.push(J.str(J.add(J.add(J.add(J.add(J.add(J.add("<|mime_start|>{\"id\": \"", image_id_10), "\", \"type\": \""), mime_type_11), "\", \"filename\": \""), J.call(J.attr(content_9, "get"), "filename", "a.jpg")), "\"}<|mime_end|>\n")), J.str("<|image_start|><|IMAGE_PAD|><|image_end|>"));
+              } else if (J.t(((v) => J.t(v) ? v : (J.has("video_url", content_9)))(((v) => J.t(v) ? v : (J.has("video", content_9)))((J.eq(J.item(content_9, "type"), "video")))))) {
+                video_id_12 = J.mod("video_%02d", J.attr(ns_vid_0, "count"));
+                J.setattr(ns_vid_0, "count", J.add(J.attr(ns_vid_0, "count"), 1));
+                mime_type_11 = J.call(J.attr(content_9, "get"), "mime_type", "video/mp4");
+                out.push(J.str(J.add(J.add(J.add(J.add(J.add(J.add("<|mime_start|>{\"id\": \"", video_id_12), "\", \"type\": \""), mime_type_11), "\", \"filename\": \""), J.call(J.attr(content_9, "get"), "filename", "a.mp4")), "\"}<|mime_end|>\n")), J.str(J.add(J.add("<|video_aux_start|>\ub2e4\uc74c \uc911 video_duration\uc740 \ube44\ub514\uc624 \uae38\uc774 \uc815\ubcf4\uc785\ub2c8\ub2e4. \ucc38\uace0\ud558\uc5ec \ub2f5\ubcc0\ud558\uc138\uc694. {\"video_duration\": ", (J.t(J.call(J.attr(content_9, "get"), "video_duration")) ? J.filter("tojson", J.call(J.attr(content_9, "get"), "video_duration")) : "<|video_duration|>")), "}<|video_aux_end|>\n")), J.str("<|video_start|><|VIDEO_PAD|><|video_end|>"));
+              } else if (J.t((J.eq(J.item(content_9, "type"), "text")))) {
+                out.push(J.str(J.item(content_9, "text")));
+              }
+            }
+          }
+          out.push(J.str("<|im_end|>\n"));
+        }
+      } else if (J.t((J.eq(J.attr(message_5, "role"), "assistant")))) {
+        out.push(J.str("<|im_start|>assistant\n"));
+        if (J.t(J.test("string", J.attr(message_5, "content")))) {
+          reasoning_content_7 = "";
+          if (J.t(J.test("string", J.attr(message_5, "reasoning_content")))) {
+            reasoning_content_7 = J.attr(message_5, "reasoning_content");
+          } else {
+            if (J.t((J.has("</think>", content_6)))) {
+              reasoning_content_7 = J.call(J.attr(J.item(J.call(J.attr(J.call(J.attr(J.item(J.call(J.attr(content_6, "split"), "</think>"), 0), "rstrip"), "\n"), "split"), "<think>"), J.neg(1)), "lstrip"), "\n");
+              content_6 = J.call(J.attr(J.item(J.call(J.attr(content_6, "split"), "</think>"), J.neg(1)), "lstrip"), "\n");
+            }
+          }
+          if (J.t((J.gt(J.attr(_loop5, "index0"), J.attr(ns_0, "last_user_index"))))) {
+            if (J.t(((v) => J.t(v) ? v : reasoning_content_7)(((v) => J.t(v) ? (J.eq(J.attr(J.item(messages_0, J.sub(J.attr(_loop5, "index0"), 1)), "role"), "user")) : v)((J.gt(J.attr(_loop5, "index0"), 0)))))) {
+              out.push(J.str(J.add(J.add(J.add("<think>\n", J.call(J.attr(reasoning_content_7, "strip"), "\n")), "\n</think>\n\n"), J.call(J.attr(content_6, "lstrip"), "\n"))));
+            } else {
+              out.push(J.str(content_6));
+            }
+          } else {
+            out.push(J.str(content_6));
+          }
+        } else if (J.t(J.test("sequence", J.attr(message_5, "content")))) {
+          {
+            let _items8 = J.iter(J.attr(message_5, "content"));
+            const _loop8 = J.loop(_items8);
+            for (let _i8 = 0; _i8 < _items8.length; _i8++) {
+              _loop8.index0 = _i8; const _it8 = _items8[_i8]; let content_part_13 = _it8;
+              if (J.t((J.eq(J.attr(content_part_13, "type"), "text")))) {
+                out.push(J.str(J.attr(content_part_13, "text")), J.str((J.t(!J.t(J.attr(_loop8, "last"))) ? "\n" : "")));
+              }
+            }
+          }
+        }
+        if (J.t(J.attr(message_5, "tool_calls"))) {
+          {
+            let _items9 = J.iter(J.attr(message_5, "tool_calls"));
+            const _loop9 = J.loop(_items9);
+            for (let _i9 = 0; _i9 < _items9.length; _i9++) {
+              _loop9.index0 = _i9; const _it9 = _items9[_i9]; let tool_call_14 = _it9;
+              let _args_15 = _args_0;
+              if (J.t(((v) => J.t(v) ? v : content_6)(!J.t(J.attr(_loop9, "first"))))) {
+                out.push(J.str("\n"));
+              }
+              if (J.t(J.attr(tool_call_14, "function"))) {
+                tool_call_14 = J.attr(tool_call_14, "function");
+              }
+              out.push(J.str(J.add(J.add("<tool_call>", J.attr(tool_call_14, "name")), "\n")));
+              _args_15 = J.attr(tool_call_14, "arguments");
+              {
+                let _items10 = J.iter(J.call(J.attr(_args_15, "items")));
+                const _loop10 = J.loop(_items10);
+                for (let _i10 = 0; _i10 < _items10.length; _i10++) {
+                  _loop10.index0 = _i10; const _it10 = _items10[_i10]; let [k_16, v_17] = J.unpack(_it10, 2);
+                  out.push(J.str(J.add(J.add("<arg_key>", k_16), "</arg_key>\n")), J.str(J.add(J.add("<arg_value>", (J.t(!J.t(J.test("string", v_17))) ? J.filter("tojson", v_17, J.kw({"ensure_ascii": false})) : v_17)), "</arg_value>\n")));
+                }
+              }
+              out.push(J.str("</tool_call>"));
+            }
+          }
+        }
+        out.push(J.str("<|im_end|>\n"));
+      } else if (J.t((J.eq(J.attr(message_5, "role"), "tool")))) {
+        if (J.t(((v) => J.t(v) ? v : (!J.eq(J.attr(J.item(messages_0, J.sub(J.attr(_loop5, "index0"), 1)), "role"), "tool")))(J.attr(_loop5, "first")))) {
+          out.push(J.str("<|im_start|>tool"));
+        }
+        out.push(J.str(J.add(J.add("\n<tool_response>", J.call(J.attr(message_5, "get"), "name", "")), "\n")), J.str(content_6), J.str("\n</tool_response>"));
+        if (J.t(((v) => J.t(v) ? v : (!J.eq(J.attr(J.item(messages_0, J.add(J.attr(_loop5, "index0"), 1)), "role"), "tool")))(J.attr(_loop5, "last")))) {
+          out.push(J.str("<|im_end|>\n"));
+        }
+      }
+    }
+  }
+  if (J.t(add_generation_prompt_0)) {
+    out.push(J.str("<|im_start|>assistant\n<think>\n"));
+    if (J.t(((v) => J.t(v) ? J.test("true", skip_reasoning_0) : v)((skip_reasoning_0 !== undefined)))) {
+      out.push(J.str("\n</think>\n\n"));
+    }
+  }
+  return out.join("");
+}

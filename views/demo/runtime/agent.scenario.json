@@ -1,0 +1,9 @@
+{"props": {"task": "Keep notes."}, "steps": [
+  {"expect": {"model_calls": 1, "prompt_contains": ["Keep notes.", "unread: 0"]}},
+  {"event": "message", "payload": {"from": "ada", "text": "first"}},
+  {"event": "message", "payload": {"from": "bob", "text": "second"}},
+  {"expect": {"state": {"__ui": {"@unread": 2}}}},
+  {"model": {"think": "Note it.", "calls": [{"name": "set_notes", "args": {"text": "two messages"}}]}},
+  {"expect": {"model_calls": 1, "prompt_contains": ["[message from ada] first", "[message from bob] second", "Notes: two messages"],
+              "state": {"__ui": {"@notes": "two messages"}}}}
+]}

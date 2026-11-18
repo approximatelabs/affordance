@@ -1,0 +1,2142 @@
+[
+ {
+  "id": "one_call",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "one_call_think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "one_call_nothink",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ },
+ {
+  "id": "one_call_reasoning",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ],
+    "reasoning_content": "I should look around first."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "one_call_reasoning_think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ],
+    "reasoning_content": "I should look around first."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "one_call_reasoning_nothink",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ],
+    "reasoning_content": "I should look around first."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ },
+ {
+  "id": "prose_and_call",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "Let me look at the repository.",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "prose_and_call_think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "Let me look at the repository.",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "prose_and_call_nothink",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "Let me look at the repository.",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ },
+ {
+  "id": "two_rounds",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Look first."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Now the tests."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "two_rounds_think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Look first."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Now the tests."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "two_rounds_nothink",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Look first."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Now the tests."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ },
+ {
+  "id": "parallel_calls",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     },
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "parallel_calls_think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     },
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "parallel_calls_nothink",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     },
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ },
+ {
+  "id": "answer_then_new_task",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "assistant",
+    "content": "One test fails: test_upload_retry.",
+    "reasoning_content": "Report it."
+   },
+   {
+    "role": "user",
+    "content": "Quarantine it and note why."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "answer_then_new_task_think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "assistant",
+    "content": "One test fails: test_upload_retry.",
+    "reasoning_content": "Report it."
+   },
+   {
+    "role": "user",
+    "content": "Quarantine it and note why."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "answer_then_new_task_nothink",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "assistant",
+    "content": "One test fails: test_upload_retry.",
+    "reasoning_content": "Report it."
+   },
+   {
+    "role": "user",
+    "content": "Quarantine it and note why."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ },
+ {
+  "id": "three_rounds_with_system",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful build engineer."
+   },
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00003",
+      "type": "function",
+      "function": {
+       "name": "set_notes",
+       "arguments": {
+        "text": "test_upload_retry is flaky; quarantined."
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Write it down."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00003",
+    "name": "set_notes",
+    "content": "notes saved"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "three_rounds_with_system_think",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful build engineer."
+   },
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00003",
+      "type": "function",
+      "function": {
+       "name": "set_notes",
+       "arguments": {
+        "text": "test_upload_retry is flaky; quarantined."
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Write it down."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00003",
+    "name": "set_notes",
+    "content": "notes saved"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "three_rounds_with_system_nothink",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful build engineer."
+   },
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "ls -la /srv && cat README.md"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "shell",
+    "content": "total 8\ndrwxr-xr-x 2 root root 4096 Oct 17 12:00 .\n-rw-r--r-- 1 root root  120 Oct 17 12:00 README.md\n# srv\nRun `make test`."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00003",
+      "type": "function",
+      "function": {
+       "name": "set_notes",
+       "arguments": {
+        "text": "test_upload_retry is flaky; quarantined."
+       }
+      }
+     }
+    ],
+    "reasoning_content": "Write it down."
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00003",
+    "name": "set_notes",
+    "content": "notes saved"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ },
+ {
+  "id": "message_between_turns",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "user",
+    "content": "[message from agent-0002] I am fixing test_upload_retry."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "message_between_turns_think",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "user",
+    "content": "[message from agent-0002] I am fixing test_upload_retry."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "message_between_turns_nothink",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Keep the build green. Start by checking the tests."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "shell",
+       "arguments": {
+        "command": "make test",
+        "timeout_s": 120
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "shell",
+    "content": "{\"passed\": 41, \"failed\": 1, \"failures\": [\"test_upload_retry\"]}"
+   },
+   {
+    "role": "user",
+    "content": "[message from agent-0002] I am fixing test_upload_retry."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "shell",
+     "description": "Run a shell command and return its output.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "command": {
+        "type": "string"
+       },
+       "timeout_s": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "command"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "set_notes",
+     "description": "Replace your notes.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "text": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "text"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ }
+]

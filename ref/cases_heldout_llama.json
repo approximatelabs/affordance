@@ -1,0 +1,1889 @@
+[
+ {
+  "id": "l2_only_system_no_user",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys only"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l2_two_user_no_assistant",
+  "messages": [
+   {
+    "role": "user",
+    "content": "a"
+   },
+   {
+    "role": "user",
+    "content": "b"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l2_assistant_first",
+  "messages": [
+   {
+    "role": "assistant",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l2_system_content_empty",
+  "messages": [
+   {
+    "role": "system",
+    "content": ""
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l2_two_system_messages",
+  "messages": [
+   {
+    "role": "system",
+    "content": "s1"
+   },
+   {
+    "role": "system",
+    "content": "s2"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l2_system_between_turns",
+  "messages": [
+   {
+    "role": "user",
+    "content": "a"
+   },
+   {
+    "role": "assistant",
+    "content": "b"
+   },
+   {
+    "role": "system",
+    "content": "s"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l2_user_list_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "hi"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l2_none_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l3_tools_silently_ignored",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l3_empty_messages",
+  "messages": [],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l3_whitespace_trim",
+  "messages": [
+   {
+    "role": "user",
+    "content": "   hi there   "
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l3_developer_role",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "developer",
+    "content": "dev note"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l3_nonstring_system",
+  "messages": [
+   {
+    "role": "system",
+    "content": [
+     {
+      "type": "text",
+      "text": "s"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_builtin_python_call",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run code"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "python",
+       "arguments": {
+        "code": "print(1)"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "name": "python",
+    "content": "ok"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "python",
+     "description": "Run Python.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "code"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "builtin_tools": [
+    "python"
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_builtin_multi_tools_code_interpreter",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are helpful."
+   },
+   {
+    "role": "user",
+    "content": "go"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "python",
+     "description": "Run Python.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "code"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "browser",
+     "description": "Browse a URL.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "url": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "url"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "builtin_tools": [
+    "code_interpreter",
+    "python"
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_builtin_call_nonstring_arg",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "python",
+       "arguments": {
+        "code": 5
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "python",
+     "description": "Run Python.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "code"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "builtin_tools": [
+    "python"
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_builtin_tools_as_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "python",
+       "arguments": {
+        "code": "x"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "python",
+     "description": "Run Python.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "code"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "builtin_tools": "python",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_builtin_tool_not_in_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "python",
+       "arguments": {
+        "code": "x"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "python",
+     "description": "Run Python.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "code"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "builtin_tools": [
+    "browser"
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tools_empty_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tools_in_user_false",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "tools_in_user_message": false,
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tools_no_user_message",
+  "messages": [
+   {
+    "role": "system",
+    "content": "s"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_custom_tools_override",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "custom_tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "browser",
+      "description": "Browse a URL.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "url": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "url"
+       ]
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_custom_tools_empty_fallback",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "custom_tools": [],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_date_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "date_string": "29 Feb 2024",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tools_string_not_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": "weather",
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tool_calls_multiple",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "A"
+       }
+      }
+     },
+     {
+      "id": "c2",
+      "type": "function",
+      "function": {
+       "name": "browser",
+       "arguments": {
+        "url": "u"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "browser",
+     "description": "Browse a URL.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "url": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "url"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tool_calls_empty_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": []
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tool_call_json_types",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "NYC",
+        "count": 3,
+        "flag": true,
+        "tags": [
+         "a",
+         "b"
+        ],
+        "meta": {
+         "x": 1
+        },
+        "nada": null
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tool_call_arguments_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"NYC\"}"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tool_result_dict",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "NYC"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "name": "get_weather",
+    "tool_call_id": "c1",
+    "content": {
+     "ok": true,
+     "n": 1
+    }
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tool_result_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "NYC"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "name": "get_weather",
+    "tool_call_id": "c1",
+    "content": null
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tool_result_empty_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "NYC"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "name": "get_weather",
+    "tool_call_id": "c1",
+    "content": ""
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_tool_result_list_parts",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "NYC"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "name": "get_weather",
+    "tool_call_id": "c1",
+    "content": [
+     {
+      "type": "text",
+      "text": "a"
+     },
+     {
+      "type": "text",
+      "text": "b"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_ipython_role",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "python",
+       "arguments": {
+        "code": "1"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "ipython",
+    "content": "42"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "python",
+     "description": "Run Python.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "code"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "builtin_tools": [
+    "python"
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_unicode_tools_json",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "café ☕ <tag> & 'quote'   你好",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l31_assistant_reasoning_ignored",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "ans",
+    "reasoning_content": "because ..."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "l32_builtin_tools_ignored",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "python",
+       "arguments": {
+        "code": "x"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "python",
+     "description": "Run Python.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "code": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "code"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "builtin_tools": [
+    "python"
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l32_date_from_clock",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_custom_tools_only",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "custom_tools": [
+    {
+     "type": "function",
+     "function": {
+      "name": "browser",
+      "description": "Browse a URL.",
+      "parameters": {
+       "type": "object",
+       "properties": {
+        "url": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "url"
+       ]
+      }
+     }
+    }
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tools_empty_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_default_tool_system",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_user_system_and_tools",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are X."
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_system_content_parts",
+  "messages": [
+   {
+    "role": "system",
+    "content": [
+     {
+      "type": "text",
+      "text": "sys part"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_system_image_first",
+  "messages": [
+   {
+    "role": "system",
+    "content": [
+     {
+      "type": "image"
+     },
+     {
+      "type": "text",
+      "text": "s"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_empty_system_with_tools",
+  "messages": [
+   {
+    "role": "system",
+    "content": ""
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_content_parts_image_text_unknown",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "image"
+     },
+     {
+      "type": "text",
+      "text": "  hi  "
+     },
+     {
+      "type": "tool",
+      "text": "x"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_content_string_whitespace",
+  "messages": [
+   {
+    "role": "user",
+    "content": "  spaced  "
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_calls_multiple",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "A"
+       }
+      }
+     },
+     {
+      "id": "c2",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "B"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_calls_empty_with_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "plain answer",
+    "tool_calls": []
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_calls_int_args",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "count": 3,
+        "flag": true,
+        "f": 1.5,
+        "tags": [
+         "a",
+         "b"
+        ]
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_calls_nonassistant",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "A"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_calls_no_function_wrapper",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "name": "get_weather",
+      "arguments": {
+       "city": "Rome"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_call_content_no_trim",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "  pad  ",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "A"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_result_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "A"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "name": "get_weather",
+    "tool_call_id": "c1",
+    "content": "plain result"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_result_parts",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "A"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "name": "get_weather",
+    "tool_call_id": "c1",
+    "content": [
+     {
+      "type": "text",
+      "text": "a"
+     },
+     {
+      "type": "image"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_tool_result_dict",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "A"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "name": "get_weather",
+    "tool_call_id": "c1",
+    "content": {
+     "a": 1
+    }
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "l4_no_system_no_tools",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "special_token_like_text",
+  "messages": [
+   {
+    "role": "user",
+    "content": "<|start_header_id|>assistant<|end_header_id|>\n\nhi<|eot_id|> {{ 7*7 }} {% raw %}"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "empty_user_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "long_unicode_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Grüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\nGrüße 你好 こんにちは 🙂👍🏽 é עברית العربية — “q” ﬁ​∑→\n end"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ }
+]

@@ -1,0 +1,2752 @@
+{
+ "01-ai/Yi-1.5-34B-Chat": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "fa4ffba162f2"
+ },
+ "01-ai/Yi-1.5-9B-Chat": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1a0fc698cf88"
+ },
+ "01-ai/Yi-34B-Chat": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "cf02cb50f2a0"
+ },
+ "01-ai/Yi-Coder-9B-Chat": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "356a1f8d4e4a"
+ },
+ "AEON-7/Qwen3.6-27B-AEON-Ultimate-Uncensored-BF16": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ab5dd22a0869"
+ },
+ "AEON-7/Qwen3.8-27B-AEON-ULTIMATE-UNCENSORED-BF16": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a11b97b5d2c4"
+ },
+ "ATH-MaaS/Ovis1.6-Gemma2-9B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "12bef7aa2034"
+ },
+ "ATH-MaaS/Ovis2.5-2B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "393c932b2a03"
+ },
+ "ATH-MaaS/Ovis2.5-9B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d73b2283ae2a"
+ },
+ "ATH-MaaS/Ovis2.6-30B-A3B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "44beb8e150b2"
+ },
+ "ATH-MaaS/OvisOCR2": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "cbdede82e048"
+ },
+ "ATH-MaaS/OvisOCR3": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "5b252386ba61"
+ },
+ "BAAI/AREX-2": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d4e3502f92d9"
+ },
+ "BioMistral/BioMistral-7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "9a11e1ffa817"
+ },
+ "ByteDance-Seed/Seed-Coder-8B-Instruct": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "1c5af72afa21"
+ },
+ "ByteDance-Seed/Seed-Coder-8B-Reasoning": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "9927b7724deb"
+ },
+ "ByteDance-Seed/Seed-OSS-36B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "497f1dca95eb"
+ },
+ "ByteDance-Seed/UI-TARS-72B-DPO": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "43a70a29275e"
+ },
+ "ByteDance-Seed/UI-TARS-7B-DPO": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "727b0df39207"
+ },
+ "ByteDance/Ouro-1.4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "574fa66cb8bf"
+ },
+ "ByteDance/Ouro-2.6B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1ed04250da1a"
+ },
+ "ByteDance/Ouro-2.6B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "f1edd81e7ac4"
+ },
+ "Cloudflare/clef": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "171287b25710"
+ },
+ "Cloudflare/clef-omni": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "189097bdeaaa"
+ },
+ "CohereLabs/North-Micro-Vision-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "fa548d9aa62c"
+ },
+ "CohereLabs/North-Mini-Code-1.0": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d11e61a84261"
+ },
+ "CohereLabs/command-a-plus-05-2026-bf16": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "5fb6fde5fd12"
+ },
+ "DavidAU/Mistral-Nemo-2407-12B-Thinking-Claude-Gemini-GPT5.2-Uncensored-HERETIC": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "9b05d236d2ad"
+ },
+ "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "079b2b268c63"
+ },
+ "DavidAU/Qwen3.8-27B-Ultimate-Heretic-Uncensored": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "74ac9c3ca6c8"
+ },
+ "Deci/DeciLM-7B-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "4adc7aa9efe6"
+ },
+ "DeepHat/DeepHat-V1-7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "361a5ce60e67"
+ },
+ "Diffuspace/Clover-35B-A3B-Preview": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "4b0402b65e52"
+ },
+ "EssentialAI/rnj-1-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "5ef96d7a82b2"
+ },
+ "GSAI-ML/LLaDA-8B-Base": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "0f2787f2d87e"
+ },
+ "GSAI-ML/LLaDA-8B-Instruct": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "08b83a6feb34"
+ },
+ "GritLM/GritLM-7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "cb7f7ffb99c0"
+ },
+ "GrootTeam/Groot-19B-A3B-261023": {
+  "license": "apache-2.0",
+  "license_link": "LICENSE",
+  "revision": "d089dadfe280"
+ },
+ "Hcompany/Holo4-27B": {
+  "license": "cc-by-nc-4.0",
+  "license_link": null,
+  "revision": "4de03cfeee1d"
+ },
+ "HemmingwayAI/Hemmingway-1": {
+  "license": "cc-by-nc-4.0",
+  "license_link": null,
+  "revision": "faba57469705"
+ },
+ "HuggingFaceBio/Carbon-X": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "17de89165e25"
+ },
+ "HuggingFaceH4/zephyr-7b-alpha": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "014792bbb59d"
+ },
+ "HuggingFaceH4/zephyr-7b-beta": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "892b3d7a7b1c"
+ },
+ "HuggingFaceM4/Idefics3-8B-Llama3": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "fddb4ff79181"
+ },
+ "HuggingFaceTB/SmolLM2-135M-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "12fd25f77366"
+ },
+ "HuggingFaceTB/SmolLM3-3B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a07cc9a04f16"
+ },
+ "HuggingFaceTB/SmolVLM2-2.2B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "be92141c8d0c"
+ },
+ "IFM/K2-Horizon-0.9B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "fc5c9dc7c13d"
+ },
+ "IFM/K2-Horizon-3.7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ea9a45d0e46f"
+ },
+ "IFM/K2-Horizon-375B-A23B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "bb3bfb4b5324"
+ },
+ "IFM/K2-Horizon-7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1ad5223c80f6"
+ },
+ "IFM/K2-Horizon-MoVA-36B-A4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "cf253b232c10"
+ },
+ "IQuestLab/IQuest-Q1": {
+  "license": "iquest-q1",
+  "license_link": "https://huggingface.co/IQuestLab/IQuest-Q1/blob/main/LICENSE",
+  "revision": "5c21b0630586"
+ },
+ "InternScience/Agents-A1-4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "945c40a4aa6f"
+ },
+ "InternScience/Sage-A1.5": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "0e3205cf441c"
+ },
+ "Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ad356102ce8e"
+ },
+ "JetBrains/Mellum2-12B-A2.5B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a7311550557e"
+ },
+ "JetBrains/Mellum2.1-12B-A2.5B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "92ddae9fc766"
+ },
+ "JonathanColetti/Qwen3.8-27B-Uncensored": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "5bb7aa90f0ef"
+ },
+ "K-intelligence/Midm-2.0-Base-Instruct": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "35479c5fc9a1"
+ },
+ "KRAFTON/Raon-1-mini-preview": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1b4f494d71df"
+ },
+ "Kwaipilot/KAT-Coder-V2.5-Dev": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "7be56fe773e7"
+ },
+ "LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct": {
+  "license": "exaone",
+  "license_link": "LICENSE",
+  "revision": "ccce25bd39c1"
+ },
+ "LGAI-EXAONE/EXAONE-3.5-32B-Instruct": {
+  "license": "exaone",
+  "license_link": "LICENSE",
+  "revision": "3d27aab477c0"
+ },
+ "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct": {
+  "license": "exaone",
+  "license_link": "LICENSE",
+  "revision": "553ea250b9a5"
+ },
+ "LGAI-EXAONE/EXAONE-4.0-1.2B": {
+  "license": "exaone",
+  "license_link": "LICENSE",
+  "revision": "3abf2810673c"
+ },
+ "LGAI-EXAONE/EXAONE-4.0-32B": {
+  "license": "exaone",
+  "license_link": "LICENSE",
+  "revision": "a1d54d1c148c"
+ },
+ "LGAI-EXAONE/EXAONE-4.5-33B": {
+  "license": "exaone",
+  "license_link": "LICENSE",
+  "revision": "570aa4b15a4f"
+ },
+ "LGAI-EXAONE/K-EXAONE-2.0-750B-A37B": {
+  "license": "apache-2.0",
+  "license_link": "LICENSE",
+  "revision": "fec0c8dd25fd"
+ },
+ "LGAI-EXAONE/K-EXAONE-236B-A23B": {
+  "license": "k-exaone",
+  "license_link": "LICENSE",
+  "revision": "61e6d578eb10"
+ },
+ "LiquidAI/LFM2-1.2B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "40f3da0d0164"
+ },
+ "LiquidAI/LFM2-2.6B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "36ed799f7024"
+ },
+ "LiquidAI/LFM2-2.6B-Exp": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "2251c8653426"
+ },
+ "LiquidAI/LFM2-24B-A2B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "20052c41d2a7"
+ },
+ "LiquidAI/LFM2-350M": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "f37d3f5c8c54"
+ },
+ "LiquidAI/LFM2-700M": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "86f49fc9a380"
+ },
+ "LiquidAI/LFM2-8B-A1B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "7ed1404fdf50"
+ },
+ "LiquidAI/LFM2-VL-1.6B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "2c2e7f9b0f48"
+ },
+ "LiquidAI/LFM2-VL-3B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "97a81f5c18b7"
+ },
+ "LiquidAI/LFM2-VL-450M": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "d355d88bf86e"
+ },
+ "LiquidAI/LFM2.5-1.2B-Base": {
+  "license": "other",
+  "license_link": null,
+  "revision": "7453bca97ca1"
+ },
+ "LiquidAI/LFM2.5-1.2B-Instruct": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "b9d816ab510f"
+ },
+ "LiquidAI/LFM2.5-1.2B-JP": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "58ef35ca21bb"
+ },
+ "LiquidAI/LFM2.5-1.2B-Thinking": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "fa4681e33c27"
+ },
+ "LiquidAI/LFM2.5-2.6B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "7141b56cd465"
+ },
+ "LiquidAI/LFM2.5-230M": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "40cb2ad3b304"
+ },
+ "LiquidAI/LFM2.5-24B-A2B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "3dc4cd09c9a2"
+ },
+ "LiquidAI/LFM2.5-350M": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "9921cd4d82c0"
+ },
+ "LiquidAI/LFM2.5-8B-A1B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "dd83f5cb02aa"
+ },
+ "LiquidAI/LFM2.5-VL-1.6B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "919fde3d022e"
+ },
+ "LiquidAI/LFM2.5-VL-3B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "35a118d938ce"
+ },
+ "LiquidAI/LFM2.5-VL-450M": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "fc6221ca597f"
+ },
+ "LiquidAI/LFM3-1.7B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "1da06bec6a81"
+ },
+ "LiquidAI/LFM3-1.7B-Base": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "7bca5038823c"
+ },
+ "LiquidAI/LFM3-Audio-2B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "2d6c1f99c129"
+ },
+ "LiquidAI/LFM3-Omni-2B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "21d75123f86c"
+ },
+ "LiquidAI/LFM3-VL-2B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "23387beda43c"
+ },
+ "LiquidAI/d1-2B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "a6bce774e6dd"
+ },
+ "LiquidAI/d1-3B": {
+  "license": "lfm1.0",
+  "license_link": "LICENSE",
+  "revision": "05b80faf5553"
+ },
+ "MemTensor/MemT-1.0-Nano": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "30fe0b22422c"
+ },
+ "MiniMaxAI/MiniMax-M1-40k": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "2d1d1c2f00c9"
+ },
+ "MiniMaxAI/MiniMax-M2": {
+  "license": "modified-mit",
+  "license_link": "https://github.com/MiniMax-AI/MiniMax-M2/blob/main/LICENSE",
+  "revision": "04312f0cfbde"
+ },
+ "MiniMaxAI/MiniMax-M2.1": {
+  "license": "modified-mit",
+  "license_link": "https://github.com/MiniMax-AI/MiniMax-M2.1/blob/main/LICENSE",
+  "revision": "917dbb7d0761"
+ },
+ "MiniMaxAI/MiniMax-M2.5": {
+  "license": "modified-mit",
+  "license_link": "https://github.com/MiniMax-AI/MiniMax-M2.5/blob/main/LICENSE",
+  "revision": "2515a3ea0afe"
+ },
+ "MiniMaxAI/MiniMax-M2.7": {
+  "license": "other",
+  "license_link": "https://github.com/MiniMax-AI/MiniMax-M2.7/blob/main/LICENSE",
+  "revision": "0a6536713b0b"
+ },
+ "MiniMaxAI/MiniMax-M3": {
+  "license": "minimax-community",
+  "license_link": "LICENSE",
+  "revision": "d95e30cb912f"
+ },
+ "MiniMaxAI/MiniMax-M3.1-Flash": {
+  "license": "minimax-community",
+  "license_link": "LICENSE",
+  "revision": "ce7f4df87d2e"
+ },
+ "MiniMaxAI/MiniMax-Text-01": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "a7351bf2bee0"
+ },
+ "MiniMaxAI/MiniMax-VL-01": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "308b79934be1"
+ },
+ "Motif-Technologies/Motif-3": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "2ed2ed5cfabf"
+ },
+ "NaiveAI/Naive-N0.5-Flash": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "9c9a11e8d2a6"
+ },
+ "Nanbeige/Nanbeige4-3B-Thinking-2511": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "396a1fb7a5e1"
+ },
+ "Nanbeige/Nanbeige4.1-3B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "9c4555c37921"
+ },
+ "Nanbeige/Nanbeige4.2-3B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b82e54bd6097"
+ },
+ "Nanbeige/Nanbeige4.3-33B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "df919e1e2cf0"
+ },
+ "NousResearch/Arete-27B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "108f0afbdcfa"
+ },
+ "NousResearch/DeepHermes-3-Llama-3-8B-Preview": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "53d902c7dcfa"
+ },
+ "NousResearch/Hermes-2-Pro-Llama-3-8B": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "f798274b30e7"
+ },
+ "NousResearch/Hermes-2-Theta-Llama-3-8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "57a73110702e"
+ },
+ "NousResearch/Hermes-3-Llama-3.1-70B": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "1fc86da0ce9c"
+ },
+ "NousResearch/Hermes-3-Llama-3.1-8B": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "896ea440e5a9"
+ },
+ "NousResearch/Hermes-3-Llama-3.2-3B": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "7f1a6bec8cdc"
+ },
+ "NousResearch/Hermes-4-14B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d6ce765c8b83"
+ },
+ "NousResearch/Hermes-4-405B": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "88e3dce03c4a"
+ },
+ "NousResearch/Hermes-4-70B": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "d5dec2bd6b39"
+ },
+ "NousResearch/Hermes-4.3-36B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "3899db2b6c4b"
+ },
+ "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "286ae6737d04"
+ },
+ "NousResearch/Nous-Hermes-2-SOLAR-10.7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "14c1fbe2f71a"
+ },
+ "NousResearch/Nous-Hermes-2-Yi-34B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "fcb0a8847e76"
+ },
+ "OBLITERATUS/DeepSeek-V4.1-Flash-1017-obliterated": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "29a9f998fe73"
+ },
+ "OpenGVLab/InternVL3-78B": {
+  "license": "qwen",
+  "license_link": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/blob/main/LICENSE",
+  "revision": "4a42b163cc0e"
+ },
+ "OpenGVLab/InternVL3-8B": {
+  "license": "qwen",
+  "license_link": "https://huggingface.co/Qwen/Qwen2.5-72B-Instruct/blob/main/LICENSE",
+  "revision": "853e3a797a66"
+ },
+ "OpenGVLab/InternVL3_5-8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "9bb6a56ad9cc"
+ },
+ "PaddlePaddle/PaddleOCR-VL": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "dae299658439"
+ },
+ "PaddlePaddle/PaddleOCR-VL-1.5": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1e5216083435"
+ },
+ "PaddlePaddle/PaddleOCR-VL-1.6": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "132c45f52c0a"
+ },
+ "PleIAs/Baguettotron": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "504b4c11c8a4"
+ },
+ "Qwen/CodeQwen1.5-7B-Chat": {
+  "license": "tongyi-qianwen",
+  "license_link": "https://huggingface.co/Qwen/CodeQwen1.5-7B-Chat/blob/main/LICENSE",
+  "revision": "7b0cc3380fe8"
+ },
+ "Qwen/QwQ-32B-Preview": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/QwQ-32B-Preview/blob/main/LICENSE",
+  "revision": "91906fe41a48"
+ },
+ "Qwen/Qwen-AgentWorld-35B-A3B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen-AgentWorld-35B-A3B/blob/main/LICENSE",
+  "revision": "60d2b0434a53"
+ },
+ "Qwen/Qwen-Image-Bench": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1b77ff83564a"
+ },
+ "Qwen/Qwen1.5-0.5B": {
+  "license": "tongyi-qianwen-research",
+  "license_link": "https://huggingface.co/Qwen/Qwen1.5-0.5B/blob/main/LICENSE",
+  "revision": "8f445e3628f3"
+ },
+ "Qwen/Qwen1.5-32B": {
+  "license": "tongyi-qianwen-research",
+  "license_link": "https://huggingface.co/Qwen/Qwen1.5-32B/blob/main/LICENSE",
+  "revision": "cefef80dc06a"
+ },
+ "Qwen/Qwen1.5-MoE-A2.7B": {
+  "license": "tongyi-qianwen",
+  "license_link": "https://huggingface.co/Qwen/Qwen1.5-MoE-A2.7B/blob/main/LICENSE",
+  "revision": "1a758c50ecb6"
+ },
+ "Qwen/Qwen2-0.5B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "91d2aff3f957"
+ },
+ "Qwen/Qwen2-1.5B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "8a16abf2848e"
+ },
+ "Qwen/Qwen2-7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "453ed1575b73"
+ },
+ "Qwen/Qwen2-VL-2B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "895c3a49bc3f"
+ },
+ "Qwen/Qwen2-VL-72B-Instruct": {
+  "license": "tongyi-qianwen",
+  "license_link": "https://huggingface.co/Qwen/Qwen2-VL-72B-Instruct/blob/main/LICENSE",
+  "revision": "2ac26c967836"
+ },
+ "Qwen/Qwen2-VL-7B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "eed13092ef92"
+ },
+ "Qwen/Qwen2.5-Math-1.5B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen2.5-Math-1.5B/blob/main/LICENSE",
+  "revision": "4a83ca6e4526"
+ },
+ "Qwen/Qwen2.5-Math-7B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen2.5-Math-7B/blob/main/LICENSE",
+  "revision": "b101308fe896"
+ },
+ "Qwen/Qwen2.5-Math-7B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen2.5-Math-7B-Instruct/blob/main/LICENSE",
+  "revision": "ef9926d75ab1"
+ },
+ "Qwen/Qwen2.5-Omni-3B": {
+  "license": "qwen-research",
+  "license_link": "LICENSE",
+  "revision": "f75b40e3da20"
+ },
+ "Qwen/Qwen2.5-Omni-7B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen2.5-Omni-7B/blob/main/LICENSE",
+  "revision": "ae9e1690543f"
+ },
+ "Qwen/Qwen2.5-VL-32B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "7cfb30d71a1f"
+ },
+ "Qwen/Qwen2.5-VL-3B-Instruct": {
+  "license": "qwen-research",
+  "license_link": "https://huggingface.co/Qwen/Qwen2.5-VL-3B-Instruct/blob/main/LICENSE",
+  "revision": "66285546d2b8"
+ },
+ "Qwen/Qwen2.5-VL-72B-Instruct": {
+  "license": "qwen",
+  "license_link": "https://huggingface.co/Qwen/Qwen2.5-VL-72B-Instruct/blob/main/LICENSE",
+  "revision": "89c86200743e"
+ },
+ "Qwen/Qwen2.5-VL-7B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "cc594898137f"
+ },
+ "Qwen/Qwen3-0.6B-Base": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "da87bfb608c1"
+ },
+ "Qwen/Qwen3-1.7B-Base": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ea980cb0a6c2"
+ },
+ "Qwen/Qwen3-4B-Base": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "906bfd4b4dc7"
+ },
+ "Qwen/Qwen3-8B-Base": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "49e3418fbbbc"
+ },
+ "Qwen/Qwen3-Coder-Next": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3-Coder-Next/blob/main/LICENSE",
+  "revision": "a7fbcb5c0e12"
+ },
+ "Qwen/Qwen3-Omni-30B-A3B-Captioner": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a2bd106cbf52"
+ },
+ "Qwen/Qwen3-Omni-30B-A3B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "26291f793822"
+ },
+ "Qwen/Qwen3-Omni-30B-A3B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "2f443cfc4c54"
+ },
+ "Qwen/Qwen3-VL-235B-A22B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "710c13861be6"
+ },
+ "Qwen/Qwen3-VL-235B-A22B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "6664affde684"
+ },
+ "Qwen/Qwen3-VL-2B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "89644892e4d8"
+ },
+ "Qwen/Qwen3-VL-2B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "33e0ad94c327"
+ },
+ "Qwen/Qwen3-VL-30B-A3B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "9c4b90e1e4ba"
+ },
+ "Qwen/Qwen3-VL-30B-A3B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d0ed0380729b"
+ },
+ "Qwen/Qwen3-VL-32B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "0cfaf48183f5"
+ },
+ "Qwen/Qwen3-VL-32B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "7edd10ffd119"
+ },
+ "Qwen/Qwen3-VL-4B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ebb281ec70b0"
+ },
+ "Qwen/Qwen3-VL-4B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1de27d8c51f1"
+ },
+ "Qwen/Qwen3-VL-8B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "0c351dd01ed8"
+ },
+ "Qwen/Qwen3-VL-8B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "92f3c4b4fead"
+ },
+ "Qwen/Qwen3.5-0.8B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3.5-0.8B/blob/main/LICENSE",
+  "revision": "2fc06364715b"
+ },
+ "Qwen/Qwen3.5-0.8B-Base": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3.5-0.8B-Base/blob/main/LICENSE",
+  "revision": "dc7cdfe2ee41"
+ },
+ "Qwen/Qwen3.5-2B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3.5-2B/blob/main/LICENSE",
+  "revision": "15852e8c1636"
+ },
+ "Qwen/Qwen3.5-2B-Base": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3.5-2B-Base/blob/main/LICENSE",
+  "revision": "b1485b2fa6df"
+ },
+ "Qwen/Qwen3.5-4B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3.5-4B/blob/main/LICENSE",
+  "revision": "851bf6e806ef"
+ },
+ "Qwen/Qwen3.6-35B-A3B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B/blob/main/LICENSE",
+  "revision": "345d467b117d"
+ },
+ "Qwen/Qwen3.8-2.4T-A95B": {
+  "license": "qwen3.8-max",
+  "license_link": "LICENSE",
+  "revision": "4f885e51d6bb"
+ },
+ "Qwen/Qwen3.8-27B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "37561816e66b"
+ },
+ "Qwen/Qwen3Guard-Gen-0.6B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3Guard-Gen-0.6B/blob/main/LICENSE",
+  "revision": "fada3b2f655b"
+ },
+ "Qwen/Qwen3Guard-Gen-8B": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3Guard-Gen-8B/blob/main/LICENSE",
+  "revision": "4505cb1a6f18"
+ },
+ "RecursiveSI/flint": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "2a247be0c0ae"
+ },
+ "RikiyaT/Qwen3.5-0.8B-weight-space-programming": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d1671a178705"
+ },
+ "ServiceNow-AI/Apriel-Nemotron-15b-Thinker": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "6f1072214e69"
+ },
+ "Skywork/Skywork-R1V-38B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "363f7c8e12c5"
+ },
+ "Snowflake/snowflake-arctic-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "be318cae5aba"
+ },
+ "TinyLlama/TinyLlama-1.1B-Chat-v1.0": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "fe8a4ea1ffed"
+ },
+ "Tongyi-MAI/MAI-UI-8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "e00a0097abb9"
+ },
+ "Vikhrmodels/Vikhr-Nemo-12B-Instruct-R-21-09-24": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "7499757d9f41"
+ },
+ "XHToken/Spark-X2.5-4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "0bcb35678590"
+ },
+ "XHToken/Spark-X2.6-4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "64ca8f2a295b"
+ },
+ "XiaomiMiMo/MiMo-V2.6-Distill-Qwen-9B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "1f09ddcc1a0e"
+ },
+ "XiaomiMiMo/MiMo-V2.6-Pro-RL": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "a066ba005719"
+ },
+ "XiaomiMiMo/MiMo-VL-7B-RL-2508": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "ec4ebdc29b83"
+ },
+ "XingChen-AGI/TeleOCR": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a32e21d4f766"
+ },
+ "XingChen-AGI/Xing4.0-29B-A4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "acbdebfe496d"
+ },
+ "XingChen-AGI/Xing4.0-29B-Intent": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "9bfc59b72baf"
+ },
+ "YannQi/R-4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "0fbbf22db686"
+ },
+ "ZJU-AI4H/Hulu-Med-7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "258594714a0d"
+ },
+ "Zyphra/Zamba2-7B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "3146688c5286"
+ },
+ "agentica-org/DeepScaleR-1.5B-Preview": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "e3f524ce413a"
+ },
+ "ai21labs/AI21-Jamba-Reasoning-3B": {
+  "license": "jamba-open-model-license",
+  "license_link": "https://www.ai21.com/licenses/jamba-open-model-license",
+  "revision": "752437041425"
+ },
+ "allenai/Llama-3.1-Tulu-3-8B": {
+  "license": "llama3.1",
+  "license_link": null,
+  "revision": "666943798adb"
+ },
+ "allenai/Molmo-7B-D-0924": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "cab33fb7f1a4"
+ },
+ "allenai/Molmo2-8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "e28fa28597e5"
+ },
+ "allenai/OLMo-2-0325-32B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b96024342a77"
+ },
+ "allenai/OLMoE-1B-7B-0924-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "7f1c97f440f0"
+ },
+ "allenai/Olmo-3-32B-Think": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "f2edda15216e"
+ },
+ "allenai/Olmo-3-7B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "6e5971d9eba4"
+ },
+ "allenai/Olmo-3-7B-Think": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d97e442d7cc6"
+ },
+ "allenai/Olmo-3.1-32B-Think": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "97ade57a9cc5"
+ },
+ "allenai/olmOCR-2-7B-1025": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "7c6fa1611328"
+ },
+ "allenai/olmOCR-7B-0225-preview": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "6f102f3807c4"
+ },
+ "alpindale/WizardLM-2-8x22B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "661fa9dcdb48"
+ },
+ "arcee-ai/AFM-4.5B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "e84d19711eca"
+ },
+ "arcee-ai/Llama-3.1-SuperNova-Lite": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "2469efed9632"
+ },
+ "arcee-ai/Trinity-Large-Preview": {
+  "license": "openmdw-1.1",
+  "license_link": "LICENSE",
+  "revision": "d8e126719c8b"
+ },
+ "arcee-ai/Trinity-Large-Thinking": {
+  "license": "openmdw-1.1",
+  "license_link": "LICENSE",
+  "revision": "dc6a99b6b742"
+ },
+ "arcee-ai/Trinity-Mini": {
+  "license": "openmdw-1.1",
+  "license_link": "LICENSE",
+  "revision": "cdb81e813081"
+ },
+ "autotrust/Qwen3.8-27B-NVFP4-DGX-SPARK-V2": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "303df2edaf39"
+ },
+ "baichuan-inc/Baichuan-M2-32B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "360f684d3cd5"
+ },
+ "baidu/ERNIE-4.5-0.3B-PT": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b565cf6caebd"
+ },
+ "baidu/ERNIE-4.5-21B-A3B-PT": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "87db95487941"
+ },
+ "baidu/ERNIE-4.5-21B-A3B-Thinking": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "4341bb42644d"
+ },
+ "baidu/ERNIE-4.5-VL-28B-A3B-PT": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "e3815e65c607"
+ },
+ "baidu/Qianfan-OCR": {
+  "license": "apache-2.0",
+  "license_link": "LICENSE",
+  "revision": "623bf5d20d44"
+ },
+ "baidu/Unlimited-OCR": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "8249d20b2822"
+ },
+ "beowolx/CodeNinja-1.0-OpenChat-7B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "9934c04c767e"
+ },
+ "bosonai/Higgs-Llama-3-70B": {
+  "license": "other",
+  "license_link": null,
+  "revision": "ecad51d809c0"
+ },
+ "chatdb/natural-sql-7b": {
+  "license": "cc-by-sa-4.0",
+  "license_link": null,
+  "revision": "ac0e30435282"
+ },
+ "codellama/CodeLlama-13b-Instruct-hf": {
+  "license": "llama2",
+  "license_link": null,
+  "revision": "745795438019"
+ },
+ "codellama/CodeLlama-34b-Instruct-hf": {
+  "license": "llama2",
+  "license_link": null,
+  "revision": "d4c1c474abca"
+ },
+ "codellama/CodeLlama-7b-Instruct-hf": {
+  "license": "llama2",
+  "license_link": null,
+  "revision": "22cb240e0292"
+ },
+ "coder3101/gemma-4-31B-it-heretic": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "9a1c7f5d8515"
+ },
+ "datalab-to/chandra-ocr-2": {
+  "license": "openrail",
+  "license_link": "LICENSE",
+  "revision": "af93b47dba1b"
+ },
+ "datalab-to/lift": {
+  "license": "openrail",
+  "license_link": "LICENSE",
+  "revision": "221e0fcecfb3"
+ },
+ "datalab-to/surya-ocr-2": {
+  "license": "openrail",
+  "license_link": "LICENSE",
+  "revision": "3b3d4cdf88d6"
+ },
+ "dealignai/Gemma-4-31B-JANG_4M-CRACK": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "bb2fa7575b90"
+ },
+ "deepseek-ai/DeepSeek-R1-0528-Qwen3-8B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "6e8885a6ff5c"
+ },
+ "deepseek-ai/DeepSeek-R1-Distill-Llama-70B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "b1c0b44b4369"
+ },
+ "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "6a6f4aa41979"
+ },
+ "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "ad9f0ae0864d"
+ },
+ "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "1df8507178af"
+ },
+ "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "711ad2ea6aa4"
+ },
+ "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "916b56a44061"
+ },
+ "deepseek-ai/DeepSeek-V2-Chat-0628": {
+  "license": "deepseek",
+  "license_link": "https://github.com/deepseek-ai/DeepSeek-V2/blob/main/LICENSE-MODEL",
+  "revision": "5d09e272c2b2"
+ },
+ "deepseek-ai/DeepSeek-V3.2-Exp": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "194c67e12b1b"
+ },
+ "deepseek-ai/DeepSeek-V4.1-Flash-1017": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "08c8657f0229"
+ },
+ "deepseek-ai/deepseek-coder-1.3b-instruct": {
+  "license": "deepseek",
+  "license_link": "LICENSE",
+  "revision": "e063262dac83"
+ },
+ "deepseek-ai/deepseek-coder-33b-instruct": {
+  "license": "deepseek",
+  "license_link": "LICENSE",
+  "revision": "61dc97b922b1"
+ },
+ "deepseek-ai/deepseek-coder-6.7b-instruct": {
+  "license": "deepseek",
+  "license_link": "LICENSE",
+  "revision": "e5d64addd26a"
+ },
+ "deepseek-ai/deepseek-coder-7b-instruct-v1.5": {
+  "license": "deepseek",
+  "license_link": "LICENSE",
+  "revision": "2a050a4c59d6"
+ },
+ "deepseek-ai/deepseek-vl2-small": {
+  "license": "deepseek",
+  "license_link": "https://github.com/deepseek-ai/DeepSeek-LLM/blob/HEAD/LICENSE-MODEL",
+  "revision": "6033e16432a1"
+ },
+ "dots-studio/dots.mocr": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "7c53434cd403"
+ },
+ "dots-studio/dots.ocr": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "c0111ce6bc07"
+ },
+ "dots-studio/dots3-note-prev": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1e1e7b0cd37a"
+ },
+ "dphn/Dolphin-Mistral-24B-Venice-Edition": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b23ff40b4a25"
+ },
+ "dphn/Dolphin3.0-Mistral-24B": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "65e9d03d587d"
+ },
+ "dphn/dolphin-2.6-mixtral-8x7b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "db797db3f23f"
+ },
+ "dphn/dolphin-2.9-llama3-8b": {
+  "license": "other",
+  "license_link": null,
+  "revision": "d94261ccf959"
+ },
+ "dphn/dolphin-2.9.3-mistral-nemo-12b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "7b535c900688"
+ },
+ "empero-ai/Qwen3.8-35B-A3B-Distill": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "bcc2dbe2f21b"
+ },
+ "empero-ai/Qwythos-9B-Claude-Mythos-5-1M": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "14a29bae5143"
+ },
+ "fancyfeast/llama-joycaption-beta-one-hf-llava": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "ebf414ea497a"
+ },
+ "fastino/GLiDE-27B": {
+  "license": "fastino-community",
+  "license_link": "https://huggingface.co/fastino/GLiDE/blob/main/LICENSE",
+  "revision": "4d32743ae96b"
+ },
+ "google/codegemma-7b-it": {
+  "license": "gemma",
+  "license_link": "https://ai.google.dev/gemma/terms",
+  "revision": "078cdc510705"
+ },
+ "google/diffusiongemma-26B-A4B-it": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "cd40195554d3"
+ },
+ "google/functiongemma-270m-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "39eccb091651"
+ },
+ "google/gemma-1.1-2b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "d750f5eceb83"
+ },
+ "google/gemma-1.1-7b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "065a528791af"
+ },
+ "google/gemma-2-27b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "aaf20e6b9f4c"
+ },
+ "google/gemma-2-2b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "299a8560bedf"
+ },
+ "google/gemma-2-2b-jpn-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "6b046bbc0910"
+ },
+ "google/gemma-2-9b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "11c9b309abf7"
+ },
+ "google/gemma-3-12b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "96b6f1eccf38"
+ },
+ "google/gemma-3-1b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "dcc83ea841ab"
+ },
+ "google/gemma-3-270m-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "ac82b4e82054"
+ },
+ "google/gemma-3-27b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "005ad3404e59"
+ },
+ "google/gemma-3-4b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "093f9f388b31"
+ },
+ "google/gemma-3n-E2B-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "5e092ebca197"
+ },
+ "google/gemma-3n-E4B-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "c1221e9c62e3"
+ },
+ "google/gemma-4-12B-it": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "43c9d014b231"
+ },
+ "google/gemma-4-26B-A4B-it": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "4d7ae4984b7d"
+ },
+ "google/gemma-4-31B-it": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "842da3794eaa"
+ },
+ "google/gemma-4-E2B-it": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "4adf15748de9"
+ },
+ "google/gemma-4-E4B-it": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "4ecc2ba63bca"
+ },
+ "google/recurrentgemma-2b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "2766eb5d4264"
+ },
+ "google/shieldgemma-2-4b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "eaf60452b5fc"
+ },
+ "google/shieldgemma-2b": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "d1dffc9c8c92"
+ },
+ "google/translategemma-12b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "d1b225e1caa1"
+ },
+ "google/translategemma-27b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "7d10f0b72f89"
+ },
+ "google/translategemma-4b-it": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "10042cb0e6e7"
+ },
+ "huggyllama/llama-7b": {
+  "license": "other",
+  "license_link": null,
+  "revision": "4782ad278652"
+ },
+ "huihui-ai/Huihui-Qwen3-VL-4B-Instruct-abliterated": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ce72a7c22aac"
+ },
+ "huihui-ai/Huihui-Qwen3-VL-8B-Instruct-abliterated": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b47a0690b22e"
+ },
+ "huihui-ai/Huihui-Qwen3.6-35B-A3B-abliterated": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/Qwen/Qwen3.6-35B-A3B/blob/main/LICENSE",
+  "revision": "8f0ee727aff5"
+ },
+ "huihui-ai/Huihui-Qwen3.8-27B-abliterated": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "739e3c5b8984"
+ },
+ "huihui-ai/Huihui-gemma-4-12B-it-abliterated": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "060ea173c4d1"
+ },
+ "humain-ai/ALLaM-7B-Instruct-preview": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a28dd1e67420"
+ },
+ "ibm-granite/granite-3.0-8b-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "5af56291a1c6"
+ },
+ "ibm-granite/granite-3.1-8b-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "4009206d5fc9"
+ },
+ "ibm-granite/granite-3.2-8b-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "610d8c6ee9c8"
+ },
+ "ibm-granite/granite-3.3-8b-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "51dd4bc2ade4"
+ },
+ "ibm-granite/granite-4.0-3b-vision": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "bf108f36960f"
+ },
+ "ibm-granite/granite-4.0-h-1b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d18cca4c121e"
+ },
+ "ibm-granite/granite-4.0-h-350m": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "3b17b717b8f2"
+ },
+ "ibm-granite/granite-4.0-h-micro": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d5f01a3ea75f"
+ },
+ "ibm-granite/granite-4.0-h-small": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b8c0982bab7f"
+ },
+ "ibm-granite/granite-4.0-h-tiny": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "791e0d3d28c8"
+ },
+ "ibm-granite/granite-4.0-micro": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "56111ae135df"
+ },
+ "ibm-granite/granite-4.0-tiny-preview": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "4ec5f963443b"
+ },
+ "ibm-granite/granite-4.1-30b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "4fae6278f713"
+ },
+ "ibm-granite/granite-4.1-3b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "c0650403e44e"
+ },
+ "ibm-granite/granite-4.1-8b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1504002f650e"
+ },
+ "ibm-granite/granite-4.2-30b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "9e668ce1c538"
+ },
+ "ibm-granite/granite-4.2-3b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "4e9c275e232f"
+ },
+ "ibm-granite/granite-4.2-8b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a7042144125c"
+ },
+ "ibm-granite/granite-docling-258M": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "982fe3b40f2f"
+ },
+ "ibm-granite/granite-vision-3.1-2b-preview": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "bd1c154ecbfe"
+ },
+ "ibm-granite/granite-vision-3.2-2b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ec894191f2e9"
+ },
+ "ibm-granite/granite-vision-4.1-4b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "37d591f06319"
+ },
+ "inclusionAI/LLaDA2.1-flash": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "2bf95e86ade3"
+ },
+ "inclusionAI/LLaDA2.1-mini": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "20e64e2ad216"
+ },
+ "inclusionAI/Ling-1T": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "9fd8c406bbd6"
+ },
+ "inclusionAI/Ling-2.6-1T": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "653026b0ba07"
+ },
+ "inclusionAI/Ling-2.6-flash": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "89f8441a8702"
+ },
+ "inclusionAI/Ling-3.0-flash": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "fcc60a52b34c"
+ },
+ "inclusionAI/Ling-3.0-flash-Fin": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "a5b4afb48f52"
+ },
+ "inclusionAI/Ling-3.0-flash-VL": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "c22bf252f15b"
+ },
+ "inclusionAI/Ling-3.0-tiny": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "9a98e35fe1c9"
+ },
+ "inclusionAI/Ling-3.1-flash": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "dde57b1c6a36"
+ },
+ "inclusionAI/Ling-3.1-flash-1019": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "2109a6863fb1"
+ },
+ "inclusionAI/Ling-flash-2.0": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "96f9b7a73e53"
+ },
+ "inclusionAI/Ling-mini-2.0": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "a810f6416bc4"
+ },
+ "inclusionAI/Ring-2.6-1T": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "2314abdf9e38"
+ },
+ "internlm/Intern-S1": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "4ecad381e282"
+ },
+ "internlm/Intern-S1-Pro": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "054ef1ef4bb7"
+ },
+ "internlm/Intern-S1-mini": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "0f25c8f60f41"
+ },
+ "internlm/internlm2_5-7b-chat": {
+  "license": "other",
+  "license_link": null,
+  "revision": "eb72b541689b"
+ },
+ "internlm/internlm3-8b-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "28c99415adaf"
+ },
+ "jondurbin/bagel-dpo-34b-v0.2": {
+  "license": "yi-license",
+  "license_link": "https://huggingface.co/01-ai/Yi-34B-200K/blob/main/LICENSE",
+  "revision": "79cd55df5caa"
+ },
+ "jzhang533/PaddleOCR-VL-For-Manga": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "1e8aa5f1dd90"
+ },
+ "lightonai/LightOnOCR-2-1B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "be7c41313c30"
+ },
+ "lightonai/LightOnOCR-3-0.8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "36d863692532"
+ },
+ "lightonai/LightOnOCR-3-4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b71010f095dc"
+ },
+ "liuhaotian/llava-v1.6-34b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "6754aa865824"
+ },
+ "liuhaotian/llava-v1.6-mistral-7b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "f13b6254afb9"
+ },
+ "llamaindex/vdr-2b-multi-v1": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "3d0c03041662"
+ },
+ "llava-hf/llava-1.5-7b-hf": {
+  "license": "llama2",
+  "license_link": null,
+  "revision": "b234b804b114"
+ },
+ "llava-hf/llava-v1.6-34b-hf": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "84e4488fffae"
+ },
+ "llava-hf/llava-v1.6-mistral-7b-hf": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "2424fdd47412"
+ },
+ "llmfan46/gemma-4-31B-it-uncensored-heretic": {
+  "license": "apache-2.0",
+  "license_link": "https://ai.google.dev/gemma/docs/gemma_4_license",
+  "revision": "d5bfc0d99e30"
+ },
+ "manycore-research/SpatialLM-Llama-1B": {
+  "license": "llama3.2",
+  "license_link": null,
+  "revision": "0a4c5f368cfd"
+ },
+ "meituan-longcat/LongCat-2.0": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "834bf5ffe304"
+ },
+ "meituan-longcat/LongCat-Flash-Chat": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "f0b8e8d73803"
+ },
+ "meituan-longcat/LongCat-Flash-Lite": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "b62b68827ead"
+ },
+ "meta-llama/Llama-3.2-11B-Vision-Instruct": {
+  "license": "llama3.2",
+  "license_link": null,
+  "revision": "9eb2daaa8597"
+ },
+ "meta-llama/Llama-Guard-3-1B": {
+  "license": "llama3.2",
+  "license_link": null,
+  "revision": "acf7aafa60f0"
+ },
+ "meta-llama/Llama-Guard-3-8B": {
+  "license": "llama3.1",
+  "license_link": null,
+  "revision": "7327bd9f6efb"
+ },
+ "meta-llama/Llama-Guard-4-12B": {
+  "license": "llama4",
+  "license_link": null,
+  "revision": "87acb4b94e93"
+ },
+ "microsoft/DialoGPT-medium": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "7b40bb0f92c4"
+ },
+ "microsoft/DialoGPT-small": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "49c537161a45"
+ },
+ "microsoft/Fara-7B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "4fca9cdeeff2"
+ },
+ "microsoft/Mage-VL": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d88b153285f1"
+ },
+ "microsoft/Mage-VL-Cowork": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "6fbe7f91da47"
+ },
+ "microsoft/Phi-3-medium-128k-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3-medium-128k-instruct/resolve/main/LICENSE",
+  "revision": "a088b37c71d4"
+ },
+ "microsoft/Phi-3-medium-4k-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3-medium-4k-instruct/resolve/main/LICENSE",
+  "revision": "48d87cd5e052"
+ },
+ "microsoft/Phi-3-mini-128k-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3-mini-128k-instruct/resolve/main/LICENSE",
+  "revision": "f3c06aed622e"
+ },
+ "microsoft/Phi-3-mini-4k-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct/resolve/main/LICENSE",
+  "revision": "f39ac1d28e92"
+ },
+ "microsoft/Phi-3-small-128k-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3-small-128k-instruct/resolve/main/LICENSE",
+  "revision": "e95b185a59a5"
+ },
+ "microsoft/Phi-3-small-8k-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3-small-8k-instruct/resolve/main/LICENSE",
+  "revision": "188b876e997e"
+ },
+ "microsoft/Phi-3-vision-128k-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3-vision-128k-instruct/resolve/main/LICENSE",
+  "revision": "ed2772fabe9d"
+ },
+ "microsoft/Phi-3.5-MoE-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3.5-MoE-instruct/resolve/main/LICENSE",
+  "revision": "43688451b462"
+ },
+ "microsoft/Phi-3.5-mini-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3.5-mini-instruct/resolve/main/LICENSE",
+  "revision": "2fe192450127"
+ },
+ "microsoft/Phi-3.5-vision-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-3.5-vision-instruct/resolve/main/LICENSE",
+  "revision": "12b77fb40b63"
+ },
+ "microsoft/Phi-4-mini-flash-reasoning": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-4-mini-flash-reasoning/resolve/main/LICENSE",
+  "revision": "1dff8163d28e"
+ },
+ "microsoft/Phi-4-mini-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-4-mini-instruct/resolve/main/LICENSE",
+  "revision": "cfbefacb9925"
+ },
+ "microsoft/Phi-4-mini-reasoning": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-4-mini-instruct-reasoning/resolve/main/LICENSE",
+  "revision": "0e3b1e2d02ee"
+ },
+ "microsoft/Phi-4-reasoning": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-4-reasoning/resolve/main/LICENSE",
+  "revision": "1de18ec97600"
+ },
+ "microsoft/Phi-4-reasoning-plus": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/Phi-4-reasoning-plus/resolve/main/LICENSE",
+  "revision": "69baf8528e1b"
+ },
+ "microsoft/Phi-4-reasoning-vision-15B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "c3e4fac79dda"
+ },
+ "microsoft/UserLM-8b": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "ce576a239996"
+ },
+ "microsoft/bitnet-b1.58-2B-4T": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/bitnet-b1.58-2B-4T/blob/main/LICENSE",
+  "revision": "04c3b9ad9361"
+ },
+ "microsoft/llava-med-v1.5-mistral-7b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "91bb16c12200"
+ },
+ "microsoft/phi-4": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/microsoft/phi-4/resolve/main/LICENSE",
+  "revision": "2db69c1c3e91"
+ },
+ "mistral-experimental/pixtral-12b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "c2756cbbb942"
+ },
+ "mistralai/Mistral-7B-Instruct-v0.1": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ec5deb64f2c6"
+ },
+ "mistralai/Mistral-7B-Instruct-v0.2": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "63a8b0818953"
+ },
+ "mistralai/Mistral-Large-4-1T-A52B": {
+  "license": "other",
+  "license_link": null,
+  "revision": "af26e7869af6"
+ },
+ "mlabonne/AlphaMonarch-7B": {
+  "license": "cc-by-nc-4.0",
+  "license_link": null,
+  "revision": "3de065d84411"
+ },
+ "mlabonne/Meta-Llama-3.1-8B-Instruct-abliterated": {
+  "license": "llama3.1",
+  "license_link": null,
+  "revision": "368c8ed94ce4"
+ },
+ "mlabonne/gemma-3-27b-it-abliterated": {
+  "license": "gemma",
+  "license_link": null,
+  "revision": "eaa815dffdf0"
+ },
+ "moonshotai/Kimi-K2-Base": {
+  "license": "modified-mit",
+  "license_link": null,
+  "revision": "ce72df012259"
+ },
+ "moonshotai/Kimi-K2-Instruct": {
+  "license": "modified-mit",
+  "license_link": null,
+  "revision": "fd1984e2b7a3"
+ },
+ "moonshotai/Kimi-K2-Instruct-0905": {
+  "license": "modified-mit",
+  "license_link": null,
+  "revision": "ac6c49f04883"
+ },
+ "moonshotai/Kimi-K2-Thinking": {
+  "license": "modified-mit",
+  "license_link": null,
+  "revision": "a51ccc050d73"
+ },
+ "moonshotai/Kimi-K2.5": {
+  "license": "modified-mit",
+  "license_link": null,
+  "revision": "4d01dfe0332d"
+ },
+ "moonshotai/Kimi-K2.6": {
+  "license": "modified-mit",
+  "license_link": null,
+  "revision": "7eb5002f6aad"
+ },
+ "moonshotai/Kimi-K2.7-Code": {
+  "license": "modified-mit",
+  "license_link": null,
+  "revision": "74797c9c6237"
+ },
+ "moonshotai/Kimi-Linear-48B-A3B-Instruct": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "e1df551a4471"
+ },
+ "moonshotai/Kimi-VL-A3B-Instruct": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "398eede0903c"
+ },
+ "moonshotai/Kimi-VL-A3B-Thinking": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "7d99e220af61"
+ },
+ "moonshotai/Kimi-VL-A3B-Thinking-2506": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "aa1730989e75"
+ },
+ "moonshotai/Moonlight-16B-A3B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "476b36a473d4"
+ },
+ "moonshotai/Moonlight-16B-A3B-Instruct": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "4e735b07a89f"
+ },
+ "nanonets/Nanonets-OCR-s": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "3baad182cc87"
+ },
+ "nanonets/Nanonets-OCR2-3B": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "c3886ff00bb0"
+ },
+ "naver-hyperclovax/HyperCLOVAX-SEED-Omni-8B": {
+  "license": "hyperclovax",
+  "license_link": "LICENSE",
+  "revision": "f1240321d605"
+ },
+ "naver-hyperclovax/HyperCLOVAX-SEED-Think-14B": {
+  "license": "hyperclovax-seed",
+  "license_link": "LICENSE",
+  "revision": "9b74e35d4c7e"
+ },
+ "naver-hyperclovax/HyperCLOVAX-SEED-Think-32B": {
+  "license": "hyperclovax",
+  "license_link": "LICENSE",
+  "revision": "3c2b6338613c"
+ },
+ "nex-agi/Nex-N2.5-mini": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "87420286149d"
+ },
+ "nvidia/Cosmos-Reason1-7B": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license",
+  "revision": "375e24000b24"
+ },
+ "nvidia/Llama-3.1-Nemotron-70B-Instruct-HF": {
+  "license": "llama3.1",
+  "license_link": null,
+  "revision": "031d4042f36a"
+ },
+ "nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "d552708a9d57"
+ },
+ "nvidia/Llama-3.1-Nemotron-Nano-8B-v1": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "54641c1611fc"
+ },
+ "nvidia/Llama-3.1-Nemotron-Nano-VL-8B-V1": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "437f4e28b989"
+ },
+ "nvidia/Llama-3_1-Nemotron-Ultra-253B-v1": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "5b47def5b895"
+ },
+ "nvidia/Llama-3_3-Nemotron-Super-49B-v1": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "387156d8d686"
+ },
+ "nvidia/Llama-3_3-Nemotron-Super-49B-v1_5": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "420ba7d28211"
+ },
+ "nvidia/Llama3-ChatQA-1.5-8B": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "3b98162e3f97"
+ },
+ "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-BF16": {
+  "license": "nvidia-nemotron-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license/",
+  "revision": "bf77c3174f68"
+ },
+ "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16": {
+  "license": "nvidia-nemotron-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license/",
+  "revision": "dfaf35de3e30"
+ },
+ "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16": {
+  "license": "nvidia-nemotron-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license/",
+  "revision": "2dc98e2afe4f"
+ },
+ "nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4": {
+  "license": "nvidia-nemotron-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license/",
+  "revision": "ff433f5493e2"
+ },
+ "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16": {
+  "license": "openmdw-1.1",
+  "license_link": "https://openmdw.ai/license/1-1/",
+  "revision": "77df655d5e9f"
+ },
+ "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-NVFP4": {
+  "license": "openmdw-1.1",
+  "license_link": "https://openmdw.ai/license/1-1/",
+  "revision": "02462641f13d"
+ },
+ "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16": {
+  "license": "openmdw-1.1",
+  "license_link": "https://openmdw.ai/license/1-1/",
+  "revision": "a9904d24bcc1"
+ },
+ "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4": {
+  "license": "openmdw-1.1",
+  "license_link": "https://openmdw.ai/license/1-1/",
+  "revision": "bee7596271d1"
+ },
+ "nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-BF16": {
+  "license": "openmdw-1.1",
+  "license_link": "https://openmdw.ai/license/1-1/",
+  "revision": "fb0ee0bc6b3f"
+ },
+ "nvidia/NVIDIA-Nemotron-Labs-Dory1.0-4B-BF16": {
+  "license": "openmdw-1.1",
+  "license_link": "https://openmdw.ai/license/1-1/",
+  "revision": "ee517dd388a9"
+ },
+ "nvidia/NVIDIA-Nemotron-Nano-12B-v2": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "f428df0ec725"
+ },
+ "nvidia/NVIDIA-Nemotron-Nano-12B-v2-VL-BF16": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "ca9543b126e8"
+ },
+ "nvidia/NVIDIA-Nemotron-Nano-9B-v2": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "6533e8de2c68"
+ },
+ "nvidia/NVIDIA-Nemotron-Nano-9B-v2-Japanese": {
+  "license": "nvidia-nemotron-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license/",
+  "revision": "3979dd166349"
+ },
+ "nvidia/NVIDIA-Nemotron-Parse-2.0": {
+  "license": "openmdw-1.1",
+  "license_link": null,
+  "revision": "4e021c03edc9"
+ },
+ "nvidia/NVIDIA-Nemotron-Parse-v1.1": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "6c8e17ba8001"
+ },
+ "nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-BF16": {
+  "license": "nvidia-open-model-agreement",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-agreement/",
+  "revision": "e5e9932441de"
+ },
+ "nvidia/Nemotron-3.5-Parse": {
+  "license": "openmdw-1.1",
+  "license_link": null,
+  "revision": "ea2e1fe486be"
+ },
+ "nvidia/Nemotron-Cascade-2-30B-A3B": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/",
+  "revision": "6327cdbcf907"
+ },
+ "nvidia/Nemotron-Labs-Diffusion-14B": {
+  "license": "nvidia-nemotron-open-model-license",
+  "license_link": "https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license/",
+  "revision": "f8c3e2c078e1"
+ },
+ "nvidia/Nemotron-Mini-4B-Instruct": {
+  "license": "nvidia-open-model-license",
+  "license_link": "https://developer.download.nvidia.com/licenses/nvidia-open-model-license-agreement-june-2024.pdf",
+  "revision": "791833e92ebd"
+ },
+ "openai/gpt-oss-safeguard-120b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "3c7391182603"
+ },
+ "openai/gpt-oss-safeguard-20b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "8a11e17b25c9"
+ },
+ "openbmb/AgentCPM-Report": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "c6232d64a47c"
+ },
+ "openbmb/BitCPM-CANN-8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "9a60ff7a487c"
+ },
+ "openbmb/MiniCPM-2B-sft-bf16": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "4ec16344ac13"
+ },
+ "openbmb/MiniCPM-Llama3-V-2_5": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "fd7f352fac0e"
+ },
+ "openbmb/MiniCPM-OCR-1.0": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "883ca368d173"
+ },
+ "openbmb/MiniCPM-OCR-Jev": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a0ed278eb6aa"
+ },
+ "openbmb/MiniCPM-SALA": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "9180fe1db74f"
+ },
+ "openbmb/MiniCPM-V-4": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "c0d840f28746"
+ },
+ "openbmb/MiniCPM-V-4.6": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "97328f3c2d70"
+ },
+ "openbmb/MiniCPM-V-4.7-1B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ad9bf379feb7"
+ },
+ "openbmb/MiniCPM-V-4.7-35B-A3B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "98e79ba972b5"
+ },
+ "openbmb/MiniCPM-V-4_5": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "14a200490814"
+ },
+ "openbmb/MiniCPM-o-4_5": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "fb09628e98b1"
+ },
+ "openbmb/MiniCPM3-4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d6b14ddaefdb"
+ },
+ "openbmb/MiniCPM4-8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "bb2ae14cf59d"
+ },
+ "openbmb/MiniCPM4.1-8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "3a8dfed9c79a"
+ },
+ "openbmb/MiniCPM5-1B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ac83f813ba7d"
+ },
+ "openbmb/MiniCPM5-2B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "42433e90dad9"
+ },
+ "openchat/openchat-3.5-0106": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ff058fda4972"
+ },
+ "openchat/openchat-3.5-1210": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "801f5459b757"
+ },
+ "openchat/openchat-3.6-8b-20240522": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "2264eb985589"
+ },
+ "opendatalab/MinerU2.5-2509-1.2B": {
+  "license": "agpl-3.0",
+  "license_link": null,
+  "revision": "1aa090b41282"
+ },
+ "opendatalab/MinerU2.5-Pro-2604-1.2B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "d3f5e08d073c"
+ },
+ "opendatalab/MinerU2.5-Pro-2605-1.2B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "08aaea840498"
+ },
+ "ornith-ai/Ornith-1.0-35B": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/deepreinforce-ai/Ornith-1.0-35B/blob/main/LICENSE",
+  "revision": "5df2ed3f675c"
+ },
+ "ornith-ai/Ornith-1.0-9B": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/deepreinforce-ai/Ornith-1.0-9B/blob/main/LICENSE",
+  "revision": "83dc1f5e24ef"
+ },
+ "ornith-ai/Ornith-1.5-122B": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/ornith-ai/Ornith-1.5-122B/blob/main/LICENSE",
+  "revision": "7681ef608624"
+ },
+ "ornith-ai/Ornith-1.5-35B-A3B": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B/blob/main/LICENSE",
+  "revision": "10fbf86fed7e"
+ },
+ "ornith-ai/Ornith-1.5-397B": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/ornith-ai/Ornith-1.5-397B/blob/main/LICENSE",
+  "revision": "8f6cc8a7aea5"
+ },
+ "ornith-ai/Ornith-1.5-9B": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/ornith-ai/Ornith-1.5-9B/blob/main/LICENSE",
+  "revision": "489cb97981b8"
+ },
+ "paradigma-inc/limite-1b-violetto": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "19569666aca3"
+ },
+ "poolside/Laguna-M.1": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "2bf8a4ab6d2e"
+ },
+ "poolside/Laguna-S-2.1": {
+  "license": "openmdw-1.1",
+  "license_link": null,
+  "revision": "0f573140834b"
+ },
+ "poolside/Laguna-XS-2.1": {
+  "license": "openmdw-1.1",
+  "license_link": null,
+  "revision": "c5f36269bbdb"
+ },
+ "poolside/Laguna-XS.2": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a397bde04501"
+ },
+ "project-numina/NuminaMath-7B-TIR": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "cf2aaf3f706e"
+ },
+ "prometheus-eval/prometheus-7b-v2.0": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "66ffb1fc20be"
+ },
+ "qnguyen3/nanoLLaVA": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "13d60cec183a"
+ },
+ "reflection/Beam-1.0-501B-A23B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "12950ae640b4"
+ },
+ "refuelai/Llama-3-Refueled": {
+  "license": "cc-by-nc-4.0",
+  "license_link": null,
+  "revision": "ff6d1c3ba37b"
+ },
+ "rhymes-ai/Aria": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "53a09c77895d"
+ },
+ "sarvamai/sarvam-1": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "e9607337286d"
+ },
+ "sarvamai/sarvam-105b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "abe264bdb8fb"
+ },
+ "sarvamai/sarvam-30b": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "2784c524a2f2"
+ },
+ "sarvamai/sarvam-m": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "01534a53c46f"
+ },
+ "sensenova/SenseNova-U1.5-8B-MoT": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a2462cc1b549"
+ },
+ "shenzhi-wang/Llama3-8B-Chinese-Chat": {
+  "license": "llama3",
+  "license_link": null,
+  "revision": "f25f13cb2571"
+ },
+ "skt/A.X-4.0": {
+  "license": "qwen",
+  "license_link": "https://huggingface.co/skt/A.X-4.0/blob/main/LICENSE",
+  "revision": "a3393fd67bf0"
+ },
+ "skt/A.X-4.0-Light": {
+  "license": "apache-2.0",
+  "license_link": "https://huggingface.co/skt/A.X-4.0-Light/blob/main/LICENSE",
+  "revision": "ba21c20ea1b3"
+ },
+ "skt/A.X-K1": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "de35cff14d27"
+ },
+ "skt/A.X-K2": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "52db6630c21d"
+ },
+ "stabilityai/stablelm-zephyr-3b": {
+  "license": "other",
+  "license_link": null,
+  "revision": "fe1fd5e36ccb"
+ },
+ "stepfun-ai/Step-3.5-Flash": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "ab446a3de5e1"
+ },
+ "stepfun-ai/Step-3.7-Flash": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "5f6244077ac6"
+ },
+ "stepfun-ai/Step-Audio-2-mini": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "e36fdd5d71e0"
+ },
+ "stepfun-ai/Step3-VL-10B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "5026053b0c2f"
+ },
+ "stepfun-ai/step3": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "e2d67fc936dc"
+ },
+ "swiss-ai/Apertus-70B-Instruct-2509": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "0f2767662a01"
+ },
+ "swiss-ai/Apertus-8B-Instruct-2509": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b946d40447b2"
+ },
+ "teknium/OpenHermes-2.5-Mistral-7B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "24c0bea14d53"
+ },
+ "tencent/Hunyuan-1.8B-Instruct": {
+  "license": "not stated",
+  "license_link": null,
+  "revision": "de940610ab5d"
+ },
+ "tencent/Hunyuan-A13B-Instruct": {
+  "license": "tencent-hunyuan-a13b",
+  "license_link": "https://github.com/Tencent-Hunyuan/Hunyuan-A13B/blob/main/LICENSE",
+  "revision": "290ddb9a56ed"
+ },
+ "tencent/HunyuanOCR": {
+  "license": "tencent-hunyuan-community",
+  "license_link": "https://huggingface.co/tencent/HunyuanOCR/blob/main/LICENSE",
+  "revision": "47644ecc4fc8"
+ },
+ "tencent/Hy-Memory-30B-A3B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "64a460a94d54"
+ },
+ "tencent/Hy3": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a960ebc3da32"
+ },
+ "tencent/Hy3-preview": {
+  "license": "other",
+  "license_link": null,
+  "revision": "549c2b3a0fd5"
+ },
+ "tencent/Hy4-preview": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "705d81ee5156"
+ },
+ "tencent/WeVisOne-VL-4B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "6b44a45873b4"
+ },
+ "tencent/Youtu-LLM-2B": {
+  "license": "youtu-llm",
+  "license_link": "https://huggingface.co/tencent/Youtu-LLM-2B/LICENSE.txt",
+  "revision": "d69af0fc8881"
+ },
+ "tencent/Youtu-Parsing-Omni": {
+  "license": "youtu-parsing",
+  "license_link": "https://huggingface.co/tencent/Youtu-Parsing-Omni/blob/main/LICENSE",
+  "revision": "77d243bfd75c"
+ },
+ "thinkingmachines/Inkling": {
+  "license": "apache-2.0",
+  "license_link": "https://www.apache.org/licenses/LICENSE-2.0",
+  "revision": "828496eeae4c"
+ },
+ "thinkingmachines/Inkling-2-Small": {
+  "license": "apache-2.0",
+  "license_link": "https://www.apache.org/licenses/LICENSE-2.0",
+  "revision": "2ad1157016e1"
+ },
+ "thinkingmachines/Inkling-Small": {
+  "license": "apache-2.0",
+  "license_link": "https://www.apache.org/licenses/LICENSE-2.0",
+  "revision": "8cc5877b44d3"
+ },
+ "tiiuae/Falcon-H1R-7B": {
+  "license": "falcon-llm-license",
+  "license_link": "https://falconllm.tii.ae/falcon-terms-and-conditions.html",
+  "revision": "a6f74bf18138"
+ },
+ "tiiuae/Falcon3-10B-Instruct": {
+  "license": "falcon-llm-license",
+  "license_link": "https://falconllm.tii.ae/falcon-terms-and-conditions.html",
+  "revision": "8799bc6aec01"
+ },
+ "tiiuae/falcon-11B": {
+  "license": "unknown",
+  "license_link": null,
+  "revision": "a4ab868d7e8d"
+ },
+ "tiiuae/falcon-7b-instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "8782b5c5d8c9"
+ },
+ "tomg-group-umd/huginn-0125": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "bb6621b65e90"
+ },
+ "ukisai/Swift-1.5-Qwen3.8-27b": {
+  "license": "swift-open-license-1.0",
+  "license_link": "https://huggingface.co/ukisai/Swift-1.5-Qwen3.8-27b/blob/main/LICENSE",
+  "revision": "b4c84d42903a"
+ },
+ "ukisai/Swift-Qwen3.8-27b": {
+  "license": "swift-open-license-1.0",
+  "license_link": "https://huggingface.co/ukisai/Swift-Qwen3.8-27b/blob/main/LICENSE",
+  "revision": "6bc57e4eca31"
+ },
+ "ukisai/Swift1.5-Qwen3.8-Flash-Next": {
+  "license": "swift-open-license-1.0",
+  "license_link": "https://huggingface.co/ukisai/Swift-Qwen3.8-Flash-Next/blob/main/LICENSE",
+  "revision": "0bd4fe224313"
+ },
+ "upstage/SOLAR-10.7B-Instruct-v1.0": {
+  "license": "cc-by-nc-4.0",
+  "license_link": null,
+  "revision": "090d405e6fe7"
+ },
+ "upstage/Solar-Open-100B": {
+  "license": "upstage-solar-license",
+  "license_link": null,
+  "revision": "1f591439b140"
+ },
+ "upstage/Solar-Open2-250B": {
+  "license": "upstage-solar-license",
+  "license_link": "LICENSE",
+  "revision": "9190fbe63a2a"
+ },
+ "upstage/solar-pro-preview-instruct": {
+  "license": "mit",
+  "license_link": "https://huggingface.co/upstage/solar-pro-preview-instruct/blob/main/LICENSE",
+  "revision": "dd4bcf7006df"
+ },
+ "utter-project/EuroLLM-1.7B-Instruct": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "a25c7fa65fc2"
+ },
+ "xiaomi-research/Xiaomi-OCR-0": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "bbd8cf8d21f2"
+ },
+ "xtools-at/DeepSeek-V4-Pro-Qwen3.5-9B-UNCENSORED-heretic": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "fbccdc6adf70"
+ },
+ "yanolja/YanoljaNEXT-EEVE-Instruct-10.8B": {
+  "license": "apache-2.0",
+  "license_link": null,
+  "revision": "b0c26460bf14"
+ },
+ "zai-org/AutoGLM-Phone-9B": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "66a46ea23815"
+ },
+ "zai-org/AutoGLM-Phone-9B-Multilingual": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "832ab5e014b9"
+ },
+ "zai-org/GLM-4.1V-9B-Thinking": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "3c1471e51dc8"
+ },
+ "zai-org/GLM-4.5V": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "ed47433b3711"
+ },
+ "zai-org/GLM-4.6V": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "4e2d47eb0b41"
+ },
+ "zai-org/GLM-4.6V-Flash": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "411bb4d77144"
+ },
+ "zai-org/GLM-5.3": {
+  "license": "glm-5.3",
+  "license_link": null,
+  "revision": "ba32f8c19c87"
+ },
+ "zai-org/GLM-5.3-Flash": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "46a050bec130"
+ },
+ "zai-org/GLM-Z1-Rumination-32B-0414": {
+  "license": "mit",
+  "license_link": null,
+  "revision": "6ae9ac6152a7"
+ },
+ "zai-org/cogvlm2-llama3-chat-19B": {
+  "license": "cogvlm2",
+  "license_link": "https://huggingface.co/THUDM/cogvlm2-llama3-chat-19B/blob/main/LICENSE",
+  "revision": "f592f291cf52"
+ }
+}

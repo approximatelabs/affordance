@@ -1,0 +1,2095 @@
+[
+ {
+  "id": "plain_chat",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hello! What is 2+2?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "plain_chat_nogen",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hello! What is 2+2?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "system_prompt",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "Name three primes."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "multi_turn",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "Hi."
+   },
+   {
+    "role": "assistant",
+    "content": "Hello! How can I help?"
+   },
+   {
+    "role": "user",
+    "content": "Tell me a joke."
+   },
+   {
+    "role": "assistant",
+    "content": "Why did the chicken cross the road? To get to the other side."
+   },
+   {
+    "role": "user",
+    "content": "Another one."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "multi_turn_end_assistant",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi."
+   },
+   {
+    "role": "assistant",
+    "content": "Hello! How can I help?"
+   },
+   {
+    "role": "user",
+    "content": "Bye."
+   },
+   {
+    "role": "assistant",
+    "content": "Goodbye!"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tool_defs",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the weather in Berlin?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_defs_system",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "What is the weather in Berlin?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the weather in Berlin?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "get_weather",
+    "content": "{\"temp_c\": 14, \"sky\": \"cloudy\"}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_with_content",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "Weather in Paris, in fahrenheit?"
+   },
+   {
+    "role": "assistant",
+    "content": "Let me check that for you.",
+    "tool_calls": [
+     {
+      "id": "call00007",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris",
+        "unit": "fahrenheit"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00007",
+    "name": "get_weather",
+    "content": "57F and sunny"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "parallel_tool_calls",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Oslo and Rome?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "callc0001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Oslo"
+       }
+      }
+     },
+     {
+      "id": "callc0002",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Rome"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "callc0001",
+    "name": "get_weather",
+    "content": "Oslo: 3C, snow"
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "callc0002",
+    "name": "get_weather",
+    "content": "Rome: 18C, clear"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "multi_step_tools",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "Find papers on KV caching from 2024, then summarize."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "calls0001",
+      "type": "function",
+      "function": {
+       "name": "search_docs",
+       "arguments": {
+        "query": "KV cache",
+        "top_k": 3,
+        "filters": {
+         "year": 2024,
+         "tags": [
+          "llm",
+          "inference"
+         ]
+        }
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "calls0001",
+    "name": "search_docs",
+    "content": "[{\"title\": \"PagedAttention\"}, {\"title\": \"RadixAttention\"}]"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "calls0002",
+      "type": "function",
+      "function": {
+       "name": "search_docs",
+       "arguments": {
+        "query": "RadixAttention details"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "calls0002",
+    "name": "search_docs",
+    "content": "RadixAttention reuses prefixes via a radix tree."
+   },
+   {
+    "role": "assistant",
+    "content": "Two key papers: PagedAttention and RadixAttention."
+   },
+   {
+    "role": "user",
+    "content": "Thanks. Which is newer?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_end_nogen",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Oslo?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "callc0001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Oslo"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "callc0001",
+    "name": "get_weather",
+    "content": "3C"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "reasoning_history",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 17*3?"
+   },
+   {
+    "role": "assistant",
+    "content": "51.",
+    "reasoning_content": "17*3 = 51. Simple."
+   },
+   {
+    "role": "user",
+    "content": "And 17*4?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_last_nogen",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 17*3?"
+   },
+   {
+    "role": "assistant",
+    "content": "51.",
+    "reasoning_content": "17*3 = 51. Simple."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "reasoning_tools",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Oslo?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "reasoning_content": "I should call the weather tool.",
+    "tool_calls": [
+     {
+      "id": "callc0001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Oslo"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "callc0001",
+    "name": "get_weather",
+    "content": "3C"
+   },
+   {
+    "role": "assistant",
+    "content": "It is 3C in Oslo.",
+    "reasoning_content": "The tool said 3C."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "think_in_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 17*3?"
+   },
+   {
+    "role": "assistant",
+    "content": "<think>\n17*3 = 51.\n</think>\n\n51."
+   },
+   {
+    "role": "user",
+    "content": "And 17*4?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_on",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "Prove that sqrt(2) is irrational."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true,
+   "thinking": true,
+   "reasoning_effort": "high"
+  }
+ },
+ {
+  "id": "thinking_off",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "Prove that sqrt(2) is irrational."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false,
+   "thinking": false,
+   "reasoning_effort": "low"
+  }
+ },
+ {
+  "id": "thinking_on_history",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 17*3?"
+   },
+   {
+    "role": "assistant",
+    "content": "51.",
+    "reasoning_content": "17*3 = 51."
+   },
+   {
+    "role": "user",
+    "content": "And 17*4?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true,
+   "thinking": true,
+   "reasoning_effort": "high"
+  }
+ },
+ {
+  "id": "thinking_off_history",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 17*3?"
+   },
+   {
+    "role": "assistant",
+    "content": "51.",
+    "reasoning_content": "17*3 = 51."
+   },
+   {
+    "role": "user",
+    "content": "And 17*4?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false,
+   "thinking": false,
+   "reasoning_effort": "low"
+  }
+ },
+ {
+  "id": "image_part",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "image"
+     },
+     {
+      "type": "text",
+      "text": "What is in this image?"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "text_parts",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "Part one."
+     },
+     {
+      "type": "text",
+      "text": "Part two."
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "empty_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "empty_system",
+  "messages": [
+   {
+    "role": "system",
+    "content": ""
+   },
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "unicode",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Système: réponds en français. 🇫🇷"
+   },
+   {
+    "role": "user",
+    "content": "Grüße aus Köln! 你好，世界。🙂👍🏽 naïve café — “quotes” ‘single’ … עברית العربية 𝔘𝔫𝔦𝔠𝔬𝔡𝔢 é \t tab"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "long_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Line 0: the quick brown fox jumps over the lazy dog 0. Line 1: the quick brown fox jumps over the lazy dog 7. Line 2: the quick brown fox jumps over the lazy dog 1. Line 3: the quick brown fox jumps over the lazy dog 8. Line 4: the quick brown fox jumps over the lazy dog 2. Line 5: the quick brown fox jumps over the lazy dog 9. Line 6: the quick brown fox jumps over the lazy dog 3. Line 7: the quick brown fox jumps over the lazy dog 10. Line 8: the quick brown fox jumps over the lazy dog 4. Line 9: the quick brown fox jumps over the lazy dog 11. Line 10: the quick brown fox jumps over the lazy dog 5. Line 11: the quick brown fox jumps over the lazy dog 12. Line 12: the quick brown fox jumps over the lazy dog 6. Line 13: the quick brown fox jumps over the lazy dog 0. Line 14: the quick brown fox jumps over the lazy dog 7. Line 15: the quick brown fox jumps over the lazy dog 1. Line 16: the quick brown fox jumps over the lazy dog 8. Line 17: the quick brown fox jumps over the lazy dog 2. Line 18: the quick brown fox jumps over the lazy dog 9. Line 19: the quick brown fox jumps over the lazy dog 3. Line 20: the quick brown fox jumps over the lazy dog 10. Line 21: the quick brown fox jumps over the lazy dog 4. Line 22: the quick brown fox jumps over the lazy dog 11. Line 23: the quick brown fox jumps over the lazy dog 5. Line 24: the quick brown fox jumps over the lazy dog 12. Line 25: the quick brown fox jumps over the lazy dog 6. Line 26: the quick brown fox jumps over the lazy dog 0. Line 27: the quick brown fox jumps over the lazy dog 7. Line 28: the quick brown fox jumps over the lazy dog 1. Line 29: the quick brown fox jumps over the lazy dog 8. Line 30: the quick brown fox jumps over the lazy dog 2. Line 31: the quick brown fox jumps over the lazy dog 9. Line 32: the quick brown fox jumps over the lazy dog 3. Line 33: the quick brown fox jumps over the lazy dog 10. Line 34: the quick brown fox jumps over the lazy dog 4. Line 35: the quick brown fox jumps over the lazy dog 11. Line 36: the quick brown fox jumps over the lazy dog 5. Line 37: the quick brown fox jumps over the lazy dog 12. Line 38: the quick brown fox jumps over the lazy dog 6. Line 39: the quick brown fox jumps over the lazy dog 0. Line 40: the quick brown fox jumps over the lazy dog 7. Line 41: the quick brown fox jumps over the lazy dog 1. Line 42: the quick brown fox jumps over the lazy dog 8. Line 43: the quick brown fox jumps over the lazy dog 2. Line 44: the quick brown fox jumps over the lazy dog 9. Line 45: the quick brown fox jumps over the lazy dog 3. Line 46: the quick brown fox jumps over the lazy dog 10. Line 47: the quick brown fox jumps over the lazy dog 4. Line 48: the quick brown fox jumps over the lazy dog 11. Line 49: the quick brown fox jumps over the lazy dog 5. Line 50: the quick brown fox jumps over the lazy dog 12. Line 51: the quick brown fox jumps over the lazy dog 6. Line 52: the quick brown fox jumps over the lazy dog 0. Line 53: the quick brown fox jumps over the lazy dog 7. Line 54: the quick brown fox jumps over the lazy dog 1. Line 55: the quick brown fox jumps over the lazy dog 8. Line 56: the quick brown fox jumps over the lazy dog 2. Line 57: the quick brown fox jumps over the lazy dog 9. Line 58: the quick brown fox jumps over the lazy dog 3. Line 59: the quick brown fox jumps over the lazy dog 10. Line 60: the quick brown fox jumps over the lazy dog 4. Line 61: the quick brown fox jumps over the lazy dog 11. Line 62: the quick brown fox jumps over the lazy dog 5. Line 63: the quick brown fox jumps over the lazy dog 12. Line 64: the quick brown fox jumps over the lazy dog 6. Line 65: the quick brown fox jumps over the lazy dog 0. Line 66: the quick brown fox jumps over the lazy dog 7. Line 67: the quick brown fox jumps over the lazy dog 1. Line 68: the quick brown fox jumps over the lazy dog 8. Line 69: the quick brown fox jumps over the lazy dog 2. Line 70: the quick brown fox jumps over the lazy dog 9. Line 71: the quick brown fox jumps over the lazy dog 3. Line 72: the quick brown fox jumps over the lazy dog 10. Line 73: the quick brown fox jumps over the lazy dog 4. Line 74: the quick brown fox jumps over the lazy dog 11. Line 75: the quick brown fox jumps over the lazy dog 5. Line 76: the quick brown fox jumps over the lazy dog 12. Line 77: the quick brown fox jumps over the lazy dog 6. Line 78: the quick brown fox jumps over the lazy dog 0. Line 79: the quick brown fox jumps over the lazy dog 7. Line 80: the quick brown fox jumps over the lazy dog 1. Line 81: the quick brown fox jumps over the lazy dog 8. Line 82: the quick brown fox jumps over the lazy dog 2. Line 83: the quick brown fox jumps over the lazy dog 9. Line 84: the quick brown fox jumps over the lazy dog 3. Line 85: the quick brown fox jumps over the lazy dog 10. Line 86: the quick brown fox jumps over the lazy dog 4. Line 87: the quick brown fox jumps over the lazy dog 11. Line 88: the quick brown fox jumps over the lazy dog 5. Line 89: the quick brown fox jumps over the lazy dog 12. Line 90: the quick brown fox jumps over the lazy dog 6. Line 91: the quick brown fox jumps over the lazy dog 0. Line 92: the quick brown fox jumps over the lazy dog 7. Line 93: the quick brown fox jumps over the lazy dog 1. Line 94: the quick brown fox jumps over the lazy dog 8. Line 95: the quick brown fox jumps over the lazy dog 2. Line 96: the quick brown fox jumps over the lazy dog 9. Line 97: the quick brown fox jumps over the lazy dog 3. Line 98: the quick brown fox jumps over the lazy dog 10. Line 99: the quick brown fox jumps over the lazy dog 4. Line 100: the quick brown fox jumps over the lazy dog 11. Line 101: the quick brown fox jumps over the lazy dog 5. Line 102: the quick brown fox jumps over the lazy dog 12. Line 103: the quick brown fox jumps over the lazy dog 6. Line 104: the quick brown fox jumps over the lazy dog 0. Line 105: the quick brown fox jumps over the lazy dog 7. Line 106: the quick brown fox jumps over the lazy dog 1. Line 107: the quick brown fox jumps over the lazy dog 8. Line 108: the quick brown fox jumps over the lazy dog 2. Line 109: the quick brown fox jumps over the lazy dog 9. Line 110: the quick brown fox jumps over the lazy dog 3. Line 111: the quick brown fox jumps over the lazy dog 10. Line 112: the quick brown fox jumps over the lazy dog 4. Line 113: the quick brown fox jumps over the lazy dog 11. Line 114: the quick brown fox jumps over the lazy dog 5. Line 115: the quick brown fox jumps over the lazy dog 12. Line 116: the quick brown fox jumps over the lazy dog 6. Line 117: the quick brown fox jumps over the lazy dog 0. Line 118: the quick brown fox jumps over the lazy dog 7. Line 119: the quick brown fox jumps over the lazy dog 1. Line 120: the quick brown fox jumps over the lazy dog 8. Line 121: the quick brown fox jumps over the lazy dog 2. Line 122: the quick brown fox jumps over the lazy dog 9. Line 123: the quick brown fox jumps over the lazy dog 3. Line 124: the quick brown fox jumps over the lazy dog 10. Line 125: the quick brown fox jumps over the lazy dog 4. Line 126: the quick brown fox jumps over the lazy dog 11. Line 127: the quick brown fox jumps over the lazy dog 5. Line 128: the quick brown fox jumps over the lazy dog 12. Line 129: the quick brown fox jumps over the lazy dog 6. Line 130: the quick brown fox jumps over the lazy dog 0. Line 131: the quick brown fox jumps over the lazy dog 7. Line 132: the quick brown fox jumps over the lazy dog 1. Line 133: the quick brown fox jumps over the lazy dog 8. Line 134: the quick brown fox jumps over the lazy dog 2. Line 135: the quick brown fox jumps over the lazy dog 9. Line 136: the quick brown fox jumps over the lazy dog 3. Line 137: the quick brown fox jumps over the lazy dog 10. Line 138: the quick brown fox jumps over the lazy dog 4. Line 139: the quick brown fox jumps over the lazy dog 11. Line 140: the quick brown fox jumps over the lazy dog 5. Line 141: the quick brown fox jumps over the lazy dog 12. Line 142: the quick brown fox jumps over the lazy dog 6. Line 143: the quick brown fox jumps over the lazy dog 0. Line 144: the quick brown fox jumps over the lazy dog 7. Line 145: the quick brown fox jumps over the lazy dog 1. Line 146: the quick brown fox jumps over the lazy dog 8. Line 147: the quick brown fox jumps over the lazy dog 2. Line 148: the quick brown fox jumps over the lazy dog 9. Line 149: the quick brown fox jumps over the lazy dog 3. Line 150: the quick brown fox jumps over the lazy dog 10. Line 151: the quick brown fox jumps over the lazy dog 4. Line 152: the quick brown fox jumps over the lazy dog 11. Line 153: the quick brown fox jumps over the lazy dog 5. Line 154: the quick brown fox jumps over the lazy dog 12. Line 155: the quick brown fox jumps over the lazy dog 6. Line 156: the quick brown fox jumps over the lazy dog 0. Line 157: the quick brown fox jumps over the lazy dog 7. Line 158: the quick brown fox jumps over the lazy dog 1. Line 159: the quick brown fox jumps over the lazy dog 8. Line 160: the quick brown fox jumps over the lazy dog 2. Line 161: the quick brown fox jumps over the lazy dog 9. Line 162: the quick brown fox jumps over the lazy dog 3. Line 163: the quick brown fox jumps over the lazy dog 10. Line 164: the quick brown fox jumps over the lazy dog 4. Line 165: the quick brown fox jumps over the lazy dog 11. Line 166: the quick brown fox jumps over the lazy dog 5. Line 167: the quick brown fox jumps over the lazy dog 12. Line 168: the quick brown fox jumps over the lazy dog 6. Line 169: the quick brown fox jumps over the lazy dog 0. Line 170: the quick brown fox jumps over the lazy dog 7. Line 171: the quick brown fox jumps over the lazy dog 1. Line 172: the quick brown fox jumps over the lazy dog 8. Line 173: the quick brown fox jumps over the lazy dog 2. Line 174: the quick brown fox jumps over the lazy dog 9. Line 175: the quick brown fox jumps over the lazy dog 3. Line 176: the quick brown fox jumps over the lazy dog 10. Line 177: the quick brown fox jumps over the lazy dog 4. Line 178: the quick brown fox jumps over the lazy dog 11. Line 179: the quick brown fox jumps over the lazy dog 5. Line 180: the quick brown fox jumps over the lazy dog 12. Line 181: the quick brown fox jumps over the lazy dog 6. Line 182: the quick brown fox jumps over the lazy dog 0. Line 183: the quick brown fox jumps over the lazy dog 7. Line 184: the quick brown fox jumps over the lazy dog 1. Line 185: the quick brown fox jumps over the lazy dog 8. Line 186: the quick brown fox jumps over the lazy dog 2. Line 187: the quick brown fox jumps over the lazy dog 9. Line 188: the quick brown fox jumps over the lazy dog 3. Line 189: the quick brown fox jumps over the lazy dog 10. Line 190: the quick brown fox jumps over the lazy dog 4. Line 191: the quick brown fox jumps over the lazy dog 11. Line 192: the quick brown fox jumps over the lazy dog 5. Line 193: the quick brown fox jumps over the lazy dog 12. Line 194: the quick brown fox jumps over the lazy dog 6. Line 195: the quick brown fox jumps over the lazy dog 0. Line 196: the quick brown fox jumps over the lazy dog 7. Line 197: the quick brown fox jumps over the lazy dog 1. Line 198: the quick brown fox jumps over the lazy dog 8. Line 199: the quick brown fox jumps over the lazy dog 2. Line 200: the quick brown fox jumps over the lazy dog 9. Line 201: the quick brown fox jumps over the lazy dog 3. Line 202: the quick brown fox jumps over the lazy dog 10. Line 203: the quick brown fox jumps over the lazy dog 4. Line 204: the quick brown fox jumps over the lazy dog 11. Line 205: the quick brown fox jumps over the lazy dog 5. Line 206: the quick brown fox jumps over the lazy dog 12. Line 207: the quick brown fox jumps over the lazy dog 6. Line 208: the quick brown fox jumps over the lazy dog 0. Line 209: the quick brown fox jumps over the lazy dog 7. Line 210: the quick brown fox jumps over the lazy dog 1. Line 211: the quick brown fox jumps over the lazy dog 8. Line 212: the quick brown fox jumps over the lazy dog 2. Line 213: the quick brown fox jumps over the lazy dog 9. Line 214: the quick brown fox jumps over the lazy dog 3. Line 215: the quick brown fox jumps over the lazy dog 10. Line 216: the quick brown fox jumps over the lazy dog 4. Line 217: the quick brown fox jumps over the lazy dog 11. Line 218: the quick brown fox jumps over the lazy dog 5. Line 219: the quick brown fox jumps over the lazy dog 12. Line 220: the quick brown fox jumps over the lazy dog 6. Line 221: the quick brown fox jumps over the lazy dog 0. Line 222: the quick brown fox jumps over the lazy dog 7. Line 223: the quick brown fox jumps over the lazy dog 1. Line 224: the quick brown fox jumps over the lazy dog 8. Line 225: the quick brown fox jumps over the lazy dog 2. Line 226: the quick brown fox jumps over the lazy dog 9. Line 227: the quick brown fox jumps over the lazy dog 3. Line 228: the quick brown fox jumps over the lazy dog 10. Line 229: the quick brown fox jumps over the lazy dog 4. Line 230: the quick brown fox jumps over the lazy dog 11. Line 231: the quick brown fox jumps over the lazy dog 5. Line 232: the quick brown fox jumps over the lazy dog 12. Line 233: the quick brown fox jumps over the lazy dog 6. Line 234: the quick brown fox jumps over the lazy dog 0. Line 235: the quick brown fox jumps over the lazy dog 7. Line 236: the quick brown fox jumps over the lazy dog 1. Line 237: the quick brown fox jumps over the lazy dog 8. Line 238: the quick brown fox jumps over the lazy dog 2. Line 239: the quick brown fox jumps over the lazy dog 9. Line 240: the quick brown fox jumps over the lazy dog 3. Line 241: the quick brown fox jumps over the lazy dog 10. Line 242: the quick brown fox jumps over the lazy dog 4. Line 243: the quick brown fox jumps over the lazy dog 11. Line 244: the quick brown fox jumps over the lazy dog 5. Line 245: the quick brown fox jumps over the lazy dog 12. Line 246: the quick brown fox jumps over the lazy dog 6. Line 247: the quick brown fox jumps over the lazy dog 0. Line 248: the quick brown fox jumps over the lazy dog 7. Line 249: the quick brown fox jumps over the lazy dog 1. Line 250: the quick brown fox jumps over the lazy dog 8. Line 251: the quick brown fox jumps over the lazy dog 2. Line 252: the quick brown fox jumps over the lazy dog 9. Line 253: the quick brown fox jumps over the lazy dog 3. Line 254: the quick brown fox jumps over the lazy dog 10. Line 255: the quick brown fox jumps over the lazy dog 4. Line 256: the quick brown fox jumps over the lazy dog 11. Line 257: the quick brown fox jumps over the lazy dog 5. Line 258: the quick brown fox jumps over the lazy dog 12. Line 259: the quick brown fox jumps over the lazy dog 6. Line 260: the quick brown fox jumps over the lazy dog 0. Line 261: the quick brown fox jumps over the lazy dog 7. Line 262: the quick brown fox jumps over the lazy dog 1. Line 263: the quick brown fox jumps over the lazy dog 8. Line 264: the quick brown fox jumps over the lazy dog 2. Line 265: the quick brown fox jumps over the lazy dog 9. Line 266: the quick brown fox jumps over the lazy dog 3. Line 267: the quick brown fox jumps over the lazy dog 10. Line 268: the quick brown fox jumps over the lazy dog 4. Line 269: the quick brown fox jumps over the lazy dog 11. Line 270: the quick brown fox jumps over the lazy dog 5. Line 271: the quick brown fox jumps over the lazy dog 12. Line 272: the quick brown fox jumps over the lazy dog 6. Line 273: the quick brown fox jumps over the lazy dog 0. Line 274: the quick brown fox jumps over the lazy dog 7. Line 275: the quick brown fox jumps over the lazy dog 1. Line 276: the quick brown fox jumps over the lazy dog 8. Line 277: the quick brown fox jumps over the lazy dog 2. Line 278: the quick brown fox jumps over the lazy dog 9. Line 279: the quick brown fox jumps over the lazy dog 3. Line 280: the quick brown fox jumps over the lazy dog 10. Line 281: the quick brown fox jumps over the lazy dog 4. Line 282: the quick brown fox jumps over the lazy dog 11. Line 283: the quick brown fox jumps over the lazy dog 5. Line 284: the quick brown fox jumps over the lazy dog 12. Line 285: the quick brown fox jumps over the lazy dog 6. Line 286: the quick brown fox jumps over the lazy dog 0. Line 287: the quick brown fox jumps over the lazy dog 7. Line 288: the quick brown fox jumps over the lazy dog 1. Line 289: the quick brown fox jumps over the lazy dog 8. Line 290: the quick brown fox jumps over the lazy dog 2. Line 291: the quick brown fox jumps over the lazy dog 9. Line 292: the quick brown fox jumps over the lazy dog 3. Line 293: the quick brown fox jumps over the lazy dog 10. Line 294: the quick brown fox jumps over the lazy dog 4. Line 295: the quick brown fox jumps over the lazy dog 11. Line 296: the quick brown fox jumps over the lazy dog 5. Line 297: the quick brown fox jumps over the lazy dog 12. Line 298: the quick brown fox jumps over the lazy dog 6. Line 299: the quick brown fox jumps over the lazy dog 0. Line 300: the quick brown fox jumps over the lazy dog 7. Line 301: the quick brown fox jumps over the lazy dog 1. Line 302: the quick brown fox jumps over the lazy dog 8. Line 303: the quick brown fox jumps over the lazy dog 2. Line 304: the quick brown fox jumps over the lazy dog 9. Line 305: the quick brown fox jumps over the lazy dog 3. Line 306: the quick brown fox jumps over the lazy dog 10. Line 307: the quick brown fox jumps over the lazy dog 4. Line 308: the quick brown fox jumps over the lazy dog 11. Line 309: the quick brown fox jumps over the lazy dog 5. Line 310: the quick brown fox jumps over the lazy dog 12. Line 311: the quick brown fox jumps over the lazy dog 6. Line 312: the quick brown fox jumps over the lazy dog 0. Line 313: the quick brown fox jumps over the lazy dog 7. Line 314: the quick brown fox jumps over the lazy dog 1. Line 315: the quick brown fox jumps over the lazy dog 8. Line 316: the quick brown fox jumps over the lazy dog 2. Line 317: the quick brown fox jumps over the lazy dog 9. Line 318: the quick brown fox jumps over the lazy dog 3. Line 319: the quick brown fox jumps over the lazy dog 10. Line 320: the quick brown fox jumps over the lazy dog 4. Line 321: the quick brown fox jumps over the lazy dog 11. Line 322: the quick brown fox jumps over the lazy dog 5. Line 323: the quick brown fox jumps over the lazy dog 12. Line 324: the quick brown fox jumps over the lazy dog 6. Line 325: the quick brown fox jumps over the lazy dog 0. Line 326: the quick brown fox jumps over the lazy dog 7. Line 327: the quick brown fox jumps over the lazy dog 1. Line 328: the quick brown fox jumps over the lazy dog 8. Line 329: the quick brown fox jumps over the lazy dog 2. Line 330: the quick brown fox jumps over the lazy dog 9. Line 331: the quick brown fox jumps over the lazy dog 3. Line 332: the quick brown fox jumps over the lazy dog 10. Line 333: the quick brown fox jumps over the lazy dog 4. Line 334: the quick brown fox jumps over the lazy dog 11. Line 335: the quick brown fox jumps over the lazy dog 5. Line 336: the quick brown fox jumps over the lazy dog 12. Line 337: the quick brown fox jumps over the lazy dog 6. Line 338: the quick brown fox jumps over the lazy dog 0. Line 339: the quick brown fox jumps over the lazy dog 7. Line 340: the quick brown fox jumps over the lazy dog 1. Line 341: the quick brown fox jumps over the lazy dog 8. Line 342: the quick brown fox jumps over the lazy dog 2. Line 343: the quick brown fox jumps over the lazy dog 9. Line 344: the quick brown fox jumps over the lazy dog 3. Line 345: the quick brown fox jumps over the lazy dog 10. Line 346: the quick brown fox jumps over the lazy dog 4. Line 347: the quick brown fox jumps over the lazy dog 11. Line 348: the quick brown fox jumps over the lazy dog 5. Line 349: the quick brown fox jumps over the lazy dog 12. Line 350: the quick brown fox jumps over the lazy dog 6. Line 351: the quick brown fox jumps over the lazy dog 0. Line 352: the quick brown fox jumps over the lazy dog 7. Line 353: the quick brown fox jumps over the lazy dog 1. Line 354: the quick brown fox jumps over the lazy dog 8. Line 355: the quick brown fox jumps over the lazy dog 2. Line 356: the quick brown fox jumps over the lazy dog 9. Line 357: the quick brown fox jumps over the lazy dog 3. Line 358: the quick brown fox jumps over the lazy dog 10. Line 359: the quick brown fox jumps over the lazy dog 4. Line 360: the quick brown fox jumps over the lazy dog 11. Line 361: the quick brown fox jumps over the lazy dog 5. Line 362: the quick brown fox jumps over the lazy dog 12. Line 363: the quick brown fox jumps over the lazy dog 6. Line 364: the quick brown fox jumps over the lazy dog 0. Line 365: the quick brown fox jumps over the lazy dog 7. Line 366: the quick brown fox jumps over the lazy dog 1. Line 367: the quick brown fox jumps over the lazy dog 8. Line 368: the quick brown fox jumps over the lazy dog 2. Line 369: the quick brown fox jumps over the lazy dog 9. Line 370: the quick brown fox jumps over the lazy dog 3. Line 371: the quick brown fox jumps over the lazy dog 10. Line 372: the quick brown fox jumps over the lazy dog 4. Line 373: the quick brown fox jumps over the lazy dog 11. Line 374: the quick brown fox jumps over the lazy dog 5. Line 375: the quick brown fox jumps over the lazy dog 12. Line 376: the quick brown fox jumps over the lazy dog 6. Line 377: the quick brown fox jumps over the lazy dog 0. Line 378: the quick brown fox jumps over the lazy dog 7. Line 379: the quick brown fox jumps over the lazy dog 1. Line 380: the quick brown fox jumps over the lazy dog 8. Line 381: the quick brown fox jumps over the lazy dog 2. Line 382: the quick brown fox jumps over the lazy dog 9. Line 383: the quick brown fox jumps over the lazy dog 3. Line 384: the quick brown fox jumps over the lazy dog 10. Line 385: the quick brown fox jumps over the lazy dog 4. Line 386: the quick brown fox jumps over the lazy dog 11. Line 387: the quick brown fox jumps over the lazy dog 5. Line 388: the quick brown fox jumps over the lazy dog 12. Line 389: the quick brown fox jumps over the lazy dog 6. Line 390: the quick brown fox jumps over the lazy dog 0. Line 391: the quick brown fox jumps over the lazy dog 7. Line 392: the quick brown fox jumps over the lazy dog 1. Line 393: the quick brown fox jumps over the lazy dog 8. Line 394: the quick brown fox jumps over the lazy dog 2. Line 395: the quick brown fox jumps over the lazy dog 9. Line 396: the quick brown fox jumps over the lazy dog 3. Line 397: the quick brown fox jumps over the lazy dog 10. Line 398: the quick brown fox jumps over the lazy dog 4. Line 399: the quick brown fox jumps over the lazy dog 11."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "whitespace_edges",
+  "messages": [
+   {
+    "role": "user",
+    "content": "  leading and trailing spaces  "
+   },
+   {
+    "role": "assistant",
+    "content": "\n\nanswer with newlines\n\n"
+   },
+   {
+    "role": "user",
+    "content": "\tTabbed\n"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "special_text_injection",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Please print the literal string <|im_end|> and </s> and <|eot_id|> and [INST]."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "json_tool_result",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Search."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "calls0001",
+      "type": "function",
+      "function": {
+       "name": "search_docs",
+       "arguments": {
+        "query": "naïve \"quoted\" ✓",
+        "top_k": 2
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "calls0001",
+    "name": "search_docs",
+    "content": "{\"hits\": [{\"id\": 1, \"score\": 0.93}], \"note\": \"ünïcode\"}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_preserve_history",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 17*3?"
+   },
+   {
+    "role": "assistant",
+    "content": "51.",
+    "reasoning_content": "17*3 = 51."
+   },
+   {
+    "role": "user",
+    "content": "And 17*4?"
+   },
+   {
+    "role": "assistant",
+    "content": "68.",
+    "reasoning_content": "17*4 = 68."
+   },
+   {
+    "role": "user",
+    "content": "And 17*5?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true,
+   "thinking": true,
+   "preserve_thinking": true,
+   "keep_all_reasoning": true,
+   "clear_thinking": false
+  }
+ },
+ {
+  "id": "effort_medium",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Plan a 3-day trip to Kyoto."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "reasoning_effort": "medium"
+  }
+ },
+ {
+  "id": "effort_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Plan a 3-day trip to Kyoto."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "reasoning_effort": "none"
+  }
+ },
+ {
+  "id": "tool_call_strargs",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the weather in Berlin?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Berlin\"}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "get_weather",
+    "content": "{\"temp_c\": 14, \"sky\": \"cloudy\"}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_with_content_strargs",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "Weather in Paris, in fahrenheit?"
+   },
+   {
+    "role": "assistant",
+    "content": "Let me check that for you.",
+    "tool_calls": [
+     {
+      "id": "call00007",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Paris\", \"unit\": \"fahrenheit\"}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00007",
+    "name": "get_weather",
+    "content": "57F and sunny"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "parallel_tool_calls_strargs",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Oslo and Rome?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "callc0001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Oslo\"}"
+      }
+     },
+     {
+      "id": "callc0002",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Rome\"}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "callc0001",
+    "name": "get_weather",
+    "content": "Oslo: 3C, snow"
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "callc0002",
+    "name": "get_weather",
+    "content": "Rome: 18C, clear"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "multi_step_tools_strargs",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are a careful assistant. Answer briefly."
+   },
+   {
+    "role": "user",
+    "content": "Find papers on KV caching from 2024, then summarize."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "calls0001",
+      "type": "function",
+      "function": {
+       "name": "search_docs",
+       "arguments": "{\"query\": \"KV cache\", \"top_k\": 3, \"filters\": {\"year\": 2024, \"tags\": [\"llm\", \"inference\"]}}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "calls0001",
+    "name": "search_docs",
+    "content": "[{\"title\": \"PagedAttention\"}, {\"title\": \"RadixAttention\"}]"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "calls0002",
+      "type": "function",
+      "function": {
+       "name": "search_docs",
+       "arguments": "{\"query\": \"RadixAttention details\"}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "calls0002",
+    "name": "search_docs",
+    "content": "RadixAttention reuses prefixes via a radix tree."
+   },
+   {
+    "role": "assistant",
+    "content": "Two key papers: PagedAttention and RadixAttention."
+   },
+   {
+    "role": "user",
+    "content": "Thanks. Which is newer?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_end_nogen_strargs",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Oslo?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "callc0001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Oslo\"}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "callc0001",
+    "name": "get_weather",
+    "content": "3C"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "reasoning_tools_strargs",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Oslo?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "reasoning_content": "I should call the weather tool.",
+    "tool_calls": [
+     {
+      "id": "callc0001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Oslo\"}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "callc0001",
+    "name": "get_weather",
+    "content": "3C"
+   },
+   {
+    "role": "assistant",
+    "content": "It is 3C in Oslo.",
+    "reasoning_content": "The tool said 3C."
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "json_tool_result_strargs",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Search."
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "calls0001",
+      "type": "function",
+      "function": {
+       "name": "search_docs",
+       "arguments": "{\"query\": \"naïve \\\"quoted\\\" ✓\", \"top_k\": 2}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "calls0001",
+    "name": "search_docs",
+    "content": "{\"hits\": [{\"id\": 1, \"score\": 0.93}], \"note\": \"ünïcode\"}"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name, e.g. Berlin"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "search_docs",
+     "description": "Search the document store and return the top hits.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "query": {
+        "type": "string"
+       },
+       "top_k": {
+        "type": "integer",
+        "default": 5
+       },
+       "filters": {
+        "type": "object",
+        "properties": {
+         "year": {
+          "type": "integer"
+         },
+         "tags": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      },
+      "required": [
+       "query"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ }
+]

@@ -1,0 +1,24 @@
+# A first agent. Run it here with `affordance run`; change a value for one run with --set:
+#   affordance run --set model.url=http://127.0.0.1:11434/v1 --set model.model=qwen3
+# Local values that should not be committed (a URL, a key) go in affordance.local.yaml.
+app:
+  view: app.tsx
+
+# Any OpenAI-compatible server: llama.cpp (llama-server --jinja), Ollama, vLLM. No key needed.
+# A hosted API: set url and model, and key_env to the environment variable that holds its key
+# (see docs/MODEL_BINDINGS.md).
+model:
+  kind: chat
+  url: http://127.0.0.1:8080/v1
+  model: local
+  context: 8192        # the model's context length
+
+machines:
+  home:
+    kind: local        # this machine's shell
+
+agents:
+  - id: first
+    max_turns: 8
+    props:
+      task: How many files are in the current directory? Use the shell, then answer.

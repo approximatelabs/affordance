@@ -1,0 +1,79 @@
+{
+  "qwen3": {
+    "app": "Qwen3App",
+    "model": "Qwen__Qwen3-4B-Instruct-2507",
+    "options": [
+      "keep_replies"
+    ]
+  },
+  "qwen36": {
+    "app": "Qwen36App",
+    "model": "Qwen__Qwen3.6-27B",
+    "options": [
+      "enable_thinking",
+      "preserve_thinking",
+      "keep_replies"
+    ]
+  },
+  "llama31": {
+    "app": "Llama31App",
+    "model": "meta-llama__Llama-3.1-8B-Instruct",
+    "options": [
+      "date_string",
+      "keep_replies"
+    ]
+  },
+  "glm53": {
+    "app": "GLM53App",
+    "model": "zai-org__GLM-5.3",
+    "options": [
+      "reasoning_effort",
+      "clear_thinking",
+      "keep_replies"
+    ]
+  },
+  "mimo25": {
+    "app": "MiMo25App",
+    "model": "XiaomiMiMo__MiMo-V2.5",
+    "options": [
+      "enable_thinking",
+      "keep_replies"
+    ]
+  },
+  "nemotron3": {
+    "app": "Nemotron3App",
+    "model": "nvidia__NVIDIA-Nemotron-3-Nano-30B-A3B-BF16",
+    "options": [
+      "enable_thinking",
+      "keep_replies"
+    ]
+  },
+  "messages": {
+    "app": "MessagesApp",
+    "model": "Qwen__Qwen3-4B-Instruct-2507",
+    "options": []
+  },
+  "qwen3_base": {
+    "app": "Qwen3BaseApp",
+    "model": "Qwen__Qwen3-8B",
+    "options": [
+      "enable_thinking",
+      "keep_replies"
+    ]
+  },
+  "deepseek_v41": {
+    "app": "DeepSeekV41App",
+    "model": "deepseek-ai__DeepSeek-V4.1-Flash",
+    "options": [
+      "enable_thinking",
+      "reasoning_effort",
+      "drop_thinking",
+      "keep_replies"
+    ]
+  },
+  "d1": {
+    "app": "D1App",
+    "model": "LiquidAI__d1-3B",
+    "options": []
+  }
+}

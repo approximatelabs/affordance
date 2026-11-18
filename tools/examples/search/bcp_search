@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""bcp_search "query": the 10 best matching documents of $BCP_CORPUS (BM25), each with its docid,
+a relevance score and a snippet (the first $BCP_SNIP words). A machine-side stand-in for the
+BrowseComp-Plus search server: the research demo's agents run it with `bash`."""
+import math, os, re, sys
+from pathlib import Path
+
+def docs():
+    root = Path(os.environ.get("BCP_CORPUS", "."))
+    return [p for p in sorted(root.rglob("*")) if p.is_file() and p.suffix in (".md", ".txt")]
+
+def words(text):
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+def main():
+    if len(sys.argv) < 2:
+        sys.exit("usage: bcp_search \"query\"")
+    q = words(" ".join(sys.argv[1:]))
+    files = docs()
+    texts = [f.read_text(errors="replace") for f in files]
+    toks = [words(t) for t in texts]
+    n = len(toks)
+    avg = sum(map(len, toks)) / max(n, 1)
+    df = {w: sum(1 for t in toks if w in set(t)) for w in set(q)}
+    scored = []
+    for i, t in enumerate(toks):
+        tf = {}
+        for w in t:
+            if w in df:
+                tf[w] = tf.get(w, 0) + 1
+        s = 0.0
+        for w in q:
+            if w in tf:
+                idf = math.log(1 + (n - df[w] + 0.5) / (df[w] + 0.5))
+                s += idf * tf[w] * 2.2 / (tf[w] + 1.2 * (0.25 + 0.75 * len(t) / avg))
+        if s > 0:
+            scored.append((s, i))
+    scored.sort(reverse=True)
+    snip = int(os.environ.get("BCP_SNIP", "60"))
+    for s, i in scored[:10]:
+        print(f"docid: {i}  score: {s:.2f}\n{' '.join(texts[i].split()[:snip])}\n")
+    if not scored:
+        print("no documents match")
+
+main()

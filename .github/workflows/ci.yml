@@ -1,0 +1,56 @@
+# The gate for pull requests and main. Actions are pinned to commit SHAs; nothing here has
+# write access or secrets.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  # tools/check-engine.sh: every test that needs no reference data, both feature sets, fmt,
+  # clippy, docs, the TSX lint and the package check.
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust 1.90
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.90.0
+      - name: ripgrep
+        run: command -v rg || (sudo apt-get update && sudo apt-get install -y ripgrep)
+      - run: ./tools/check-engine.sh
+  # The minimum supported Rust version still builds.
+  msrv:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          rustup toolchain install 1.89.0 --profile minimal
+          cargo +1.89.0 check --locked --all-targets
+  # macOS: the command builds and the tests that need no reference data pass.
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust 1.90
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal
+          rustup default 1.90.0
+      # Every test binary runs even after one fails, so one run shows everything that differs here.
+      - run: cargo test --release --locked --no-fail-fast -- --test-threads=2

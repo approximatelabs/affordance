@@ -1,0 +1,16 @@
+# A coding chat driven by a frontend over stdio (JSON lines):
+#   affordance host
+#   {"type":"prompt","text":"What is in this directory?"}
+# It asks before each command ({"type":"question",...}; answer {"type":"answer","request":N,"value":"yes"}),
+# and {"type":"abort"} stops the turn in progress. Restart with `affordance host --resume`.
+root:
+  app: app.tsx
+  model: default
+model:
+  kind: chat
+  url: http://127.0.0.1:8080/v1
+  model: local
+  context: 8192
+machines:
+  home:
+    kind: local

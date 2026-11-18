@@ -1,0 +1,1255 @@
+[
+ {
+  "id": "no_system_default",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "no_system_nogen",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "knowledge_cutoff_set",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "knowledge_cutoff": "1999-12-31",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "knowledge_cutoff_empty",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "knowledge_cutoff": "",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "current_date_set",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "current_date": "1999-01-01",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_strength_low",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_strength": "low",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_strength_empty",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_strength": "",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_effort_ignored",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": "low",
+   "reasoning_strength": "minimal",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "sys_reasoning_effort_titlecase",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Reasoning Effort: low"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "sys_reasoning_effort_mixed",
+  "messages": [
+   {
+    "role": "system",
+    "content": "REASONING effort: low"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "sys_already_strength",
+  "messages": [
+   {
+    "role": "system",
+    "content": "reasoning strength: low"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "sys_content_none",
+  "messages": [
+   {
+    "role": "system",
+    "content": null
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "two_system_messages",
+  "messages": [
+   {
+    "role": "system",
+    "content": "A"
+   },
+   {
+    "role": "system",
+    "content": "B"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "sys_with_tools",
+  "messages": [
+   {
+    "role": "system",
+    "content": "You are terse."
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "ns.f",
+     "description": "d",
+     "parameters": {}
+    }
+   }
+  ],
+  "kwargs": {
+   "tool_namespace_descriptions": {
+    "ns": "NS does things"
+   },
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_content_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_content_missing",
+  "messages": [
+   {
+    "role": "user"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_content_empty",
+  "messages": [
+   {
+    "role": "user",
+    "content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_parts_video",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "video"
+     },
+     {
+      "type": "text",
+      "text": "watch"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_parts_image_text",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "image"
+     },
+     {
+      "type": "text",
+      "text": "look"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_parts_unknown_type",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "audio",
+      "data": "x"
+     },
+     {
+      "type": "text",
+      "text": "after"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_parts_text_missing",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_content_dict",
+  "messages": [
+   {
+    "role": "user",
+    "content": {
+     "type": "text",
+     "text": "hi"
+    }
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "part_text_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": null
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "long_text",
+  "messages": [
+   {
+    "role": "user",
+    "content": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word END"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "unicode_emoji",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Grüße 你好 🙂👍🏽🇩🇪 é עברית العربية Ω ß ﬁ"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "special_token_text",
+  "messages": [
+   {
+    "role": "user",
+    "content": "a<|start|>b<|eot|>c<|message|>d<|patch|>e<|video|>f"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "assistant_recipient_self",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "yo",
+    "recipient": "self"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "assistant_recipient_empty",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "yo",
+    "recipient": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "assistant_end_turn_false",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "yo",
+    "end_turn": false
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "assistant_end_turn_true",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "yo",
+    "end_turn": true
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "assistant_end_turn_zero",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "yo",
+    "end_turn": 0
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "assistant_content_none_no_tools",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "reasoning_only_empty_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "reasoning_content": "think"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "reasoning_empty_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "ans",
+    "reasoning_content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_args_odd_types",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "i": 7,
+        "fl": 1.5,
+        "t": true,
+        "n": null,
+        "l": [
+         1,
+         "x",
+         null
+        ],
+        "d": {
+         "z": false
+        }
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_args_empty",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {}
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_args_html_unicode",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "a": "<b>&'\"",
+        "lst": [
+         "<x>",
+         "é",
+         "😀"
+        ],
+        "d": {
+         "k": "<v>",
+         "u": "ẞ"
+        }
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_args_string_raises",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": "{\"a\": 1}"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_args_special_text",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "s": "<|start|><|eot|>",
+        "l": [
+         "<|message|>"
+        ]
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_reasoning_plus",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "reasoning_content": "think",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "a": 1
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_then_assistant_eom",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "a": 1
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "assistant",
+    "content": "second"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_two_then_assistant_eom",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "a": 1
+       }
+      }
+     },
+     {
+      "id": "c2",
+      "type": "function",
+      "function": {
+       "name": "g",
+       "arguments": {
+        "b": 2
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "assistant",
+    "content": "second"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "toolcalls_last_eot",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "a": 1
+       }
+      }
+     },
+     {
+      "id": "c2",
+      "type": "function",
+      "function": {
+       "name": "g",
+       "arguments": {
+        "b": 2
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tool_result_name_field",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "tool",
+    "name": "explicit",
+    "content": "result"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tool_result_lookup_by_id",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "a": 1
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "c1",
+    "content": "result"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tool_result_no_name_no_id",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "a": 1
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "content": "result"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tool_result_bad_id",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "a": 1
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "zzz",
+    "content": "result"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tool_result_content_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "tool",
+    "name": "f",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tool_result_unicode",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "tool",
+    "name": "f",
+    "content": "Grüße <|eot|> 🙂"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tools_flat_no_wrapper",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "name": "ns.fn",
+    "description": "d <b>",
+    "parameters": {
+     "type": "object"
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tools_dotted_namespaces",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "a.x",
+     "description": "d",
+     "parameters": {}
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "b.y",
+     "description": "e",
+     "parameters": {}
+    }
+   }
+  ],
+  "kwargs": {
+   "tool_namespace_descriptions": {
+    "a": "A desc",
+    "b": "B desc"
+   },
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tools_empty_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_missing_parameters_raises",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f",
+     "description": "d"
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_desc_params_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f",
+     "description": null,
+     "parameters": null
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tools_duplicate_namespace",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "dup.a",
+     "description": "d",
+     "parameters": {}
+    }
+   },
+   {
+    "type": "function",
+    "function": {
+     "name": "dup.b",
+     "description": "e",
+     "parameters": {}
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "empty_conversation_raises",
+  "messages": [],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "unknown_role_message",
+  "messages": [
+   {
+    "role": "user",
+    "content": "a"
+   },
+   {
+    "role": "function",
+    "content": "c"
+   },
+   {
+    "role": "user",
+    "content": "b"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "consecutive_user_messages",
+  "messages": [
+   {
+    "role": "user",
+    "content": "a"
+   },
+   {
+    "role": "user",
+    "content": "b"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "assistant_last_generation_prompt",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "yo"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "system_after_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "system",
+    "content": "late"
+   },
+   {
+    "role": "user",
+    "content": "next"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ }
+]

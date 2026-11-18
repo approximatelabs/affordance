@@ -1,0 +1,2 @@
+img { max-tokens: 64tok; }
+img[last] { max-tokens: 220tok; }

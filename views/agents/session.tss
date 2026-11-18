@@ -1,0 +1,8 @@
+/* The session's layout. The model's window bounds every
+   prompt: past 75% of it the history drops whole turns from the start, in steps of a quarter, so
+   the cut moves rarely and the kept prefix stays cached. (With no `context` on the binding there
+   is no window and nothing is dropped; the fold policy in session.tsx summarizes first.) */
+history { max-tokens: 75win; overflow: drop-start; drop-step: 25%; }
+
+/* Tool output is capped in tokens by layout, head and tail; the full text stays in the log. */
+result[name="shell"] { max-tokens: 1500tok; overflow: clip-middle; more: "\n[... {hidden} tokens hidden; read_event(\"{id}\") for the full output ...]\n"; }

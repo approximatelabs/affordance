@@ -1,0 +1,17 @@
+app:
+  view: app.tsx
+model:
+  kind: sglang
+  url: http://127.0.0.1:8192
+  context: 4096
+  sampling:
+    temperature: 0
+machines:
+  home:
+    kind: local
+agents:
+  - id: first
+    max_turns: 3
+    max_new: 512
+    props:
+      task: ""

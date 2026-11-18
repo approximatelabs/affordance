@@ -1,0 +1,120 @@
+[package]
+name = "affordance"
+version = "0.1.0"
+edition = "2024"
+# The integration tests are one program (tests/suite.rs); each file under tests/ is a module of it.
+autotests = false
+rust-version = "1.89"
+description = "Renders app state into exact token ids for a model: a TSX view language and an agent runtime with deterministic replay"
+# Affordance's own code. The chat templates under views/third_party are their publishers',
+# included for interoperability, each under the terms in its folder's NOTICE.md (README,
+# "License").
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://affordance.rs"
+repository = "https://github.com/approximatelabs/affordance"
+documentation = "https://docs.rs/affordance"
+keywords = ["llm", "agents", "tokenizer", "tsx", "prompt"]
+categories = ["development-tools", "text-processing"]
+autobins = false
+include = ["/build.rs", "/src/**", "/assets/**", "/views/**", "/spec/*.md", "/docs/*.md", "/tools/bench/*.rs", "/tools/middle_demo.rs", "/examples/**", "/README.md", "/CONTRIBUTING.md", "/LICENSE", "/THIRD_PARTY_NOTICES.md", "/Cargo.toml", "/Cargo.lock"]
+
+[dependencies]
+ahash = "0.8.12"
+itoa = "1"
+libm = "0.2"
+memmap2 = "0.9"
+sha2 = "0.10"
+stacker = "0.1.25"
+aho-corasick = "1.1.5"
+chrono = "0.4.45"
+indexmap = "2.14.2"
+regex = "1"
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = { version = "1.0.151", features = ["preserve_order", "float_roundtrip", "raw_value"] }
+reqwest = { version = "0.12.28", optional = true, default-features = false, features = ["rustls-tls", "rustls-tls-native-roots"] }
+rustls = { version = "0.23.46", optional = true, default-features = false, features = ["ring", "std", "tls12"] }
+bytes = { version = "1", optional = true }
+hyper = { version = "1", optional = true, default-features = false, features = ["client", "server", "http1"] }
+hyper-util = { version = "0.1.21", optional = true, default-features = false, features = ["tokio"] }
+http-body-util = { version = "0.1.5", optional = true, features = ["channel"] }
+tokio = { version = "1", optional = true, features = ["rt-multi-thread", "sync", "macros", "time", "net"] }
+tokenizers = { version = "0.23.2", default-features = false, features = ["onig"] }
+pprof = { version = "0.15", features = ["flamegraph"], optional = true }
+serde-saphyr = "2.1.1"
+include_dir = "0.7.4"
+# Reading and writing a picture, to send it at the size layout gave it (src/media.rs).
+png = "0.18"
+zune-jpeg = "0.5"
+
+# For the tests only: nothing a user builds includes it. Loading a tokenizer is hundreds of
+# thousands of small allocations, and the test programs load many on many threads: with the
+# system allocator 64 loads at once took 1,673 ms each, with mimalloc 453 ms.
+[dev-dependencies.mimalloc]
+version = "0.1"
+default-features = false
+
+[features]
+# Generic HTTP host adapter. Renderer-only embedders can use --no-default-features.
+default = ["http"]
+http = ["dep:reqwest", "dep:hyper", "dep:hyper-util", "dep:http-body-util", "dep:tokio", "dep:rustls", "dep:bytes"]
+# A sampling profile (SIGPROF, no perf events) of the benchmarks: AFFORDANCE_FLAMEGRAPH=out.svg turn_bench ..
+profile = ["dep:pprof"]
+# Tests against the reference data under ref/ (real model tokenizers, official template outputs,
+# conformance corpora; docs/DEVELOPING.md says how to fetch it). Without it they are ignored.
+reference-tests = []
+
+[lints.rust]
+# Kani proof harnesses (src/emit_proofs.rs) build only under `cargo kani`; the Verus
+# specifications in src/fit.rs exist only when Verus reads the file (docs/VERIFICATION.md).
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)", "cfg(verus_keep_ghost)"] }
+
+[[bin]]
+name = "affordance"
+path = "src/bin/affordance/main.rs"
+
+[[example]]
+name = "hello"
+path = "examples/embedding/hello.rs"
+
+[[example]]
+name = "middle_demo"
+path = "tools/middle_demo.rs"
+
+[[example]]
+name = "boot_bench"
+path = "tools/bench/boot_bench.rs"
+
+[[example]]
+name = "fleet_bench"
+path = "tools/bench/fleet_bench.rs"
+
+[[example]]
+name = "render_threads"
+path = "tools/bench/render_threads.rs"
+
+[[example]]
+name = "runtime_bench"
+path = "tools/bench/runtime_bench.rs"
+
+[[example]]
+name = "turn_bench"
+path = "tools/bench/turn_bench.rs"
+
+[[example]]
+name = "protocol_survey"
+path = "tools/protocol_survey.rs"
+required-features = ["reference-tests"]
+
+[[example]]
+name = "load_bench"
+path = "tools/bench/load_bench.rs"
+
+[[test]]
+name = "suite"
+path = "tests/suite.rs"
+
+# Counts every allocation its process makes, with an allocator of its own.
+[[test]]
+name = "closures_freed"
+path = "tests/closures_freed.rs"

@@ -1,0 +1,1477 @@
+[
+ {
+  "id": "first_assistant",
+  "messages": [
+   {
+    "role": "assistant",
+    "content": "I start the conversation."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "first_tool_raise",
+  "messages": [
+   {
+    "role": "tool",
+    "content": "orphan tool result"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "developer_role",
+  "messages": [
+   {
+    "role": "developer",
+    "content": "Answer in haiku only."
+   },
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "second_system_dropped",
+  "messages": [
+   {
+    "role": "system",
+    "content": "first system"
+   },
+   {
+    "role": "user",
+    "content": "u1"
+   },
+   {
+    "role": "system",
+    "content": "second system is dropped"
+   },
+   {
+    "role": "user",
+    "content": "u2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "system_content_parts",
+  "messages": [
+   {
+    "role": "system",
+    "content": [
+     {
+      "type": "text",
+      "text": "part a"
+     },
+     {
+      "type": "text",
+      "text": "part b"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_content_none_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_content_parts_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "hello part"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_missing_content_raise",
+  "messages": [
+   {
+    "role": "user"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "system_after_assistant_ignored",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "a"
+   },
+   {
+    "role": "system",
+    "content": "late system ignored"
+   },
+   {
+    "role": "user",
+    "content": "q2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_last_nogen",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 6*7?"
+   },
+   {
+    "role": "assistant",
+    "content": "42.",
+    "thinking": "6*7=42."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "thinking_last_gen",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 6*7?"
+   },
+   {
+    "role": "assistant",
+    "content": "42.",
+    "thinking": "6*7=42."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_mid_history",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 6*7?"
+   },
+   {
+    "role": "assistant",
+    "content": "42.",
+    "thinking": "6*7=42."
+   },
+   {
+    "role": "user",
+    "content": "And 6*8?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_nocontent_last_nogen",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "thinking": "only analysis, no final"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "reasoning_content_ignored",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is 6*7?"
+   },
+   {
+    "role": "assistant",
+    "content": "42.",
+    "reasoning_content": "this field is not read by the template"
+   },
+   {
+    "role": "user",
+    "content": "And 6*8?"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_toolcall_future_final",
+  "messages": [
+   {
+    "role": "user",
+    "content": "weather?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "thinking": "I will call the tool.",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Oslo"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "content": "3C"
+   },
+   {
+    "role": "assistant",
+    "content": "It is 3C in Oslo."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "content_and_thinking_toolcall_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "weather?"
+   },
+   {
+    "role": "assistant",
+    "content": "Let me check.",
+    "thinking": "analysis too",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Oslo"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_channel_tag_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "ok",
+    "thinking": "before <|channel|>analysis<|message|> after"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "assistant_content_none_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "assistant_nocontent_last_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "assistant_content_parts_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "part"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "y"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "assistant_empty_content_last_nogen",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "assistant_channel_tag_in_content_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "before <|channel|>final<|message|> after"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_content_type_text",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       },
+       "content_type": "text"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_args_missing_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_args_null",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": null
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_args_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": [
+        1,
+        2,
+        3
+       ]
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_args_unicode_special",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "z": "café 你好",
+        "a": "<b>&\"'",
+        "nested": {
+         "x": 1
+        }
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_args_str_escaped",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"München\"}"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_three_only_first",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "f1",
+       "arguments": {
+        "a": 1
+       }
+      }
+     },
+     {
+      "type": "function",
+      "function": {
+       "name": "f2",
+       "arguments": {
+        "b": 2
+       }
+      }
+     },
+     {
+      "type": "function",
+      "function": {
+       "name": "f3",
+       "arguments": {
+        "c": 3
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_empty_list_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": []
+   },
+   {
+    "role": "tool",
+    "content": "r"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "toolcall_name_missing_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "arguments": {
+        "a": 1
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_no_content_key",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "f1",
+       "arguments": {
+        "a": 1
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_result_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "f1",
+       "arguments": {}
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "content": [
+     1,
+     "x",
+     null
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_message_without_name",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Oslo"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "content": "3C"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_desc_missing_raise",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_no_parameters",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "Does a thing."
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_params_empty_properties",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {}
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_prop_desc_empty",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "string",
+        "description": ""
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_prop_defaults_falsy",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "integer",
+        "default": 0
+       },
+       "b": {
+        "type": "boolean",
+        "default": false
+       },
+       "c": {
+        "type": "string",
+        "default": ""
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_prop_default_null",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "string",
+        "default": null
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_prop_enum_default",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "string",
+        "enum": [
+         "a",
+         "b"
+        ],
+        "default": "a"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_prop_oneof_default",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "oneOf": [
+         {
+          "type": "string"
+         },
+         {
+          "type": "integer"
+         }
+        ],
+        "description": "Either",
+        "default": "x"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_prop_oneof_variant_default",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "oneOf": [
+         {
+          "type": "string",
+          "description": "as text",
+          "default": "hi"
+         },
+         {
+          "type": "integer",
+          "description": "as number"
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_prop_oneof_object_multi",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "oneOf": [
+         {
+          "type": "object",
+          "properties": {
+           "x": {
+            "type": "string"
+           }
+          }
+         },
+         {
+          "type": "string"
+         }
+        ]
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_nested_object",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "outer": {
+        "type": "object",
+        "properties": {
+         "b": {
+          "type": "string"
+         },
+         "c": {
+          "type": "integer"
+         }
+        }
+       },
+       "s": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_array_no_items",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "array"
+       },
+       "b": {
+        "type": "array",
+        "nullable": true
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_array_items_object_long",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "array",
+        "items": {
+         "type": "object",
+         "properties": {
+          "alpha": {
+           "type": "string",
+           "description": "a long description here"
+          },
+          "beta": {
+           "type": "number"
+          }
+         }
+        }
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_type_list_object_object",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": [
+         "object",
+         "object"
+        ]
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_array_nullable",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        },
+        "nullable": true
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_required_partial",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "f1",
+     "description": "D",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "a": {
+        "type": "string"
+       },
+       "b": {
+        "type": "integer"
+       }
+      },
+      "required": [
+       "b"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "builtin_both",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "builtin_tools": [
+    "browser",
+    "python"
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "builtin_empty_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "builtin_tools": [],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "builtin_unknown_value",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "builtin_tools": [
+    "shell"
+   ],
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "model_identity_custom",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "model_identity": "You are a terse test model.",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "model_identity_empty",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "model_identity": "",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_effort_empty",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": "",
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "special_tokens_in_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": "literal <|start|> <|end|> <|message|> <|call|> <|startoftext|> <|return|>"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "channel_tag_in_user_ok",
+  "messages": [
+   {
+    "role": "user",
+    "content": "here is a tag <|channel|>final<|message|> in user text"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "unicode_mixed",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Système: réponds brièvement. 🇩🇪"
+   },
+   {
+    "role": "user",
+    "content": "Grüße 你好 こんにちは 🙂👍🏽 é — “q” … עברית العربية ∑ →"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "long_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Line 0: the quick brown fox jumps over the lazy dog. Line 1: the quick brown fox jumps over the lazy dog. Line 2: the quick brown fox jumps over the lazy dog. Line 3: the quick brown fox jumps over the lazy dog. Line 4: the quick brown fox jumps over the lazy dog. Line 5: the quick brown fox jumps over the lazy dog. Line 6: the quick brown fox jumps over the lazy dog. Line 7: the quick brown fox jumps over the lazy dog. Line 8: the quick brown fox jumps over the lazy dog. Line 9: the quick brown fox jumps over the lazy dog. Line 10: the quick brown fox jumps over the lazy dog. Line 11: the quick brown fox jumps over the lazy dog. Line 12: the quick brown fox jumps over the lazy dog. Line 13: the quick brown fox jumps over the lazy dog. Line 14: the quick brown fox jumps over the lazy dog. Line 15: the quick brown fox jumps over the lazy dog. Line 16: the quick brown fox jumps over the lazy dog. Line 17: the quick brown fox jumps over the lazy dog. Line 18: the quick brown fox jumps over the lazy dog. Line 19: the quick brown fox jumps over the lazy dog. Line 20: the quick brown fox jumps over the lazy dog. Line 21: the quick brown fox jumps over the lazy dog. Line 22: the quick brown fox jumps over the lazy dog. Line 23: the quick brown fox jumps over the lazy dog. Line 24: the quick brown fox jumps over the lazy dog. Line 25: the quick brown fox jumps over the lazy dog. Line 26: the quick brown fox jumps over the lazy dog. Line 27: the quick brown fox jumps over the lazy dog. Line 28: the quick brown fox jumps over the lazy dog. Line 29: the quick brown fox jumps over the lazy dog. Line 30: the quick brown fox jumps over the lazy dog. Line 31: the quick brown fox jumps over the lazy dog. Line 32: the quick brown fox jumps over the lazy dog. Line 33: the quick brown fox jumps over the lazy dog. Line 34: the quick brown fox jumps over the lazy dog. Line 35: the quick brown fox jumps over the lazy dog. Line 36: the quick brown fox jumps over the lazy dog. Line 37: the quick brown fox jumps over the lazy dog. Line 38: the quick brown fox jumps over the lazy dog. Line 39: the quick brown fox jumps over the lazy dog. Line 40: the quick brown fox jumps over the lazy dog. Line 41: the quick brown fox jumps over the lazy dog. Line 42: the quick brown fox jumps over the lazy dog. Line 43: the quick brown fox jumps over the lazy dog. Line 44: the quick brown fox jumps over the lazy dog. Line 45: the quick brown fox jumps over the lazy dog. Line 46: the quick brown fox jumps over the lazy dog. Line 47: the quick brown fox jumps over the lazy dog. Line 48: the quick brown fox jumps over the lazy dog. Line 49: the quick brown fox jumps over the lazy dog. Line 50: the quick brown fox jumps over the lazy dog. Line 51: the quick brown fox jumps over the lazy dog. Line 52: the quick brown fox jumps over the lazy dog. Line 53: the quick brown fox jumps over the lazy dog. Line 54: the quick brown fox jumps over the lazy dog. Line 55: the quick brown fox jumps over the lazy dog. Line 56: the quick brown fox jumps over the lazy dog. Line 57: the quick brown fox jumps over the lazy dog. Line 58: the quick brown fox jumps over the lazy dog. Line 59: the quick brown fox jumps over the lazy dog. Line 60: the quick brown fox jumps over the lazy dog. Line 61: the quick brown fox jumps over the lazy dog. Line 62: the quick brown fox jumps over the lazy dog. Line 63: the quick brown fox jumps over the lazy dog. Line 64: the quick brown fox jumps over the lazy dog. Line 65: the quick brown fox jumps over the lazy dog. Line 66: the quick brown fox jumps over the lazy dog. Line 67: the quick brown fox jumps over the lazy dog. Line 68: the quick brown fox jumps over the lazy dog. Line 69: the quick brown fox jumps over the lazy dog. Line 70: the quick brown fox jumps over the lazy dog. Line 71: the quick brown fox jumps over the lazy dog. Line 72: the quick brown fox jumps over the lazy dog. Line 73: the quick brown fox jumps over the lazy dog. Line 74: the quick brown fox jumps over the lazy dog. Line 75: the quick brown fox jumps over the lazy dog. Line 76: the quick brown fox jumps over the lazy dog. Line 77: the quick brown fox jumps over the lazy dog. Line 78: the quick brown fox jumps over the lazy dog. Line 79: the quick brown fox jumps over the lazy dog. Line 80: the quick brown fox jumps over the lazy dog. Line 81: the quick brown fox jumps over the lazy dog. Line 82: the quick brown fox jumps over the lazy dog. Line 83: the quick brown fox jumps over the lazy dog. Line 84: the quick brown fox jumps over the lazy dog. Line 85: the quick brown fox jumps over the lazy dog. Line 86: the quick brown fox jumps over the lazy dog. Line 87: the quick brown fox jumps over the lazy dog. Line 88: the quick brown fox jumps over the lazy dog. Line 89: the quick brown fox jumps over the lazy dog. Line 90: the quick brown fox jumps over the lazy dog. Line 91: the quick brown fox jumps over the lazy dog. Line 92: the quick brown fox jumps over the lazy dog. Line 93: the quick brown fox jumps over the lazy dog. Line 94: the quick brown fox jumps over the lazy dog. Line 95: the quick brown fox jumps over the lazy dog. Line 96: the quick brown fox jumps over the lazy dog. Line 97: the quick brown fox jumps over the lazy dog. Line 98: the quick brown fox jumps over the lazy dog. Line 99: the quick brown fox jumps over the lazy dog. Line 100: the quick brown fox jumps over the lazy dog. Line 101: the quick brown fox jumps over the lazy dog. Line 102: the quick brown fox jumps over the lazy dog. Line 103: the quick brown fox jumps over the lazy dog. Line 104: the quick brown fox jumps over the lazy dog. Line 105: the quick brown fox jumps over the lazy dog. Line 106: the quick brown fox jumps over the lazy dog. Line 107: the quick brown fox jumps over the lazy dog. Line 108: the quick brown fox jumps over the lazy dog. Line 109: the quick brown fox jumps over the lazy dog. Line 110: the quick brown fox jumps over the lazy dog. Line 111: the quick brown fox jumps over the lazy dog. Line 112: the quick brown fox jumps over the lazy dog. Line 113: the quick brown fox jumps over the lazy dog. Line 114: the quick brown fox jumps over the lazy dog. Line 115: the quick brown fox jumps over the lazy dog. Line 116: the quick brown fox jumps over the lazy dog. Line 117: the quick brown fox jumps over the lazy dog. Line 118: the quick brown fox jumps over the lazy dog. Line 119: the quick brown fox jumps over the lazy dog. Line 120: the quick brown fox jumps over the lazy dog. Line 121: the quick brown fox jumps over the lazy dog. Line 122: the quick brown fox jumps over the lazy dog. Line 123: the quick brown fox jumps over the lazy dog. Line 124: the quick brown fox jumps over the lazy dog. Line 125: the quick brown fox jumps over the lazy dog. Line 126: the quick brown fox jumps over the lazy dog. Line 127: the quick brown fox jumps over the lazy dog. Line 128: the quick brown fox jumps over the lazy dog. Line 129: the quick brown fox jumps over the lazy dog. Line 130: the quick brown fox jumps over the lazy dog. Line 131: the quick brown fox jumps over the lazy dog. Line 132: the quick brown fox jumps over the lazy dog. Line 133: the quick brown fox jumps over the lazy dog. Line 134: the quick brown fox jumps over the lazy dog. Line 135: the quick brown fox jumps over the lazy dog. Line 136: the quick brown fox jumps over the lazy dog. Line 137: the quick brown fox jumps over the lazy dog. Line 138: the quick brown fox jumps over the lazy dog. Line 139: the quick brown fox jumps over the lazy dog. Line 140: the quick brown fox jumps over the lazy dog. Line 141: the quick brown fox jumps over the lazy dog. Line 142: the quick brown fox jumps over the lazy dog. Line 143: the quick brown fox jumps over the lazy dog. Line 144: the quick brown fox jumps over the lazy dog. Line 145: the quick brown fox jumps over the lazy dog. Line 146: the quick brown fox jumps over the lazy dog. Line 147: the quick brown fox jumps over the lazy dog. Line 148: the quick brown fox jumps over the lazy dog. Line 149: the quick brown fox jumps over the lazy dog. Line 150: the quick brown fox jumps over the lazy dog. Line 151: the quick brown fox jumps over the lazy dog. Line 152: the quick brown fox jumps over the lazy dog. Line 153: the quick brown fox jumps over the lazy dog. Line 154: the quick brown fox jumps over the lazy dog. Line 155: the quick brown fox jumps over the lazy dog. Line 156: the quick brown fox jumps over the lazy dog. Line 157: the quick brown fox jumps over the lazy dog. Line 158: the quick brown fox jumps over the lazy dog. Line 159: the quick brown fox jumps over the lazy dog. Line 160: the quick brown fox jumps over the lazy dog. Line 161: the quick brown fox jumps over the lazy dog. Line 162: the quick brown fox jumps over the lazy dog. Line 163: the quick brown fox jumps over the lazy dog. Line 164: the quick brown fox jumps over the lazy dog. Line 165: the quick brown fox jumps over the lazy dog. Line 166: the quick brown fox jumps over the lazy dog. Line 167: the quick brown fox jumps over the lazy dog. Line 168: the quick brown fox jumps over the lazy dog. Line 169: the quick brown fox jumps over the lazy dog. Line 170: the quick brown fox jumps over the lazy dog. Line 171: the quick brown fox jumps over the lazy dog. Line 172: the quick brown fox jumps over the lazy dog. Line 173: the quick brown fox jumps over the lazy dog. Line 174: the quick brown fox jumps over the lazy dog. Line 175: the quick brown fox jumps over the lazy dog. Line 176: the quick brown fox jumps over the lazy dog. Line 177: the quick brown fox jumps over the lazy dog. Line 178: the quick brown fox jumps over the lazy dog. Line 179: the quick brown fox jumps over the lazy dog. Line 180: the quick brown fox jumps over the lazy dog. Line 181: the quick brown fox jumps over the lazy dog. Line 182: the quick brown fox jumps over the lazy dog. Line 183: the quick brown fox jumps over the lazy dog. Line 184: the quick brown fox jumps over the lazy dog. Line 185: the quick brown fox jumps over the lazy dog. Line 186: the quick brown fox jumps over the lazy dog. Line 187: the quick brown fox jumps over the lazy dog. Line 188: the quick brown fox jumps over the lazy dog. Line 189: the quick brown fox jumps over the lazy dog. Line 190: the quick brown fox jumps over the lazy dog. Line 191: the quick brown fox jumps over the lazy dog. Line 192: the quick brown fox jumps over the lazy dog. Line 193: the quick brown fox jumps over the lazy dog. Line 194: the quick brown fox jumps over the lazy dog. Line 195: the quick brown fox jumps over the lazy dog. Line 196: the quick brown fox jumps over the lazy dog. Line 197: the quick brown fox jumps over the lazy dog. Line 198: the quick brown fox jumps over the lazy dog. Line 199: the quick brown fox jumps over the lazy dog. Line 200: the quick brown fox jumps over the lazy dog. Line 201: the quick brown fox jumps over the lazy dog. Line 202: the quick brown fox jumps over the lazy dog. Line 203: the quick brown fox jumps over the lazy dog. Line 204: the quick brown fox jumps over the lazy dog. Line 205: the quick brown fox jumps over the lazy dog. Line 206: the quick brown fox jumps over the lazy dog. Line 207: the quick brown fox jumps over the lazy dog. Line 208: the quick brown fox jumps over the lazy dog. Line 209: the quick brown fox jumps over the lazy dog. Line 210: the quick brown fox jumps over the lazy dog. Line 211: the quick brown fox jumps over the lazy dog. Line 212: the quick brown fox jumps over the lazy dog. Line 213: the quick brown fox jumps over the lazy dog. Line 214: the quick brown fox jumps over the lazy dog. Line 215: the quick brown fox jumps over the lazy dog. Line 216: the quick brown fox jumps over the lazy dog. Line 217: the quick brown fox jumps over the lazy dog. Line 218: the quick brown fox jumps over the lazy dog. Line 219: the quick brown fox jumps over the lazy dog. Line 220: the quick brown fox jumps over the lazy dog. Line 221: the quick brown fox jumps over the lazy dog. Line 222: the quick brown fox jumps over the lazy dog. Line 223: the quick brown fox jumps over the lazy dog. Line 224: the quick brown fox jumps over the lazy dog. Line 225: the quick brown fox jumps over the lazy dog. Line 226: the quick brown fox jumps over the lazy dog. Line 227: the quick brown fox jumps over the lazy dog. Line 228: the quick brown fox jumps over the lazy dog. Line 229: the quick brown fox jumps over the lazy dog. Line 230: the quick brown fox jumps over the lazy dog. Line 231: the quick brown fox jumps over the lazy dog. Line 232: the quick brown fox jumps over the lazy dog. Line 233: the quick brown fox jumps over the lazy dog. Line 234: the quick brown fox jumps over the lazy dog. Line 235: the quick brown fox jumps over the lazy dog. Line 236: the quick brown fox jumps over the lazy dog. Line 237: the quick brown fox jumps over the lazy dog. Line 238: the quick brown fox jumps over the lazy dog. Line 239: the quick brown fox jumps over the lazy dog. Line 240: the quick brown fox jumps over the lazy dog. Line 241: the quick brown fox jumps over the lazy dog. Line 242: the quick brown fox jumps over the lazy dog. Line 243: the quick brown fox jumps over the lazy dog. Line 244: the quick brown fox jumps over the lazy dog. Line 245: the quick brown fox jumps over the lazy dog. Line 246: the quick brown fox jumps over the lazy dog. Line 247: the quick brown fox jumps over the lazy dog. Line 248: the quick brown fox jumps over the lazy dog. Line 249: the quick brown fox jumps over the lazy dog. Line 250: the quick brown fox jumps over the lazy dog. Line 251: the quick brown fox jumps over the lazy dog. Line 252: the quick brown fox jumps over the lazy dog. Line 253: the quick brown fox jumps over the lazy dog. Line 254: the quick brown fox jumps over the lazy dog. Line 255: the quick brown fox jumps over the lazy dog. Line 256: the quick brown fox jumps over the lazy dog. Line 257: the quick brown fox jumps over the lazy dog. Line 258: the quick brown fox jumps over the lazy dog. Line 259: the quick brown fox jumps over the lazy dog. Line 260: the quick brown fox jumps over the lazy dog. Line 261: the quick brown fox jumps over the lazy dog. Line 262: the quick brown fox jumps over the lazy dog. Line 263: the quick brown fox jumps over the lazy dog. Line 264: the quick brown fox jumps over the lazy dog. Line 265: the quick brown fox jumps over the lazy dog. Line 266: the quick brown fox jumps over the lazy dog. Line 267: the quick brown fox jumps over the lazy dog. Line 268: the quick brown fox jumps over the lazy dog. Line 269: the quick brown fox jumps over the lazy dog. Line 270: the quick brown fox jumps over the lazy dog. Line 271: the quick brown fox jumps over the lazy dog. Line 272: the quick brown fox jumps over the lazy dog. Line 273: the quick brown fox jumps over the lazy dog. Line 274: the quick brown fox jumps over the lazy dog. Line 275: the quick brown fox jumps over the lazy dog. Line 276: the quick brown fox jumps over the lazy dog. Line 277: the quick brown fox jumps over the lazy dog. Line 278: the quick brown fox jumps over the lazy dog. Line 279: the quick brown fox jumps over the lazy dog. Line 280: the quick brown fox jumps over the lazy dog. Line 281: the quick brown fox jumps over the lazy dog. Line 282: the quick brown fox jumps over the lazy dog. Line 283: the quick brown fox jumps over the lazy dog. Line 284: the quick brown fox jumps over the lazy dog. Line 285: the quick brown fox jumps over the lazy dog. Line 286: the quick brown fox jumps over the lazy dog. Line 287: the quick brown fox jumps over the lazy dog. Line 288: the quick brown fox jumps over the lazy dog. Line 289: the quick brown fox jumps over the lazy dog. Line 290: the quick brown fox jumps over the lazy dog. Line 291: the quick brown fox jumps over the lazy dog. Line 292: the quick brown fox jumps over the lazy dog. Line 293: the quick brown fox jumps over the lazy dog. Line 294: the quick brown fox jumps over the lazy dog. Line 295: the quick brown fox jumps over the lazy dog. Line 296: the quick brown fox jumps over the lazy dog. Line 297: the quick brown fox jumps over the lazy dog. Line 298: the quick brown fox jumps over the lazy dog. Line 299: the quick brown fox jumps over the lazy dog. Line 300: the quick brown fox jumps over the lazy dog. Line 301: the quick brown fox jumps over the lazy dog. Line 302: the quick brown fox jumps over the lazy dog. Line 303: the quick brown fox jumps over the lazy dog. Line 304: the quick brown fox jumps over the lazy dog. Line 305: the quick brown fox jumps over the lazy dog. Line 306: the quick brown fox jumps over the lazy dog. Line 307: the quick brown fox jumps over the lazy dog. Line 308: the quick brown fox jumps over the lazy dog. Line 309: the quick brown fox jumps over the lazy dog. Line 310: the quick brown fox jumps over the lazy dog. Line 311: the quick brown fox jumps over the lazy dog. Line 312: the quick brown fox jumps over the lazy dog. Line 313: the quick brown fox jumps over the lazy dog. Line 314: the quick brown fox jumps over the lazy dog. Line 315: the quick brown fox jumps over the lazy dog. Line 316: the quick brown fox jumps over the lazy dog. Line 317: the quick brown fox jumps over the lazy dog. Line 318: the quick brown fox jumps over the lazy dog. Line 319: the quick brown fox jumps over the lazy dog. Line 320: the quick brown fox jumps over the lazy dog. Line 321: the quick brown fox jumps over the lazy dog. Line 322: the quick brown fox jumps over the lazy dog. Line 323: the quick brown fox jumps over the lazy dog. Line 324: the quick brown fox jumps over the lazy dog. Line 325: the quick brown fox jumps over the lazy dog. Line 326: the quick brown fox jumps over the lazy dog. Line 327: the quick brown fox jumps over the lazy dog. Line 328: the quick brown fox jumps over the lazy dog. Line 329: the quick brown fox jumps over the lazy dog. Line 330: the quick brown fox jumps over the lazy dog. Line 331: the quick brown fox jumps over the lazy dog. Line 332: the quick brown fox jumps over the lazy dog. Line 333: the quick brown fox jumps over the lazy dog. Line 334: the quick brown fox jumps over the lazy dog. Line 335: the quick brown fox jumps over the lazy dog. Line 336: the quick brown fox jumps over the lazy dog. Line 337: the quick brown fox jumps over the lazy dog. Line 338: the quick brown fox jumps over the lazy dog. Line 339: the quick brown fox jumps over the lazy dog. Line 340: the quick brown fox jumps over the lazy dog. Line 341: the quick brown fox jumps over the lazy dog. Line 342: the quick brown fox jumps over the lazy dog. Line 343: the quick brown fox jumps over the lazy dog. Line 344: the quick brown fox jumps over the lazy dog. Line 345: the quick brown fox jumps over the lazy dog. Line 346: the quick brown fox jumps over the lazy dog. Line 347: the quick brown fox jumps over the lazy dog. Line 348: the quick brown fox jumps over the lazy dog. Line 349: the quick brown fox jumps over the lazy dog. Line 350: the quick brown fox jumps over the lazy dog. Line 351: the quick brown fox jumps over the lazy dog. Line 352: the quick brown fox jumps over the lazy dog. Line 353: the quick brown fox jumps over the lazy dog. Line 354: the quick brown fox jumps over the lazy dog. Line 355: the quick brown fox jumps over the lazy dog. Line 356: the quick brown fox jumps over the lazy dog. Line 357: the quick brown fox jumps over the lazy dog. Line 358: the quick brown fox jumps over the lazy dog. Line 359: the quick brown fox jumps over the lazy dog. Line 360: the quick brown fox jumps over the lazy dog. Line 361: the quick brown fox jumps over the lazy dog. Line 362: the quick brown fox jumps over the lazy dog. Line 363: the quick brown fox jumps over the lazy dog. Line 364: the quick brown fox jumps over the lazy dog. Line 365: the quick brown fox jumps over the lazy dog. Line 366: the quick brown fox jumps over the lazy dog. Line 367: the quick brown fox jumps over the lazy dog. Line 368: the quick brown fox jumps over the lazy dog. Line 369: the quick brown fox jumps over the lazy dog. Line 370: the quick brown fox jumps over the lazy dog. Line 371: the quick brown fox jumps over the lazy dog. Line 372: the quick brown fox jumps over the lazy dog. Line 373: the quick brown fox jumps over the lazy dog. Line 374: the quick brown fox jumps over the lazy dog. Line 375: the quick brown fox jumps over the lazy dog. Line 376: the quick brown fox jumps over the lazy dog. Line 377: the quick brown fox jumps over the lazy dog. Line 378: the quick brown fox jumps over the lazy dog. Line 379: the quick brown fox jumps over the lazy dog. Line 380: the quick brown fox jumps over the lazy dog. Line 381: the quick brown fox jumps over the lazy dog. Line 382: the quick brown fox jumps over the lazy dog. Line 383: the quick brown fox jumps over the lazy dog. Line 384: the quick brown fox jumps over the lazy dog. Line 385: the quick brown fox jumps over the lazy dog. Line 386: the quick brown fox jumps over the lazy dog. Line 387: the quick brown fox jumps over the lazy dog. Line 388: the quick brown fox jumps over the lazy dog. Line 389: the quick brown fox jumps over the lazy dog. Line 390: the quick brown fox jumps over the lazy dog. Line 391: the quick brown fox jumps over the lazy dog. Line 392: the quick brown fox jumps over the lazy dog. Line 393: the quick brown fox jumps over the lazy dog. Line 394: the quick brown fox jumps over the lazy dog. Line 395: the quick brown fox jumps over the lazy dog. Line 396: the quick brown fox jumps over the lazy dog. Line 397: the quick brown fox jumps over the lazy dog. Line 398: the quick brown fox jumps over the lazy dog. Line 399: the quick brown fox jumps over the lazy dog."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ }
+]

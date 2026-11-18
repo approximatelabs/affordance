@@ -1,0 +1,16 @@
+/* The research agent's context policies as layout. The window
+   is the model binding's `context` less the reply's room; set `context` to the budget.
+
+   R1 trunc, and R5 fold in the main line: past 85% of the window the oldest whole turns drop,
+   down to about half of it (a step of 41% of the cap), so the cut moves rarely. */
+Context[policy="trunc"] history { max-tokens: 85win; overflow: drop-start; drop-step: 41%; }
+Context[policy="fold"] history { max-tokens: 85win; overflow: drop-start; drop-step: 41%; }
+
+/* Every policy: a command's output shows its head and tail, at most a quarter of the window. */
+result[name="bash"] { max-tokens: 25win; overflow: clip-middle; more: "\n\n[... {hidden} tokens elided to respect the context window; narrow the command and search more selectively ...]\n\n"; }
+result[name="bcp_search"] { max-tokens: 25win; overflow: clip-middle; more: "\n\n[... {hidden} tokens elided ...]\n\n"; }
+result[name="bcp_get_document"] { max-tokens: 25win; overflow: clip-middle; more: "\n\n[... {hidden} tokens elided; search more selectively ...]\n\n"; }
+result[name="recall"] { max-tokens: 1500tok; overflow: clip-middle; more: "\n\n[... {hidden} tokens elided ...]\n\n"; }
+
+/* A handoff summary quotes the turns it replaces: head and tail, within its call's window. */
+#handoff { max-tokens: 80win; overflow: clip-middle; more: "\n\n[... {hidden} tokens of the middle turns elided ...]\n\n"; }

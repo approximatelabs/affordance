@@ -1,0 +1,21 @@
+# Once a week: has a publisher changed a chat template we have registered? Each registered
+# model's view was made from the template as it was on one day (views/templates.lock.json holds
+# its hash). The job fails, naming the models, when a repository's template now differs; those
+# models need `tools/add_model.py` run again. It can also be started by hand.
+name: templates
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  changed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # With the repository secret HF_TOKEN set, gated repositories (Gemma, Llama) are read too.
+      - run: python3 tools/check_templates.py
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}

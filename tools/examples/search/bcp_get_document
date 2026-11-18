@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""bcp_get_document DOCID: the document's text (its first 30000 characters), by the docid
+bcp_search printed."""
+import os, sys
+from pathlib import Path
+
+root = Path(os.environ.get("BCP_CORPUS", "."))
+files = [p for p in sorted(root.rglob("*")) if p.is_file() and p.suffix in (".md", ".txt")]
+try:
+    i = int(sys.argv[1])
+    print(files[i].read_text(errors="replace")[:30000])
+except (IndexError, ValueError):
+    sys.exit(f"no document {sys.argv[1:] or ''} (docids run from 0 to {len(files) - 1})")

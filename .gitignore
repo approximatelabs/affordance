@@ -1,0 +1,32 @@
+# Private working notes.
+/notes/
+
+# Rust builds and runtime output.
+/target/
+/runs/
+.affordance/
+affordance.local.yaml
+
+# Development environments and downloaded conformance references.
+/.venv/
+__pycache__/
+*.pyc
+/ref/models/
+/ref/tokenizers/
+/ref/out/
+/ref/new_out/
+/ref/middle_models/
+/ref/middle_out/
+
+# Generated benchmark output.
+/bench/*.json
+/bench/*.png
+/bench/*.txt
+/bench/compare.md
+
+# Local notes, and out-of-tree view directories that `affordance lint` also checks (one per line).
+/reports/
+/tools/view_consumers.txt
+/ref/sandbox/out/
+/ref/sandbox/cases/
+/ref/sandbox/tiktoken_cache/

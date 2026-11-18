@@ -1,0 +1,1560 @@
+[
+ {
+  "id": "empty_user_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "none_user_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "int_user_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": 12345
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "list_user_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "hello"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "multi_system_join",
+  "messages": [
+   {
+    "role": "system",
+    "content": "A"
+   },
+   {
+    "role": "system",
+    "content": "B"
+   },
+   {
+    "role": "user",
+    "content": "x"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "none_system_content",
+  "messages": [
+   {
+    "role": "system",
+    "content": null
+   },
+   {
+    "role": "user",
+    "content": "x"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "unknown_role_mid",
+  "messages": [
+   {
+    "role": "system",
+    "content": "s"
+   },
+   {
+    "role": "moderator",
+    "content": "z"
+   },
+   {
+    "role": "user",
+    "content": "x"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "unicode_mix",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Grüße é🙂 עברית 你好 مرحبا é ​   𝔘𝔫"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "special_text_like",
+  "messages": [
+   {
+    "role": "user",
+    "content": "<|end_of_sentence|> <|begin_of_sentence|> <|User|> <|Assistant|> {{ x }} {% raw %}"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "long_user_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary token subword boundary xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx GYé世GYé世GYé世GYé世GYé世"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "asst_none_no_toolcalls",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "asst_none_empty_toolcalls",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": []
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "asst_content_null_tc",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "done",
+    "tool_calls": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "asst_empty_content_w_tc",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Paris\"}"
+      },
+      "id": "call_1"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tc_args_badjson",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "not json {"
+      },
+      "id": "call_1"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tc_args_scalar_json",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "\"42\""
+      },
+      "id": "call_1"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tc_args_nested",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Zürich\", \"rain\": false, \"days\": 3, \"tags\": [\"a\", \"b\"]}"
+      },
+      "id": "call_1"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tc_args_dict_obj",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Reykjavik"
+       }
+      },
+      "id": "call_1"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tc_args_unicode_keys",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"été\": \"世界\", \"n\": 1.5}"
+      },
+      "id": "call_1"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tc_many_reordered",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\":\"A\"}"
+      },
+      "id": "call_1"
+     },
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\":\"B\"}"
+      },
+      "id": "call_2"
+     },
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\":\"C\"}"
+      },
+      "id": "call_3"
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call_3",
+    "name": "get_weather",
+    "content": "ra"
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call_1",
+    "name": "get_weather",
+    "content": "rb"
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call_2",
+    "name": "get_weather",
+    "content": "rc"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_orphan_first",
+  "messages": [
+   {
+    "role": "tool",
+    "tool_call_id": "call_1",
+    "name": "get_weather",
+    "content": "orphan result"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_list_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\":\"X\"}"
+      },
+      "id": "call_1"
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call_1",
+    "name": "get_weather",
+    "content": [
+     {
+      "type": "text",
+      "text": "part one"
+     },
+     {
+      "type": "image"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "think_two_in_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "a</think>b</think>c"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v31_prefix_thinking",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "answer",
+    "prefix": true
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "thinking": true,
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "asst_reasoning_only",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "reasoning_content": "because reasons"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "thinking": true,
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "reasoning_and_thinking_field",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "ok",
+    "reasoning_content": "rc",
+    "thinking": "th"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "thinking": true,
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "asst_after_user_no_reasoning",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "plain"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "thinking": true,
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "asst_empty_reasoning_last",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "ok",
+    "reasoning_content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "thinking": true,
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "developer_role",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "developer",
+    "content": "dev note"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "developer_empty_content",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "developer",
+    "content": ""
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "developer_with_tools",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "developer",
+    "content": "dev note"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "latest_reminder_role",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "latest_reminder",
+    "content": "remember this"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "task_action_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go",
+    "task": "action"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "task_query_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go",
+    "task": "query"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "task_bad",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go",
+    "task": "bogus"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "resp_format_system",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys",
+    "response_format": {
+     "type": "json_object"
+    }
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "resp_format_developer",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "developer",
+    "content": "dev",
+    "response_format": {
+     "type": "json_schema"
+    }
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       },
+       "rain": {
+        "type": "boolean"
+       },
+       "days": {
+        "type": "integer"
+       },
+       "tags": {
+        "type": "array",
+        "items": {
+         "type": "string"
+        }
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_namespace",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "ns::lookup"
+    },
+    "namespace": "ns"
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_name_colon",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "a::b"
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_ns_conflict",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "a::b"
+    },
+    "namespace": "c"
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_no_function_key",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [
+   {
+    "name": "bare"
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tools_empty_list",
+  "messages": [
+   {
+    "role": "system",
+    "content": "sys"
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "effort_bool_true",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": true,
+   "thinking_mode": "thinking",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "effort_int_1",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": 1,
+   "thinking_mode": "thinking",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "effort_int_100",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": 100,
+   "thinking_mode": "thinking",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "effort_zero",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": 0,
+   "thinking_mode": "thinking",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "effort_float",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": 1.5,
+   "thinking_mode": "thinking",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "effort_xhigh",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": "xhigh",
+   "thinking_mode": "thinking",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "effort_none_str",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": "none",
+   "thinking_mode": "thinking",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "effort_neg",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "reasoning_effort": "-1",
+   "thinking_mode": "thinking",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "thinking_mode_bad",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "thinking_mode": "foo",
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "thinking_mode_chat_enable_true",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "thinking_mode": "chat",
+   "enable_thinking": true,
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "enable_thinking_false_only",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "enable_thinking": false,
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "image_block_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "look"
+     },
+     {
+      "type": "image"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "image_url_block_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "image_url",
+      "image_url": {
+       "url": "http://x/y.png"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "unsupported_block_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "audio",
+      "text": "zzz"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "img_token_in_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "a <｜deepseek_image｜> b"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "img_token_in_reasoning",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": "ok",
+    "reasoning_content": "x<｜deepseek_image｜>"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "thinking": true,
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "tc_missing_name",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "arguments": "{\"x\": 1}"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tc_missing_arguments",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Weather lookup.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ }
+]

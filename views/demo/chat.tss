@@ -1,0 +1,5 @@
+/* Token style sheet for styled_chat.tsx. Units: tok. Specificity: #id > [prop] > Component. */
+ToolOutput            { max-tokens: 32tok; more: "\n[... truncated]"; }
+ToolOutput[full]      { max-tokens: 4096tok; }           /* a more specific rule wins */
+Reasoning[old]        { display: none; }                 /* old thinking costs no tokens */
+#scratch              { tok-size: 16tok; }

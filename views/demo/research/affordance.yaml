@@ -1,0 +1,20 @@
+# The research ladder (see README.md): one agent per question and context policy. Set the provider
+# and export its key as API_KEY, set env's paths to this checkout (absolute: commands run in each
+# agent's home), then run `affordance run` here. The results table is the root's state.
+root:
+  app: ladder.tsx
+  max_turns: 25
+  props:
+    questions: [{question: "...", expect: ["..."]}]
+    policies: [none, trunc, compact, tree]
+model:
+  kind: chat
+  url: https://your-provider.example/v1
+  model: deepseek/deepseek-v4.1-flash
+  context: 8000
+  key_env: API_KEY
+machines:
+  "m{n}": {kind: local, home: "homes/{agent}", count: 12}
+env:
+  PATH: /abs/affordance/tools/examples/search:/usr/bin:/bin
+  BCP_CORPUS: /abs/affordance/docs

@@ -1,0 +1,22 @@
+# The MCP example: an agent that discovers an MCP server's tools over HTTP and exposes the ones
+# `expose` names as its actions. Set the endpoint, the model server and its tokenizer, then run
+# `affordance run` here.
+app:
+  view: app.tsx
+  tokenizer: ../../../ref/tokenizers/zai-org__GLM-5.3.json   # the model's tokenizer
+model:
+  kind: sglang
+  url: http://127.0.0.1:30000
+machines:
+  http:
+    kind: http
+    url: https://mcp.example.com/mcp
+    timeout_ms: 30000
+    max_response_bytes: 8388608
+agents:
+  - id: assistant
+    machines: [http]
+    props:
+      url: /mcp
+      expose: {search: search_docs}
+      task: Search the documentation for installation instructions.

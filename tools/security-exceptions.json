@@ -1,0 +1,38 @@
+{
+  "review_by": "2027-01-21",
+  "advisories": {
+    "RUSTSEC-2026-0194": {
+      "package": "quick-xml",
+      "version": "0.26.0"
+    },
+    "RUSTSEC-2026-0195": {
+      "package": "quick-xml",
+      "version": "0.26.0"
+    },
+    "RUSTSEC-2024-0436": {
+      "package": "paste",
+      "version": "1.0.15"
+    }
+  },
+  "packages": {
+    "inferno": {
+      "version": "0.11.21",
+      "checksum": "232929e1d75fe899576a3d5c7416ad0d88dbfbb3c3d6aa00873a7408a50ddb88"
+    },
+    "pprof": {
+      "version": "0.15.0",
+      "checksum": "38a01da47675efa7673b032bf8efd8214f1917d89685e07e395ab125ea42b187"
+    },
+    "quick-xml": {
+      "version": "0.26.0",
+      "checksum": "7f50b1c63b38611e7d4d7f68b82d3ad0cc71a2ad2e7f61fc10f1328d917c93cd"
+    },
+    "paste": {
+      "version": "1.0.15",
+      "checksum": "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+    }
+  },
+  "callsites": {
+    "src/profile.rs": "13b1cd0f20df4d1d10cd1452e98e16898396a118f152042ea011992972c1d178"
+  }
+}

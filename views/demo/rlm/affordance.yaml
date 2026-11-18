@@ -1,0 +1,21 @@
+# A recursive language model over a long context (see README.md). Put the contents of tasks.json in
+# root.props.tasks, set the provider and export its key as API_KEY, set env.PATH's first entry to
+# this checkout's tools/examples/rlm (absolute: commands run in each agent's home), then run
+# `affordance run` here.
+root:
+  app: rlm.tsx
+  max_turns: 25
+  max_new: 32768
+  props:
+    tasks: "<the contents of tasks.json>"
+    direct: true
+model:
+  kind: chat
+  url: https://your-provider.example/v1
+  model: deepseek/deepseek-v4.1-flash
+  context: 128000
+  key_env: API_KEY
+machines:
+  "m{n}": {kind: local, home: "homes/{agent}", count: 3}
+env:
+  PATH: /abs/affordance/tools/examples/rlm:/usr/bin:/bin

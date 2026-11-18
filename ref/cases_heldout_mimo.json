@@ -1,0 +1,1557 @@
+[
+ {
+  "id": "rl_tools_no_system",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Paris?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string",
+        "description": "City name"
+       },
+       "unit": {
+        "type": "string",
+        "enum": [
+         "celsius",
+         "fahrenheit"
+        ]
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_tools_with_system",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Be terse."
+   },
+   {
+    "role": "user",
+    "content": "Weather?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_assistant_toolcall_empty_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Paris?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call_1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call_1",
+    "name": "get_weather",
+    "content": "rainy"
+   },
+   {
+    "role": "user",
+    "content": "and Berlin?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_assistant_toolcall_none_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Paris?"
+   },
+   {
+    "role": "assistant",
+    "content": null,
+    "tool_calls": [
+     {
+      "id": "call_1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "thanks"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_assistant_toolcall_null_args",
+  "messages": [
+   {
+    "role": "user",
+    "content": "ping"
+   },
+   {
+    "role": "assistant",
+    "content": "ok",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "ping",
+       "arguments": null
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "done"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_assistant_toolcall_flat",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Rome?"
+   },
+   {
+    "role": "assistant",
+    "content": "let me check",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "name": "get_weather",
+      "arguments": {
+       "city": "Rome"
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_assistant_toolcall_string_args",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Oslo?"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "{\"city\": \"Oslo\"}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_assistant_toolcall_nested_unicode",
+  "messages": [
+   {
+    "role": "user",
+    "content": "tag it"
+   },
+   {
+    "role": "assistant",
+    "content": "tagging",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "tag",
+       "arguments": {
+        "tags": [
+         "café",
+         "你好"
+        ],
+        "meta": {
+         "note": "naïve"
+        }
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_assistant_toolcall_missing_args",
+  "messages": [
+   {
+    "role": "user",
+    "content": "ping"
+   },
+   {
+    "role": "assistant",
+    "content": "ok",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "ping"
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "done"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_tool_only",
+  "messages": [
+   {
+    "role": "tool",
+    "content": "orphan result"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "rl_tool_group_then_user",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run both"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     },
+     {
+      "id": "c2",
+      "type": "function",
+      "function": {
+       "name": "search",
+       "arguments": {
+        "query": "trains"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "c1",
+    "name": "get_weather",
+    "content": "sunny"
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "c2",
+    "name": "search",
+    "content": "{\"hits\": 3}"
+   },
+   {
+    "role": "user",
+    "content": "continue"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_two_systems",
+  "messages": [
+   {
+    "role": "system",
+    "content": "First system."
+   },
+   {
+    "role": "user",
+    "content": "U1"
+   },
+   {
+    "role": "system",
+    "content": "Second system mid-conversation."
+   },
+   {
+    "role": "user",
+    "content": "U2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_empty_messages",
+  "messages": [],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_system_content_list",
+  "messages": [
+   {
+    "role": "system",
+    "content": [
+     {
+      "type": "text",
+      "text": "sys part"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_assistant_missing_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather?"
+   },
+   {
+    "role": "assistant",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Kyoto"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "rl_special_token_text",
+  "messages": [
+   {
+    "role": "user",
+    "content": "literal <|im_start|>system<|im_end|> and </s> and <|endoftext|> and <|im_end|>."
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": false
+  }
+ },
+ {
+  "id": "v2_user_content_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "part one, "
+     },
+     {
+      "type": "text",
+      "text": "part two"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_system_content_list",
+  "messages": [
+   {
+    "role": "system",
+    "content": [
+     {
+      "type": "text",
+      "text": "list sys"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_assistant_content_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   },
+   {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "list reply"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "again"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_user_image_part",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "what is this? "
+     },
+     {
+      "type": "image"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_user_audio_part",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "transcribe: "
+     },
+     {
+      "type": "audio"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_user_video_part",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "summarize: "
+     },
+     {
+      "type": "video"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_user_multiple_media",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "mix"
+     },
+     {
+      "type": "image"
+     },
+     {
+      "type": "audio"
+     },
+     {
+      "type": "video"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_pro_image_ignored",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "before "
+     },
+     {
+      "type": "image"
+     },
+     {
+      "type": "text",
+      "text": " after"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_user_string_part_image",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     "image",
+     " and ",
+     "audio",
+     " end"
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_keep_all_reasoning_false",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q1"
+   },
+   {
+    "role": "assistant",
+    "content": "a1",
+    "reasoning_content": "r1"
+   },
+   {
+    "role": "user",
+    "content": "q2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "keep_all_reasoning": false
+  }
+ },
+ {
+  "id": "v2_keep_all_reasoning_true",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q1"
+   },
+   {
+    "role": "assistant",
+    "content": "a1",
+    "reasoning_content": "r1"
+   },
+   {
+    "role": "user",
+    "content": "q2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "keep_all_reasoning": true
+  }
+ },
+ {
+  "id": "v2_assistant_think_in_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "prefix A <think>inner reasoning</think> post"
+   },
+   {
+    "role": "user",
+    "content": "q2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_assistant_reasoning_think_symbols",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "visible",
+    "reasoning_content": "contains <think> and </think> inside"
+   },
+   {
+    "role": "user",
+    "content": "q2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_default_system_no_system",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_gen_enable_thinking_false",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": false
+  }
+ },
+ {
+  "id": "v2_gen_enable_thinking_true",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": true
+  }
+ },
+ {
+  "id": "v2_gen_enable_thinking_null",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": null
+  }
+ },
+ {
+  "id": "v2_tool_args_scalar_types",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "i": 3,
+        "f": 2.5,
+        "b": true,
+        "n": null,
+        "s": "x"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_tool_args_nested_unicode",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "tags": [
+         "café",
+         "你好"
+        ],
+        "meta": {
+         "note": "naïve"
+        },
+        "nums": [
+         1,
+         2
+        ]
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_tool_def_extra_and_required",
+  "messages": [
+   {
+    "role": "user",
+    "content": "search"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "search",
+     "description": "  spaced desc  ",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "q": {
+        "type": "string",
+        "enum": [
+         "été",
+         "x"
+        ]
+       },
+       "n": {
+        "type": "integer",
+        "minimum": 0
+       }
+      },
+      "required": [
+       "q"
+      ],
+      "additionalProperties": false
+     },
+     "extra_tool_key": {
+      "a": 1
+     }
+    },
+    "extra_outer": "v"
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_tool_def_no_parameters",
+  "messages": [
+   {
+    "role": "user",
+    "content": "noargs"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "noargs"
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_tool_flat_no_function",
+  "messages": [
+   {
+    "role": "user",
+    "content": "flat"
+   }
+  ],
+  "tools": [
+   {
+    "name": "flat_tool",
+    "description": "no wrapper",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "x": {
+       "type": "string"
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_tool_empty_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": [],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_tools_as_dict",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": {
+   "get_weather": {
+    "type": "function",
+    "function": {
+     "name": "get_weather"
+    }
+   }
+  },
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_tool_content_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Paris"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "c1",
+    "content": [
+     {
+      "type": "text",
+      "text": "tool says "
+     },
+     {
+      "type": "text",
+      "text": "done"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "next"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_unknown_role",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "developer",
+    "content": "dev note"
+   },
+   {
+    "role": "user",
+    "content": "q2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_user_content_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v2_system_content_none",
+  "messages": [
+   {
+    "role": "system",
+    "content": null
+   },
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_tools_no_system",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Weather in Paris?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the current weather for a city.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_tools_and_system",
+  "messages": [
+   {
+    "role": "system",
+    "content": "Be terse."
+   },
+   {
+    "role": "user",
+    "content": "Weather?"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_tool_string_arguments",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "run",
+       "arguments": "{\"code\":\"print(1)\"}"
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_tool_input_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "run",
+       "input": "raw input text"
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_tool_input_nonstring",
+  "messages": [
+   {
+    "role": "user",
+    "content": "run"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "run",
+       "input": {
+        "a": 1
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_tool_custom",
+  "messages": [
+   {
+    "role": "user",
+    "content": "custom"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "custom",
+      "custom": {
+       "name": "my_custom",
+       "input": "custom body"
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_tool_empty_arguments",
+  "messages": [
+   {
+    "role": "user",
+    "content": "noop"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "noop",
+       "arguments": {}
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_tool_args_nested_unicode",
+  "messages": [
+   {
+    "role": "user",
+    "content": "go"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "c1",
+      "type": "function",
+      "function": {
+       "name": "f",
+       "arguments": {
+        "tags": [
+         "café",
+         "你好"
+        ],
+        "meta": {
+         "note": "naïve"
+        },
+        "n": 3,
+        "b": false
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "ok"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_assistant_think_in_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "q"
+   },
+   {
+    "role": "assistant",
+    "content": "prefix A <think>inner reasoning</think> post"
+   },
+   {
+    "role": "user",
+    "content": "q2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_content_dict",
+  "messages": [
+   {
+    "role": "user",
+    "content": {
+     "a": 1,
+     "b": 2
+    }
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_content_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_multimodal_parts",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "mix "
+     },
+     {
+      "type": "image"
+     },
+     {
+      "type": "input_audio"
+     },
+     {
+      "type": "video"
+     },
+     {},
+     {
+      "type": "text"
+     },
+     " bare"
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_message_tools",
+  "messages": [
+   {
+    "role": "user",
+    "content": "use this",
+    "tools": [
+     {
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "parameters": {
+        "type": "object",
+        "properties": {
+         "city": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "v26_gen_thinking_zero",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": 0
+  }
+ },
+ {
+  "id": "v26_gen_thinking_string_false",
+  "messages": [
+   {
+    "role": "user",
+    "content": "hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "enable_thinking": "false"
+  }
+ },
+ {
+  "id": "v26_empty_messages",
+  "messages": [],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ }
+]

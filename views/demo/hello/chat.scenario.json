@@ -1,0 +1,14 @@
+{"steps": [
+  {"expect": {"model_calls": 0}},
+  {"event": "message", "payload": {"text": "What's the weather?"}},
+  {"expect": {"model_calls": 1, "prompt_contains": ["What's the weather?", "lookup"]}},
+  {"model": {"think": "Look it up.", "calls": [{"name": "lookup", "args": {"q": "weather"}}]}},
+  {"expect": {"issued": [{"name": "machine:home", "args": {"cmd": "weather"}}]}},
+  {"event": "message", "payload": {"text": "Quickly, please."}},
+  {"result": {"output": "sunny", "exit": 0}},
+  {"expect": {"model_calls": 1, "prompt_contains": ["sunny", "Quickly, please."]}},
+  {"model": {"think": "Answer.", "text": "It's sunny."}},
+  {"expect": {"idle": true, "model_calls": 0,
+              "log": [{"kind": "input"}, {"kind": "screen"}, {"kind": "model"}, {"kind": "action"}, {"kind": "input"}, {"kind": "screen"},
+                             {"kind": "model"}]}}
+]}

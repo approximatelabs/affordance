@@ -1,0 +1,1760 @@
+[
+ {
+  "id": "empty_messages",
+  "messages": [],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_none_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": null
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_empty_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_empty_list_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": []
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "assistant_whitespace_only",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi"
+   },
+   {
+    "role": "assistant",
+    "content": "   "
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "assistant_empty_content",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi"
+   },
+   {
+    "role": "assistant",
+    "content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "system_none_content",
+  "messages": [
+   {
+    "role": "system",
+    "content": null
+   },
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "system_empty_string",
+  "messages": [
+   {
+    "role": "system",
+    "content": ""
+   },
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "system_content_text_parts",
+  "messages": [
+   {
+    "role": "system",
+    "content": [
+     {
+      "type": "text",
+      "text": "sys a"
+     },
+     {
+      "type": "text",
+      "text": "sys b"
+     }
+    ]
+   },
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_two_text_parts",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "part one"
+     },
+     {
+      "type": "text",
+      "text": "part two"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_text_image_reorder",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "look"
+     },
+     {
+      "type": "image"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_image_only",
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "image"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "two_leading_system",
+  "messages": [
+   {
+    "role": "system",
+    "content": "s1"
+   },
+   {
+    "role": "system",
+    "content": "s2"
+   },
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "five_system_messages",
+  "messages": [
+   {
+    "role": "system",
+    "content": "s0"
+   },
+   {
+    "role": "system",
+    "content": "s1"
+   },
+   {
+    "role": "system",
+    "content": "s2"
+   },
+   {
+    "role": "system",
+    "content": "s3"
+   },
+   {
+    "role": "system",
+    "content": "s4"
+   },
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "system_between_user_assistant",
+  "messages": [
+   {
+    "role": "system",
+    "content": "s"
+   },
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "a"
+   },
+   {
+    "role": "system",
+    "content": "s2"
+   },
+   {
+    "role": "user",
+    "content": "u2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "trailing_system",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "system",
+    "content": "tail"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "system_then_two_users",
+  "messages": [
+   {
+    "role": "system",
+    "content": "s"
+   },
+   {
+    "role": "user",
+    "content": "u1"
+   },
+   {
+    "role": "user",
+    "content": "u2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "two_consecutive_users",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u1"
+   },
+   {
+    "role": "user",
+    "content": "u2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "two_consecutive_assistants",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "a1"
+   },
+   {
+    "role": "assistant",
+    "content": "a2"
+   },
+   {
+    "role": "user",
+    "content": "u2"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "starts_with_assistant",
+  "messages": [
+   {
+    "role": "assistant",
+    "content": "a"
+   },
+   {
+    "role": "user",
+    "content": "u"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tools_empty_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": [],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_def_extra_keys",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "lookup",
+     "description": "Look up.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "q": {
+        "type": "string"
+       }
+      }
+     },
+     "return": "string",
+     "strict": true
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_def_no_description",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "nod",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "x": {
+        "type": "integer"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_def_no_parameters",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "nop",
+     "description": "No parameters."
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_def_no_type",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": [
+   {
+    "function": {
+     "name": "noty",
+     "description": "No type key.",
+     "parameters": {
+      "type": "object",
+      "properties": {}
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_def_unicode_html",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Hi"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "html",
+     "description": "Tags <b>bold</b> & \"quotes\" 'single' café 你好",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "q": {
+        "type": "string",
+        "description": "a < b && c > d"
+       }
+      }
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_id_short",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "abc",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "abc",
+    "name": "get_weather",
+    "content": "r"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_id_nonalnum9",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "!!!!!!!!!",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "!!!!!!!!!",
+    "name": "get_weather",
+    "content": "r"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_id_null",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": null,
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": null,
+    "name": "get_weather",
+    "content": "r"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_content_and_calls",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "I will call the tool",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_empty_calls_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "plain answer",
+    "tool_calls": []
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_args_string_badjson",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": "not json at all"
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_args_empty_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": ""
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_args_list",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": [
+        1,
+        "two",
+        true
+       ]
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_args_dict_unicode",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "q": "naïve ✓ <tag>",
+        "n": 1
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "parallel_tool_calls_id9",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     },
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Rome"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "get_weather",
+    "content": "A"
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "get_weather",
+    "content": "B"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_call_name_unicode",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "café",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_results_role_alias",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool_results",
+    "tool_call_id": "call00001",
+    "content": "r"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_result_content_dict_wrapped",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "get_weather",
+    "content": {
+     "content": "inner"
+    }
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_result_content_dict_plain",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "get_weather",
+    "content": {
+     "a": 1
+    }
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_result_content_numeric",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "get_weather",
+    "content": 42
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_result_content_text_parts",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "get_weather",
+    "content": [
+     {
+      "type": "text",
+      "text": "res"
+     }
+    ]
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_result_missing_id",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "content": "r"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "tool_results_reversed_order",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "",
+    "tool_calls": [
+     {
+      "id": "call00001",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Berlin"
+       }
+      }
+     },
+     {
+      "id": "call00002",
+      "type": "function",
+      "function": {
+       "name": "get_weather",
+       "arguments": {
+        "city": "Rome"
+       }
+      }
+     }
+    ]
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00002",
+    "name": "get_weather",
+    "content": "B"
+   },
+   {
+    "role": "tool",
+    "tool_call_id": "call00001",
+    "name": "get_weather",
+    "content": "A"
+   }
+  ],
+  "tools": [
+   {
+    "type": "function",
+    "function": {
+     "name": "get_weather",
+     "description": "Get the weather.",
+     "parameters": {
+      "type": "object",
+      "properties": {
+       "city": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "city"
+      ]
+     }
+    }
+   }
+  ],
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_v4_plain",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "answer",
+    "reasoning_content": "I thought about it"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_field_alias",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "answer",
+    "reasoning": "alias field"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_empty_string",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "answer",
+    "reasoning_content": ""
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_plus_thinking_chunk",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "t"
+     },
+     {
+      "type": "text",
+      "text": "ans"
+     }
+    ],
+    "reasoning_content": "r"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_chunk_closed_false",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "t",
+      "closed": false
+     },
+     {
+      "type": "text",
+      "text": "ans"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "thinking_chunk_ministral3",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "thinking",
+      "thinking": "t"
+     },
+     {
+      "type": "text",
+      "text": "ans"
+     }
+    ]
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "reasoning_effort_high",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "reasoning_effort": "high"
+  }
+ },
+ {
+  "id": "reasoning_effort_none",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "reasoning_effort": "none"
+  }
+ },
+ {
+  "id": "reasoning_effort_invalid",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "reasoning_effort": "medium"
+  }
+ },
+ {
+  "id": "reasoning_effort_absent",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "unknown_kwarg_ignored",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true,
+   "date_string": "01 Jan 2025",
+   "enable_thinking": true,
+   "preserve_thinking": false
+  }
+ },
+ {
+  "id": "text_control_tokens",
+  "messages": [
+   {
+    "role": "user",
+    "content": "<s> </s> [INST]x[/INST] [TOOL_CALLS] [TOOL_RESULTS] <|im_end|> <unk> {today} {yesterday}"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "text_unicode_astral",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Grüße 👍🏾 🇩🇪 مرحبا שלום é ​ 𝔘𝔫𝔢 → ∑"
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "text_very_long",
+  "messages": [
+   {
+    "role": "user",
+    "content": "sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. sentence number. 你好 tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail tail "
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "assistant_trailing_spaces",
+  "messages": [
+   {
+    "role": "user",
+    "content": "u"
+   },
+   {
+    "role": "assistant",
+    "content": "answer   "
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ },
+ {
+  "id": "user_leading_whitespace",
+  "messages": [
+   {
+    "role": "user",
+    "content": "   spaced   "
+   }
+  ],
+  "tools": null,
+  "kwargs": {
+   "add_generation_prompt": true
+  }
+ }
+]

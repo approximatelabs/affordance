@@ -1,0 +1,7 @@
+{"steps": [
+  {"event": "message", "payload": {"text": "first question"}},
+  {"expect": {"model_calls": 1, "prompt_contains": ["first question"], "prompt_lacks": ["earlier records"]}},
+  {"model": {"think": "a", "text": "First answer."}},
+  {"event": "message", "payload": {"text": "second question"}},
+  {"expect": {"model_calls": 1, "prompt_contains": ["second question", "(2 earlier records are not shown)"], "prompt_lacks": ["first question", "First answer."]}}
+]}
