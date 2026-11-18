@@ -77,7 +77,6 @@ jobs:
           rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy
           rustup default 1.90.0
       - run: cargo fmt --all --check
-      - run: ./tools/check-package.sh
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: lint
@@ -85,6 +84,8 @@ jobs:
       - run: cargo doc --locked --no-deps --all-features
         env:
           RUSTDOCFLAGS: "-D warnings"
+      # After a cargo step, so the dependencies it lists offline are downloaded.
+      - run: ./tools/check-package.sh
   # The minimum supported Rust version still builds.
   msrv:
     runs-on: ubuntu-24.04
