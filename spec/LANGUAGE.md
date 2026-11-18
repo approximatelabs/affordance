@@ -669,8 +669,8 @@ still division) and `new RegExp(src, flags)` / `RegExp(src, flags)` make a `RegE
 `source flags global ignoreCase multiline dotAll unicode lastIndex`. Methods: `re.test(s)`,
 `re.exec(s)`, and with a regex argument `s.match(re)` (all matches with `g`), `s.matchAll(re)` (an
 array of match arrays; needs `g`), `s.search(re)`, `s.replace(re, str|fn)`, `s.replaceAll(re, ..)`
-(needs `g`), `s.split(re, limit)` (captures spliced in). Replacement strings take `$$ $& $\` $' $n
-$nn $<name>`; a replacer function gets `(match, p1.., offset, string[, groups])`. Unmatched groups
+(needs `g`), `s.split(re, limit)` (captures spliced in). Replacement strings take `` $$ $& $` $' $n
+$nn $<name> ``; a replacer function gets `(match, p1.., offset, string[, groups])`. Unmatched groups
 are `undefined`; no match is `null`. Flags `g i m s u`. Semantics follow JS: `.` excludes all line
 terminators unless `s`; `\d \w \b` are ASCII; `\s` is the JS whitespace set; `[]`/`[^]`; global
 iteration steps one code point past empty matches. Differential (27 patterns x 15 strings, 7
