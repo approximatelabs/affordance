@@ -101,10 +101,18 @@ jobs:
         with:
           shared-key: msrv
       - run: cargo check --locked --all-targets
-  # macOS: the command builds and the tests that need no reference data pass.
+  # macOS: the command builds and the tests that need no reference data pass, in the same two
+  # halves as on Linux. Every test binary runs even after one fails, so one run shows everything
+  # that differs here.
   macos:
     runs-on: macos-15
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        half: [a, b]
+    env:
+      SLOW: "hardening:: group_commit:: runtime_http:: model_bindings::"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -116,5 +124,8 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: macos
-      # Every test binary runs even after one fails, so one run shows everything that differs here.
-      - run: cargo test --profile ci --locked --lib --bins --tests --no-fail-fast -- --test-threads=8
+          save-if: ${{ matrix.half == 'a' }}
+      - name: Tests (half ${{ matrix.half }})
+        run: |
+          if [ "${{ matrix.half }}" = a ]; then filters=($SLOW); else filters=(); for f in $SLOW; do filters+=(--skip "$f"); done; fi
+          cargo test --profile ci --locked --lib --bins --tests --no-fail-fast -- --test-threads=8 "${filters[@]}"
