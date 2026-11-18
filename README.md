@@ -43,10 +43,23 @@ Rust; there is no npm resolver. See [public contracts and known limits](spec/CON
 
 ## Try it
 
-Install the `affordance` command (from a checkout until the first crates.io release):
+Install the `affordance` command:
 
 ```sh
-cargo install --path .
+cargo install affordance
+```
+
+Or run it without installing anything, with [uv](https://docs.astral.sh/uv/) (Python's package
+runner). Put `uvx` in front of each `affordance` command below:
+
+```sh
+uvx affordance init my-agent
+```
+
+The examples are in this repository:
+
+```sh
+git clone https://github.com/approximatelabs/affordance && cd affordance
 ```
 
 Render the app above (no model, no Python):

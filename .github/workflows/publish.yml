@@ -1,6 +1,7 @@
 # Publish a release to the registries. It starts when a GitHub release is published (the draft
-# that release.yml made, reviewed and published by a person), and each job waits for approval in
-# the `release` environment.
+# that release.yml made, reviewed and published by a person). The three publishing jobs run in
+# the `release` environment, which needs a person's approval; all three wait for `packages`, so
+# they become ready together and one approval covers them.
 #
 # No registry token is stored: each registry trusts this workflow through OpenID Connect
 # ("trusted publishing"), configured once on the registry for this repository, this file and
@@ -17,6 +18,8 @@ permissions:
   contents: read
 jobs:
   crates-io:
+    # Waits for `packages` though it does not use them: so the approval is asked once, for all three.
+    needs: packages
     runs-on: ubuntu-24.04
     environment: release
     timeout-minutes: 60

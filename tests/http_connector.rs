@@ -45,6 +45,9 @@ fn ordinary_http_is_independent_of_mcp_and_reuses_then_closes_idle_connections()
     );
     let ctx = context();
     let a = transport.call(&ctx, &json!({"path": "items?q=tea"})).unwrap();
+    // The client puts a finished connection back in its pool in the background (as a browser
+    // does); the second request is sent once the first connection is idle, so it reuses it.
+    std::thread::sleep(Duration::from_millis(200));
     let b = transport
         .call(
             &ctx,

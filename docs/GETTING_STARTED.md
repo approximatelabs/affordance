@@ -6,14 +6,25 @@ not needed.
 
 ## Install
 
-From a source checkout, until the first crates.io release:
-
 ```sh
-cargo install --path .
+cargo install affordance
 ```
 
 This installs one command, `affordance`. Everything below uses it; you do not write Rust to build
 an app.
+
+Or run it without installing anything, with [uv](https://docs.astral.sh/uv/) (Python's package
+runner). Put `uvx` in front of each `affordance` command below:
+
+```sh
+uvx affordance init my-agent
+```
+
+The example apps are in the repository:
+
+```sh
+git clone https://github.com/approximatelabs/affordance && cd affordance
+```
 
 ## Render an app
 

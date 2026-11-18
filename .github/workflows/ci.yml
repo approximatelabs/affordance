@@ -1,5 +1,9 @@
 # The gate for pull requests and main. Actions are pinned to commit SHAs; nothing here has
 # write access or secrets.
+#
+# The jobs run side by side and each compiles once. The tests are built in the `ci` profile
+# (Cargo.toml): Affordance's own code built fast, its dependencies optimized. Compiled
+# dependencies are kept between runs (rust-cache), so a run recompiles only what changed.
 name: ci
 on:
   pull_request:
@@ -12,12 +16,29 @@ concurrency:
   cancel-in-progress: true
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
 jobs:
-  # tools/check-engine.sh: every test that needs no reference data, both feature sets, fmt,
-  # clippy, docs, the TSX lint and the package check.
-  gate:
+  # Every test that needs no reference data, and the TSX lint of the shipped views.
+  test:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Rust 1.90
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal
+          rustup default 1.90.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: test
+      - run: cargo test --profile ci --locked --lib --bins --tests -- --test-threads=8
+      - run: cargo run --profile ci --locked --bin affordance -- lint
+  # Formatting, clippy on every feature set, the docs and the package's file list.
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,22 +49,35 @@ jobs:
           rustup default 1.90.0
       - name: ripgrep
         run: command -v rg || (sudo apt-get update && sudo apt-get install -y ripgrep)
-      - run: ./tools/check-engine.sh
+      - run: cargo fmt --all --check
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: lint
+      - run: cargo clippy --locked --all-features --all-targets -- -D warnings
+      - run: cargo clippy --locked --no-default-features --all-targets -- -D warnings
+      - run: cargo doc --locked --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+      - run: ./tools/check-package.sh
   # The minimum supported Rust version still builds.
   msrv:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: |
           rustup toolchain install 1.89.0 --profile minimal
-          cargo +1.89.0 check --locked --all-targets
+          rustup default 1.89.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: msrv
+      - run: cargo check --locked --all-targets
   # macOS: the command builds and the tests that need no reference data pass.
   macos:
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -52,5 +86,8 @@ jobs:
         run: |
           rustup toolchain install 1.90.0 --profile minimal
           rustup default 1.90.0
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: macos
       # Every test binary runs even after one fails, so one run shows everything that differs here.
-      - run: cargo test --release --locked --no-fail-fast -- --test-threads=2
+      - run: cargo test --profile ci --locked --lib --bins --tests --no-fail-fast -- --test-threads=8
