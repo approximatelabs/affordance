@@ -40,6 +40,9 @@ jobs:
         run: |
           rustup toolchain install 1.90.0 --profile minimal
           rustup default 1.90.0
+          # Only this toolchain: the cache key hashes every installed one, and the runner's
+          # preinstalled stable changes from image to image.
+          rustup toolchain list | cut -d' ' -f1 | grep -v '^1.90.0' | xargs -r -n1 rustup toolchain uninstall
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # Each shard keeps its own build: with one cache that only shard 1 saved, the other
@@ -67,6 +70,9 @@ jobs:
         run: |
           rustup toolchain install 1.90.0 --profile minimal --component clippy
           rustup default 1.90.0
+          # Only this toolchain: the cache key hashes every installed one, and the runner's
+          # preinstalled stable changes from image to image.
+          rustup toolchain list | cut -d' ' -f1 | grep -v '^1.90.0' | xargs -r -n1 rustup toolchain uninstall
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: clippy
@@ -83,6 +89,9 @@ jobs:
         run: |
           rustup toolchain install 1.90.0 --profile minimal --component rustfmt,clippy
           rustup default 1.90.0
+          # Only this toolchain: the cache key hashes every installed one, and the runner's
+          # preinstalled stable changes from image to image.
+          rustup toolchain list | cut -d' ' -f1 | grep -v '^1.90.0' | xargs -r -n1 rustup toolchain uninstall
       - run: cargo fmt --all --check
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -104,6 +113,9 @@ jobs:
       - run: |
           rustup toolchain install 1.89.0 --profile minimal
           rustup default 1.89.0
+          # Only this toolchain: the cache key hashes every installed one, and the runner's
+          # preinstalled stable changes from image to image.
+          rustup toolchain list | cut -d' ' -f1 | grep -v '^1.89.0' | xargs -r -n1 rustup toolchain uninstall
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: msrv
@@ -129,6 +141,9 @@ jobs:
         run: |
           rustup toolchain install 1.90.0 --profile minimal
           rustup default 1.90.0
+          # Only this toolchain: the cache key hashes every installed one, and the runner's
+          # preinstalled stable changes from image to image.
+          rustup toolchain list | cut -d' ' -f1 | grep -v '^1.90.0' | xargs -r -n1 rustup toolchain uninstall
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # Each shard keeps its own build: with one cache that only shard 1 saved, the other
