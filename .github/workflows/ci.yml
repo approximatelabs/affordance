@@ -42,8 +42,9 @@ jobs:
           rustup default 1.90.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          shared-key: test
-          save-if: ${{ matrix.shard == 1 }}
+          # Each shard keeps its own build: with one cache that only shard 1 saved, the other
+          # shards' lookups sometimes came back empty and they compiled from nothing.
+          shared-key: test-${{ matrix.shard }}
       - name: Tests (shard ${{ matrix.shard }})
         run: |
           case "${{ matrix.shard }}" in
@@ -130,8 +131,9 @@ jobs:
           rustup default 1.90.0
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          shared-key: macos
-          save-if: ${{ matrix.shard == 1 }}
+          # Each shard keeps its own build: with one cache that only shard 1 saved, the other
+          # shards' lookups sometimes came back empty and they compiled from nothing.
+          shared-key: macos-${{ matrix.shard }}
       - name: Tests (shard ${{ matrix.shard }})
         run: |
           case "${{ matrix.shard }}" in
