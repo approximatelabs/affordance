@@ -266,7 +266,7 @@ export default function Main() {
     .unwrap();
     std::fs::write(
         dir.join("affordance.yaml"),
-        "root: {app: app.tsx}\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\nserve: {listen: \"127.0.0.1:0\", timeout_s: 2}\n",
+        "root: {app: app.tsx}\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\nserve: {listen: \"127.0.0.1:0\", timeout_s: 4}\n",
     )
     .unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_affordance"))
@@ -286,14 +286,16 @@ export default function Main() {
     let (status, _) = request(port, "GET", "/hang", "");
     assert!(status.contains("504"), "{status}");
     assert!(
-        started.elapsed() < Duration::from_secs(6),
+        started.elapsed() < Duration::from_secs(10),
         "a request that is never answered ends at timeout_s"
     );
+    // 4 s: time for a loaded machine to start the stream and write its first chunk before the
+    // server cuts it (at 2 s, a CI runner running eight tests at once was sometimes too slow).
     let started = Instant::now();
     let (status, body) = request(port, "GET", "/open", "");
     assert!(status.contains("200") && body.contains("first"), "{status} {body}");
     assert!(
-        started.elapsed() < Duration::from_secs(6),
+        started.elapsed() < Duration::from_secs(10),
         "a stream left open is cut at timeout_s"
     );
     let (status, body) = request(port, "GET", "/bad", "");

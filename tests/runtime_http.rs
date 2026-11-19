@@ -118,8 +118,9 @@ fn a_finished_request_keeps_its_connection_for_the_next() {
             post_json(&url, b"{}", &[], Duration::from_secs(1), &cancel).unwrap(),
             (200, json!({}))
         );
-        // The pool takes the connection back a moment after the body's end.
-        std::thread::sleep(Duration::from_millis(20));
+        // The pool takes the connection back a moment after the body's end (from a background
+        // task, so on a loaded machine 20 ms was sometimes too short).
+        std::thread::sleep(Duration::from_millis(200));
     }
     assert_eq!(peer.join().unwrap(), (3, true), "three requests on one connection");
     assert!(!cancel.is_cancelled());
