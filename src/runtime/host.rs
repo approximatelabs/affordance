@@ -344,6 +344,11 @@ struct Shared {
     quiescing: AtomicBool,
     clock_base: i64,
     clock_started: Instant,
+    /// The clock's value from the moment a pause (or the end of the run) began, or `i64::MIN`
+    /// while it runs. Work still finishing during the pause sees that moment and no later, so a
+    /// timer neither fires nor loses time while the pause drains: a resume continues every
+    /// timer with what it had left, as a frozen browser tab's timers do.
+    clock_frozen: AtomicI64,
     /// Instances no worker holds: unmounted ones as they were when they left, and lost ones
     /// (`lost`). The run's report includes them.
     retired: Mutex<BTreeMap<String, AgentReport>>,
@@ -400,7 +405,17 @@ impl Shared {
         )
     }
     fn clock_ms(&self) -> i64 {
-        self.clock_base + self.clock_started.elapsed().as_millis() as i64
+        match self.clock_frozen.load(Ordering::SeqCst) {
+            i64::MIN => self.clock_base + self.clock_started.elapsed().as_millis() as i64,
+            frozen => frozen,
+        }
+    }
+    /// Stop the clock at this moment (the first call wins).
+    fn freeze_clock(&self) {
+        let now = self.clock_base + self.clock_started.elapsed().as_millis() as i64;
+        let _ = self
+            .clock_frozen
+            .compare_exchange(i64::MIN, now, Ordering::SeqCst, Ordering::SeqCst);
     }
     /// List a machine call as live; cancelling its token stops it.
     fn token(&self, agent: &str, incarnation: u64, task: u64) -> CancelToken {
@@ -784,6 +799,7 @@ impl Runtime {
             quiescing: AtomicBool::new(false),
             clock_base,
             clock_started: Instant::now(),
+            clock_frozen: AtomicI64::new(i64::MIN),
             retired: Default::default(),
             booting: Default::default(),
             durable: durable.clone(),
@@ -913,6 +929,7 @@ impl Runtime {
                     // for the resume to issue again, so it cannot be taken back by removing the
                     // file. `pause_started` is the state; the file only starts it.
                     if pause_started.is_some() || control.join("pause.json").exists() {
+                        shared.freeze_clock();
                         shared.quiescing.store(true, Ordering::SeqCst);
                         suspend_queued_models(&shared);
                         let pause_at = pause_started.get_or_insert_with(Instant::now);
@@ -1042,6 +1059,7 @@ impl Runtime {
         // Abort everything still running (commands are killed, requests closed).
         // No periodic status lands after this (the final clock below must be the last).
         status_writer.finish();
+        shared.freeze_clock();
         shared.quiescing.store(true, Ordering::SeqCst);
         suspend_queued_models(&shared);
         for (_, live) in shared.cancels.lock().unwrap().drain() {

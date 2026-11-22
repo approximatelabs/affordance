@@ -297,6 +297,7 @@ mod model_gate_tests {
             quiescing: AtomicBool::new(false),
             clock_base: 0,
             clock_started: Instant::now(),
+            clock_frozen: AtomicI64::new(i64::MIN),
             retired: Default::default(),
             booting: Default::default(),
             durable: Default::default(),

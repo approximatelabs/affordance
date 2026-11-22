@@ -882,6 +882,91 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
 }
 
 #[test]
+fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
+    // A 2.5 s timer in one agent; a 3.5 s command in another. A pause once the command has
+    // started waits for it to finish, by when the timer would be due; but the timer's time stops at the pause:
+    // it neither fires during the drain nor after the resume until the ~2.2 s it had left pass. (Found by Multiplet: a 240 s
+    // wait fired a second after its fleet resumed.)
+    use std::process::Command as Process;
+    use std::time::{Duration, Instant};
+    let dir = std::env::temp_dir().join(format!("aff-pause-drain-clock-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let home = dir.join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(
+        dir.join("app.tsx"),
+        r#"export function Main({busy}) {
+  useEffect(() => {
+    async function run() {
+      const home = harness.machine.get("home");
+      if (busy) { await home.call({cmd: "touch busy-started; sleep 3.5"}); return; }
+      await harness.wait({ms: 2500, events: []});
+      await home.call({cmd: "touch timer-fired"});
+      harness.stop({});
+    }
+    run();
+  }, []);
+  return <box>timer</box>;
+}"#,
+    )
+    .unwrap();
+    let deployment = json!({
+        "app": {"view": "app.tsx", "entry": "Main"},
+        "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
+        "machines": {"home": {"kind": "local", "home": home}},
+        "agents": [
+            {"id": "busy", "model": null, "props": {"busy": true}},
+            {"id": "timer", "model": null, "props": {"busy": false}}
+        ],
+        "dir": "agents",
+        "max_wall_s": 20
+    });
+    std::fs::write(dir.join("deployment.json"), deployment.to_string()).unwrap();
+    let run = |resume: bool| {
+        let mut command = Process::new(env!("CARGO_BIN_EXE_affordance"));
+        command.arg("run").arg("deployment.json").current_dir(&dir);
+        if resume {
+            command.arg("--resume");
+        }
+        command
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        command
+    };
+    let mut first = run(false).spawn().unwrap();
+    // The pause comes once the command is running (and the timer with it), so the drain is real.
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !home.join("busy-started").exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    std::thread::sleep(Duration::from_millis(300));
+    let control = dir.join("agents/control");
+    std::fs::create_dir_all(&control).unwrap();
+    std::fs::write(control.join("pause.json"), "{}").unwrap();
+    assert!(first.wait().unwrap().success());
+    std::fs::remove_file(control.join("pause.json")).unwrap();
+    assert!(
+        !home.join("timer-fired").exists(),
+        "the timer fired while the pause drained"
+    );
+    let resumed = Instant::now();
+    assert!(run(true).status().unwrap().success());
+    assert!(home.join("timer-fired").exists());
+    let waited = std::fs::metadata(home.join("timer-fired"))
+        .unwrap()
+        .modified()
+        .unwrap()
+        .duration_since(std::time::SystemTime::now() - resumed.elapsed())
+        .unwrap_or_default();
+    eprintln!("after the resume the timer fired in {waited:?}");
+    assert!(
+        waited >= Duration::from_millis(2000),
+        "after the resume the timer fired in {waited:?}, not the ~2.2 s it had left"
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
 fn recovery_repairs_a_torn_tail_before_appending() {
     use std::io::Write;
