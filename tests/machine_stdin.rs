@@ -126,7 +126,7 @@ fn an_apps_large_input_is_a_blob_reference_in_the_journal() {
     );
     // The journal records the call's result (its arguments are recomputed on replay); the input
     // crossed as a blob reference, so it sat on disk once, not on the heap.
-    let journal = std::fs::read_to_string(dir.join("run/a/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/journal.jsonl")).unwrap();
     assert!(journal.len() < 1024, "{journal}");
     let blobs: Vec<_> = std::fs::read_dir(dir.join("run/blobs"))
         .unwrap()

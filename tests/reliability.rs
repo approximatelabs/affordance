@@ -141,7 +141,8 @@ export default function Main({{denied,reverse,name}}){{
             )
         );
         // Exercise complete journal replay as well as the normal cache-based stop path.
-        let _ = std::fs::remove_file(dir.0.join("run").join(&agent.id).join("checkpoint.json"));
+        let _ =
+            std::fs::remove_file(crate::shared::instance_dir(&dir.0.join("run"), &agent.id).join("checkpoint.json"));
     }
     let restored = run(true);
     for (before, after) in report.agents.iter().zip(&restored.agents) {
@@ -235,7 +236,7 @@ export default function Main(){
             // the controller); the wall limit only bounds a failure, so a slow restore under load
             // cannot end the run before the held work continues.
             cfg.max_wall = Some(Duration::from_secs(2));
-            let journal = dir.0.join("run/busy/journal.jsonl");
+            let journal = crate::shared::inst(&dir.0, "run/busy/journal.jsonl");
             let lines = |p: &std::path::Path| std::fs::read(p).map_or(0, |b| b.iter().filter(|&&c| c == b'\n').count());
             let start = lines(&journal).max(before.journal_len);
             let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -280,7 +281,9 @@ fn child_keys_cannot_alias_persisted_instance_paths() {
         rt.add_agent(AgentSpec::new("parent", json!({}))).unwrap();
         let report = rt.run().unwrap();
         assert!(report.agents[0].error.as_deref().unwrap().contains("key"));
-        let saved: J = serde_json::from_slice(&std::fs::read(dir.0.join("run/parent/agent.json")).unwrap()).unwrap();
+        let saved: J =
+            serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir.0, "run/parent/agent.json")).unwrap())
+                .unwrap();
         assert_eq!(saved["id"], "parent");
         assert_eq!(report.agents.len(), 1);
     }
@@ -310,7 +313,7 @@ export default function Main() { const [phase,setPhase]=useState(0,'phase'); use
         assert!(kid.error.is_none(), "{:?}", kid.error);
         assert_eq!(kid.state["__ui"]["@n"], 101);
     }
-    assert!(dir.0.join("run/.retired").is_dir());
+    assert!(dir.0.join("run/retired").is_dir());
 }
 
 #[test]
@@ -419,7 +422,7 @@ fn store_recovers_partial_utf8_tail_and_preserves_committed_records() {
     let dir = Scratch::new();
     let store = Store::new(Some(dir.0.clone()));
     store.call("a", "store.put", &json!({"text":"saved"})).unwrap();
-    let file = dir.0.join("a/store.jsonl");
+    let file = crate::shared::inst(&dir.0, "a/store.jsonl");
     use std::io::Write;
     std::fs::OpenOptions::new()
         .append(true)
@@ -444,7 +447,7 @@ fn store_recovers_partial_utf8_tail_and_preserves_committed_records() {
         "next"
     );
     assert!(
-        std::fs::read_dir(dir.0.join("a"))
+        std::fs::read_dir(crate::shared::instance_dir(&dir.0, "a"))
             .unwrap()
             .any(|e| { e.unwrap().file_name().to_string_lossy().starts_with("torn-store-") })
     );
@@ -488,15 +491,15 @@ export default function Main(){
         writeln!(
             std::fs::OpenOptions::new()
                 .append(true)
-                .open(run.join(id).join("journal.jsonl"))
+                .open(crate::shared::instance_dir(&run, id).join("journal.jsonl"))
                 .unwrap(),
             "{}",
             serde_json::to_string(&input).unwrap()
         )
         .unwrap();
     };
-    let checkpoint = run.join("a/checkpoint.json");
-    let child_checkpoint = run.join("a/kid/checkpoint.json");
+    let checkpoint = crate::shared::inst(&run, "a/checkpoint.json");
+    let child_checkpoint = crate::shared::inst(&run, "a/kid/checkpoint.json");
     assert!(checkpoint.exists() && child_checkpoint.exists());
     let clock = read(&run.join("clock.json"))["clock_ms"].as_i64().unwrap() + 10;
     append("a", "advance", json!({"label":"second"}), clock);
@@ -515,12 +518,12 @@ export default function Main(){
     let from = saved["data"]["image"]["journaled"].as_u64().unwrap();
     let child_from = child_saved["data"]["image"]["journaled"].as_u64().unwrap();
     assert!(from > 0 && child_from > 0);
-    let root_prefix = std::fs::read(run.join("a/journal.jsonl")).unwrap();
-    let child_prefix = std::fs::read(run.join("a/kid/journal.jsonl")).unwrap();
+    let root_prefix = std::fs::read(crate::shared::inst(&run, "a/journal.jsonl")).unwrap();
+    let child_prefix = std::fs::read(crate::shared::inst(&run, "a/kid/journal.jsonl")).unwrap();
     let clock = read(&run.join("clock.json"))["clock_ms"].as_i64().unwrap() + 10;
     append("a", "advance", json!({"label":"third"}), clock);
     append("a/kid", "bump", json!({}), clock + 1);
-    let child_journal = run.join("a/kid/journal.jsonl");
+    let child_journal = crate::shared::inst(&run, "a/kid/journal.jsonl");
     let boundary = std::fs::metadata(&child_journal).unwrap().len();
     std::fs::OpenOptions::new()
         .append(true)
@@ -540,7 +543,7 @@ export default function Main(){
     assert_eq!(child.state["__ui"]["@n"], 13);
     assert_eq!(child.state["label"], "third");
     for (id, from, prefix) in [("a", from, root_prefix), ("a/kid", child_from, child_prefix)] {
-        let records = std::fs::read_to_string(run.join(id).join("trace.jsonl"))
+        let records = std::fs::read_to_string(crate::shared::instance_dir(&run, id).join("trace.jsonl"))
             .unwrap()
             .lines()
             .map(|line| serde_json::from_str::<J>(line).unwrap())
@@ -549,14 +552,18 @@ export default function Main(){
         assert_eq!(restored["from_input"], from);
         assert_eq!(restored["replayed_inputs"], 1);
         assert!(
-            std::fs::read(run.join(id).join("journal.jsonl"))
+            std::fs::read(crate::shared::instance_dir(&run, id).join("journal.jsonl"))
                 .unwrap()
                 .starts_with(&prefix)
         );
     }
-    assert!(run.join("a/kid").join(format!("torn-journal-{boundary}.bin")).exists());
+    assert!(
+        crate::shared::instance_dir(&run, "a/kid")
+            .join(format!("torn-journal-{boundary}.bin"))
+            .exists()
+    );
     // A valid edit of the same byte length must invalidate the certified prefix.
-    let root_journal = run.join("a/journal.jsonl");
+    let root_journal = crate::shared::inst(&run, "a/journal.jsonl");
     let before = std::fs::read_to_string(&root_journal).unwrap();
     let edited = before.replace("\"label\":\"third\"", "\"label\":\"other\"");
     assert_ne!(before, edited);
@@ -619,9 +626,9 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), template(json!({"reasoning_effort":"high"})));
     rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
     assert!(rt.run().unwrap().agents[0].error.is_none());
-    assert!(run.join("a/checkpoint.json").exists());
+    assert!(crate::shared::inst(&run, "a/checkpoint.json").exists());
     let restores = || {
-        std::fs::read_to_string(run.join("a/trace.jsonl"))
+        std::fs::read_to_string(crate::shared::inst(&run, "a/trace.jsonl"))
             .unwrap()
             .lines()
             .filter(|l| serde_json::from_str::<J>(l).unwrap()["t"] == "checkpoint_restore")
@@ -643,7 +650,7 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
         writeln!(
             std::fs::OpenOptions::new()
                 .append(true)
-                .open(run.join("a/journal.jsonl"))
+                .open(crate::shared::inst(&run, "a/journal.jsonl"))
                 .unwrap(),
             "{}",
             serde_json::to_string(&input).unwrap()
@@ -715,7 +722,7 @@ fn recovery_caches_skip_secret_environments_and_live_source_values() {
         rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
         let first = rt.run().unwrap();
         assert!(first.agents[0].error.is_none());
-        assert!(!run.join("a/checkpoint.json").exists());
+        assert!(!crate::shared::inst(&run, "a/checkpoint.json").exists());
         let second = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
         assert!(second.agents[0].error.is_none());
         assert_eq!(first.agents[0].state, second.agents[0].state);
@@ -738,7 +745,7 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
         rt.run().unwrap()
     };
     fresh(cfg.clone());
-    let path = run.join("a/store.jsonl");
+    let path = crate::shared::inst(&run, "a/store.jsonl");
     std::fs::write(&path, b"{broken record}\n").unwrap();
     let restored = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
@@ -762,7 +769,7 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
     let restarted = fresh(cfg);
     assert!(restarted.agents.iter().all(|a| a.error.is_none()));
     assert!(!path.exists());
-    assert!(run.join(".retired").is_dir());
+    assert!(run.join("retired").is_dir());
 }
 
 #[test]
@@ -783,12 +790,14 @@ export function Sender(){const [seen,setSeen]=useState([],'seen');
     cfg.dir = Some(run.clone());
     let enc = encoder();
     let mut rt = Runtime::new(cfg, enc, model());
-    let checkpoint = run.join("halt/checkpoint.json");
-    let observed = checkpoint.clone();
+    let observed = run.clone();
     rt.bind_machine(
         "home",
         Arc::new(move |_: &affordance::runtime::CallContext, _: &J| {
-            let image: J = serde_json::from_slice(&std::fs::read(&observed).map_err(|e| e.to_string())?)
+            let image = crate::shared::find_instance(&observed, "halt")
+                .ok_or("no instance halt")?
+                .join("checkpoint.json");
+            let image: J = serde_json::from_slice(&std::fs::read(&image).map_err(|e| e.to_string())?)
                 .map_err(|e| e.to_string())?;
             Ok(json!({"inputs":image["data"]["image"]["journaled"]}))
         }),
@@ -803,7 +812,10 @@ export function Sender(){const [seen,setSeen]=useState([],'seen');
     let sender = report.agents.iter().find(|a| a.id == "sender").unwrap();
     assert_eq!(sender.state["__ui"]["@seen"], json!([0, 0, 0]));
     assert_eq!(sender.metrics.handler_errors, 0);
-    let saved: J = serde_json::from_slice(&std::fs::read(checkpoint).unwrap()).unwrap();
+    let saved: J = serde_json::from_slice(
+        &std::fs::read(crate::shared::instance_dir(&run, "halt").join("checkpoint.json")).unwrap(),
+    )
+    .unwrap();
     assert_eq!(saved["data"]["image"]["journaled"], 3);
 }
 
@@ -823,8 +835,8 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
         first_report.agents.iter().all(|a| a.error.is_none()),
         "{first_report:?}"
     );
-    let child = cfg.dir.as_ref().unwrap().join("a/child/journal.jsonl");
-    let root = cfg.dir.as_ref().unwrap().join("a/journal.jsonl");
+    let child = crate::shared::inst(cfg.dir.as_ref().unwrap(), "a/child/journal.jsonl");
+    let root = crate::shared::inst(cfg.dir.as_ref().unwrap(), "a/journal.jsonl");
     let mut last = first_report.agents.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
         .as_u64()
         .unwrap();
@@ -893,7 +905,7 @@ fn one_unreadable_journal_does_not_stop_the_fleet() {
         first.add_agent(AgentSpec::new(id, json!({}))).unwrap();
     }
     assert!(first.run().unwrap().agents.iter().all(|a| a.error.is_none()));
-    let journal = dir.0.join("run/b/journal.jsonl");
+    let journal = crate::shared::inst(&dir.0, "run/b/journal.jsonl");
     std::fs::OpenOptions::new()
         .append(true)
         .open(&journal)
@@ -929,8 +941,8 @@ fn a_second_runtime_cannot_take_a_live_run_directory() {
     let mut first = Runtime::new(cfg.clone(), enc.clone(), model());
     first.add_agent(AgentSpec::new("a", json!({}))).unwrap();
     let running = std::thread::spawn(move || first.run());
-    let journal = dir.0.join("run/a/journal.jsonl");
-    while std::fs::metadata(&journal).map_or(true, |m| m.len() == 0) {
+    let journal = || crate::shared::find_instance(&dir.0.join("run"), "a").map(|d| d.join("journal.jsonl"));
+    while journal().is_none_or(|j| std::fs::metadata(j).map_or(true, |m| m.len() == 0)) {
         std::thread::sleep(Duration::from_millis(5));
     }
     let err = Runtime::restore(cfg.clone(), enc.clone(), model())
@@ -1013,8 +1025,11 @@ fn completed_runtimes_release_their_background_threads() {
     assert!(threads() <= before, "threads before={before}, after={}", threads());
 }
 
+/// A saved name is only a name: it never becomes a path (instances live under ids the runtime
+/// assigned), and one that is not a valid name is refused on restore, with nothing written outside
+/// the run.
 #[test]
-fn resume_rejects_a_saved_identity_that_escapes_its_directory() {
+fn restore_refuses_a_saved_name_that_is_not_a_name() {
     let dir = Scratch::new();
     let app = dir.app("export default function Main(){return 'idle';}");
     let mut cfg = config(&app);
@@ -1023,14 +1038,21 @@ fn resume_rejects_a_saved_identity_that_escapes_its_directory() {
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
     rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
     rt.run().unwrap();
-    let path = dir.0.join("run/a/agent.json");
+    let path = crate::shared::inst(&dir.0, "run/a/agent.json");
     let mut saved: J = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    saved["id"] = json!("../outside");
+    saved["id"] = json!("..");
     std::fs::write(&path, saved.to_string()).unwrap();
     let err = Runtime::restore(cfg, enc, model())
         .err()
-        .expect("invalid saved identity must fail");
-    assert!(err.contains("does not match its directory"), "{err}");
+        .expect("an invalid saved name must fail");
+    assert!(err.contains("is not a name"), "{err}");
+    let mut beside: Vec<String> = std::fs::read_dir(&dir.0)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    beside.sort();
+    assert_eq!(beside, ["app.tsx", "run"], "nothing was written outside the run");
 }
 
 #[test]

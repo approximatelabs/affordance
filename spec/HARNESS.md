@@ -57,8 +57,8 @@ mounts a child. A missing key unmounts it. Changed props are a `Props` input to 
 changed app, model or machines remounts it. Reconciliation is a deterministic function of state,
 so replay mounts the same children. A remount starts a fresh incarnation, including hook and
 store state. Recovery after a process restart restores the current incarnation instead. Old
-incarnations are preserved under the run directory's `.retired/` archive. Child keys cannot
-start with a dot or contain path separators or control characters. Inspection cursors are scoped to the
+incarnations are preserved under the run directory's `retired/`. Child keys cannot
+start with a dot or contain `/` or control characters. Inspection cursors are scoped to the
 incarnation, so reusing a child key produces a fresh state read.
 
 **The boundary.** The child runs as its own instance, so the element crosses a boundary, as a
@@ -89,7 +89,8 @@ its parent's. Top-level instances are bound to the deployment's machines unless 
 roles. With a model binding, an instance calls its model when its code says so
 (`model()`, §3); without one it only reacts.
 
-Children live on their parent's worker. Each journals under `<dir>/<parent>/<key>/`. On restore, a
+Children live on their parent's worker. Each journals in its own instance directory (below),
+like any instance. On restore, a
 parent's replay rebuilds its children set, and each child restores from its own journal and first
 props.
 
@@ -516,7 +517,7 @@ is in memory. Replay reconstructs computation, not live sockets, processes or a 
 heap. Outstanding external calls can run again (§5); cancellation does not undo remote writes.
 Deployment environment and credentials must be supplied again on restore.
 
-**Recovery checkpoints.** With a run directory the host may write `<id>/checkpoint.json`,
+**Recovery checkpoints.** With a run directory the host may write an instance's `checkpoint.json`,
 an optional recovery cache. It keeps the complete journal and all historical data. A compatible
 image restores supported data/metadata at a complete input boundary, then applies only newer
 journal inputs. An image is of an idle agent (no pending execution, cleanup closures or
@@ -600,17 +601,22 @@ and already-journaled receivers deduplicate them. Old sender incarnations cannot
 acknowledgements. Journals are synced together by commits (§7), across instances and workers.
 
 With `dir`, the run directory holds the run's durable state (a controller uses `Control`, not
-these files):
+these files). An instance's name is a label and never becomes a path: each instance, a child
+included, lives in `instances/<id>/` under an id the runtime assigned when it was first created
+(a UUIDv7), and its `agent.json` records its name. The run's own files sit beside `instances/`,
+where no name reaches them.
 
 | Path | Meaning |
 |---|---|
-| `<id>/agent.json` | The instance's spec and pins. Secrets are removed. |
-| `<id>/journal.jsonl` | Its inputs. **Sensitive:** tool outputs and messages are stored as they were. |
+| `run.json` | The run's own record: the directory holds a run. |
+| `instances/<id>/agent.json` | The instance's name, spec and pins. Secrets are removed. |
+| `instances/<id>/journal.jsonl` | Its inputs. **Sensitive:** tool outputs and messages are stored as they were. |
 | `commit.jsonl` | The journals' commits: each journal's committed length, by instance (§7). A restore truncates journals to the last one. |
 | `runtime.lock` | Locked by the runtime that owns the directory (§7). |
-| `<id>/trace.jsonl` | Renders, replies, model calls (usage, cost), semantic tool completions, handler errors, stops. Secrets redacted. |
-| `<id>/snapshot.json` | Diagnostic state and metrics at shutdown. |
-| `<id>/checkpoint.json` | Optional verified recovery image and journal cursor (§8). |
+| `instances/<id>/trace.jsonl` | Renders, replies, model calls (usage, cost), semantic tool completions, handler errors, stops. Secrets redacted. |
+| `instances/<id>/snapshot.json` | Diagnostic state and metrics at shutdown. Secrets redacted. |
+| `instances/<id>/checkpoint.json` | Optional verified recovery image and journal cursor (§8). |
+| `retired/<id>/` | An instance a fresh mount (or a fresh run) replaced, as it was. |
 | `blobs/` | Large strings (§7). |
 | `clock.json` | Where the logical clock stood (private recovery state, not an interface): rewritten about every 100 ms by its own thread, and at the end of the run, so a restore continues the clock from there, even after a crash during a long quiet wait. |
 

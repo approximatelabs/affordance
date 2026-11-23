@@ -118,7 +118,8 @@ fn capture(req: &GenRequest, rid: &str, kind: &str, data: impl FnOnce() -> Vec<u
     let Some(root) = &req.diagnostics.0.capture_dir else {
         return;
     };
-    let dir = root.join(agent);
+    // The instance's name, escaped into one path component: never a path of its own.
+    let dir = root.join(super::exec::instance_component(agent));
     let path = dir.join(format!("{rid}.{kind}.json"));
     let temporary = path.with_extension("tmp");
     let written = std::fs::create_dir_all(&dir).and_then(|_| {

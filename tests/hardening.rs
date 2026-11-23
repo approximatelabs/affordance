@@ -80,8 +80,8 @@ fn store_autokeys_do_not_overwrite_user_keys() {
 #[test]
 fn store_rejects_invalid_complete_records() {
     let f = Files::new();
-    std::fs::create_dir_all(f.0.join("a")).unwrap();
-    std::fs::write(f.0.join("a/store.jsonl"), "{\"unrelated\":true}\n").unwrap();
+    crate::shared::new_instance(&f.0, "a");
+    std::fs::write(crate::shared::inst(&f.0, "a/store.jsonl"), "{\"unrelated\":true}\n").unwrap();
     let s = affordance::runtime::store::Store::new(Some(f.0.clone()));
     let r = s.load("a");
     eprintln!("load={r:?}");
@@ -706,8 +706,8 @@ fn complete_invalid_store_records_are_not_treated_as_torn_tails() {
         json!({"key":"x","text":"y","next":-1}),
     ] {
         let f = Files::new();
-        std::fs::create_dir_all(f.0.join("a")).unwrap();
-        let path = f.0.join("a/store.jsonl");
+        crate::shared::new_instance(&f.0, "a");
+        let path = crate::shared::inst(&f.0, "a/store.jsonl");
         let bytes = record.to_string();
         std::fs::write(&path, &bytes).unwrap();
         let store = affordance::runtime::store::Store::new(Some(f.0.clone()));
@@ -737,8 +737,8 @@ fn persisted_auto_keys_survive_reload_and_explicit_collisions() {
 #[test]
 fn a_backwards_store_counter_is_rejected_before_completing_its_line() {
     let f = Files::new();
-    std::fs::create_dir_all(f.0.join("a")).unwrap();
-    let path = f.0.join("a/store.jsonl");
+    crate::shared::new_instance(&f.0, "a");
+    let path = crate::shared::inst(&f.0, "a/store.jsonl");
     let bytes = b"{\"key\":\"saved\",\"text\":\"first\",\"next\":2}\n{\"key\":\"bad\",\"text\":\"second\",\"next\":1}";
     std::fs::write(&path, bytes).unwrap();
     let store = affordance::runtime::store::Store::new(Some(f.0.clone()));

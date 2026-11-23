@@ -37,7 +37,9 @@ fn len(path: &Path) -> u64 {
     std::fs::metadata(path).map(|m| m.len()).unwrap_or(0)
 }
 fn state(dir: &Path, id: &str) -> J {
-    let snap: J = serde_json::from_slice(&std::fs::read(dir.join(id).join("snapshot.json")).unwrap()).unwrap();
+    let snap: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::instance_dir(dir, id).join("snapshot.json")).unwrap())
+            .unwrap();
     assert!(snap["error"].is_null(), "{id}: {}", snap["error"]);
     snap["state"]["__ui"].clone()
 }
@@ -65,7 +67,12 @@ fn a_crash_between_commits_resumes_from_a_consistent_cut() {
     let cfg_path = root.join("run.json");
     std::fs::write(&cfg_path, cfg.to_string()).unwrap();
 
-    let hub_journal = dir.join("hub/journal.jsonl");
+    // The hub's journal, once the run has made its instance (empty until then).
+    let hub_journal = || {
+        crate::shared::find_instance(&dir, "hub")
+            .map(|d| d.join("journal.jsonl"))
+            .unwrap_or_default()
+    };
     // A commit can land between seeing uncommitted lines and the kill arriving, and then there
     // is nothing for the power loss to take: the run is started again.
     let hub_uncommitted = 'run: {
@@ -91,9 +98,9 @@ fn a_crash_between_commits_resumes_from_a_consistent_cut() {
                     .unwrap_or(0);
                 // And the hub's journal is longer than its last commit covers: that is what the kill
                 // must leave uncommitted.
-                if commits >= 4 && len(&hub_journal) > 20_000 {
+                if commits >= 4 && len(&hub_journal()) > 20_000 {
                     let committed = commit_cut(&dir).get("hub").map_or(0, |at| at[1].as_u64().unwrap());
-                    if len(&hub_journal) > committed {
+                    if len(&hub_journal()) > committed {
                         break;
                     }
                 }
@@ -105,7 +112,7 @@ fn a_crash_between_commits_resumes_from_a_consistent_cut() {
             let cut = commit_cut(&dir);
             let mut lost = 0;
             for i in 0..ASKERS {
-                let journal = dir.join(format!("asker-{i}/journal.jsonl"));
+                let journal = crate::shared::inst(&dir, &format!("asker-{i}/journal.jsonl"));
                 let keep = cut.get(&format!("asker-{i}")).map_or(0, |at| at[1].as_u64().unwrap());
                 lost += len(&journal) - keep;
                 std::fs::OpenOptions::new()
@@ -115,7 +122,7 @@ fn a_crash_between_commits_resumes_from_a_consistent_cut() {
                     .set_len(keep)
                     .unwrap();
             }
-            let hub_uncommitted = len(&hub_journal) - cut["hub"][1].as_u64().unwrap();
+            let hub_uncommitted = len(&hub_journal()) - cut["hub"][1].as_u64().unwrap();
             if lost + hub_uncommitted > 0 {
                 break 'run hub_uncommitted;
             }
@@ -132,7 +139,7 @@ fn a_crash_between_commits_resumes_from_a_consistent_cut() {
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     if hub_uncommitted > 0 {
         assert!(
-            std::fs::read_dir(dir.join("hub"))
+            std::fs::read_dir(crate::shared::instance_dir(&dir, "hub"))
                 .unwrap()
                 .flatten()
                 .any(|e| e.file_name().to_string_lossy().starts_with("uncommitted-journal-")),
@@ -270,7 +277,7 @@ fn a_crash_between_commits_keeps_every_blob_and_store_entry_a_committed_line_ref
         let mut keep = std::collections::BTreeSet::new();
         for id in &ids {
             for (file, cut) in [("journal.jsonl", &journals), ("store.jsonl", &stores)] {
-                let path = dir.join(id).join(file);
+                let path = crate::shared::instance_dir(&dir, id).join(file);
                 let at = cut.get(id).map_or(0, |at| at[1].as_u64().unwrap());
                 keep.extend(blob_refs(&prefix(&path, at)).into_iter().map(|(h, _)| h));
                 if path.exists() {
@@ -282,7 +289,7 @@ fn a_crash_between_commits_keeps_every_blob_and_store_entry_a_committed_line_ref
                         .unwrap();
                 }
             }
-            if let Ok(image) = std::fs::read_to_string(dir.join(id).join("checkpoint.json")) {
+            if let Ok(image) = std::fs::read_to_string(crate::shared::instance_dir(&dir, id).join("checkpoint.json")) {
                 keep.extend(blob_refs(&image).into_iter().map(|(h, _)| h));
             }
         }
@@ -316,7 +323,7 @@ fn a_crash_between_commits_keeps_every_blob_and_store_entry_a_committed_line_ref
     // Every reference anywhere reads back its content.
     for id in &ids {
         for file in ["journal.jsonl", "store.jsonl", "checkpoint.json", "snapshot.json"] {
-            let text = std::fs::read_to_string(dir.join(id).join(file)).unwrap_or_default();
+            let text = std::fs::read_to_string(crate::shared::instance_dir(&dir, id).join(file)).unwrap_or_default();
             for (hash, bytes) in blob_refs(&text) {
                 let content = std::fs::read(dir.join("blobs").join(&hash))
                     .unwrap_or_else(|e| panic!("{id}/{file}: blob {hash}: {e}"));
@@ -341,7 +348,7 @@ fn a_crash_between_commits_keeps_every_blob_and_store_entry_a_committed_line_ref
             assert_eq!(m[3], json!(format!("{}#{seq:05}", &id[id.len() - 6..])), "{id} #{seq}");
         }
         // Every key the asker learned reads back the text it put.
-        let records: Vec<J> = std::fs::read_to_string(dir.join(&id).join("store.jsonl"))
+        let records: Vec<J> = std::fs::read_to_string(crate::shared::instance_dir(&dir, &id).join("store.jsonl"))
             .unwrap()
             .lines()
             .map(|l| serde_json::from_str(l).unwrap())

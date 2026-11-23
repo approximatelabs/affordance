@@ -143,10 +143,10 @@ fn an_overseer_reads_what_changed_and_only_what_it_was_granted() {
     assert_eq!(line["id"], "agent-0");
     assert_eq!(line["changes"], json!([{"key": "m", "set": map(5)}]));
     // The targets' journals hold only their own inputs: being read wrote nothing to them.
-    let journal = std::fs::read_to_string(dir.join("run/agent-0/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "run/agent-0/journal.jsonl")).unwrap();
     assert_eq!(journal.lines().count(), 5, "{journal}");
     assert!(
-        !std::fs::read_to_string(dir.join("run/agent-1/journal.jsonl"))
+        !std::fs::read_to_string(crate::shared::inst(&dir, "run/agent-1/journal.jsonl"))
             .unwrap_or_default()
             .contains("inspect")
     );

@@ -277,7 +277,7 @@ useEffect(() => { (async () => {
     assert_eq!(report["complete"], true, "{report}");
     assert_eq!(server.requests.lock().unwrap().len(), 2);
     for id in ["alice", "bob"] {
-        let journal = std::fs::read_to_string(dir.join(format!("run/{id}/journal.jsonl"))).unwrap();
+        let journal = std::fs::read_to_string(crate::shared::inst(&dir, &format!("run/{id}/journal.jsonl"))).unwrap();
         assert!(!journal.contains("-private"));
         assert!(journal.contains(id));
     }

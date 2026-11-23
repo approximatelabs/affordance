@@ -382,7 +382,7 @@ fn escape_stops_a_streaming_reply_and_the_journal_keeps_it() {
     let text = out["text"].as_str().unwrap();
     let words = text.matches('a').count();
     assert!((5..50).contains(&words), "stopped soon after the Escape: {text:?}");
-    let journal = std::fs::read_to_string(dir.join("run/a/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/journal.jsonl")).unwrap();
     assert!(journal.contains(r#""aborted":true"#), "{journal}");
     let _ = std::fs::remove_dir_all(&dir);
 }

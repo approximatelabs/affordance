@@ -41,7 +41,7 @@ deployment is valid YAML too); unknown keys are errors.
   directory, so a deployment runs the same from anywhere.
 - **The journal directory** is `dir`, by default `.affordance/` beside the file. A run that
   finds an earlier run there stops and asks for `--restore` (continue it) or `--fresh` (start over;
-  the earlier run's files move under `.retired/`).
+  the earlier run's instances move under `retired/`).
 - **`affordance config`** prints the resolved deployment (same arguments as `run`), with the
   values of `secrets` hidden.
 
@@ -280,7 +280,8 @@ to run it.
   See [the configuration contract](../spec/HARNESS.md#6-models) and
   [multi-binding examples, sessions and recovery](MODEL_BINDINGS.md).
 - **Files in the journal directory (`dir`):**
-  - `<dir>/<agent>/agent.json`: its spec;
+  - `<dir>/instances/<id>/agent.json`: its name and spec (each instance lives under an id the
+    runtime assigned, never under its name);
   - `journal.jsonl`: every input, appended before it takes effect (durable at the next
     commit, below);
   - `trace.jsonl`: renders with prompt size, append check and render time; replies with

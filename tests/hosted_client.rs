@@ -728,7 +728,7 @@ fn app_session(f: &Fixture, mut client: Chat, system: &str) -> (J, Vec<J>) {
         .run()
         .unwrap();
     assert_eq!(restored.agents[0].state, state);
-    std::fs::remove_file(dir.join("run/a/checkpoint.json")).unwrap();
+    std::fs::remove_file(crate::shared::inst(&dir, "run/a/checkpoint.json")).unwrap();
     let replay = Runtime::restore(cfg, f.enc.clone(), model).unwrap().run().unwrap();
     assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
     assert_eq!(replay.agents[0].state, state);
@@ -1066,7 +1066,7 @@ fn summary_renders_disable_hosted_calls_without_changing_descriptions_or_active_
                 .run()
                 .unwrap();
             assert_eq!(recovered.agents[0].stopped, report.stopped);
-            std::fs::remove_file(dir.join("run/a/checkpoint.json")).unwrap();
+            std::fs::remove_file(crate::shared::inst(&dir, "run/a/checkpoint.json")).unwrap();
             let replay = Runtime::restore(cfg, f.enc.clone(), client).unwrap().run().unwrap();
             assert_eq!(replay.agents[0].stopped, report.stopped);
             assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);

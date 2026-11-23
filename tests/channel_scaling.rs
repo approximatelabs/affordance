@@ -205,7 +205,7 @@ fn multicast_has_one_durable_result_and_recovery_preserves_batched_delivery() {
             &json!({"delivered":1,"failed":3,"undelivered":["bad","missing","hub"]})
         );
     }
-    let journal = std::fs::read_to_string(files.0.join("run/good/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&files.0, "run/good/journal.jsonl")).unwrap();
     let frames: Vec<Input> = journal
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
@@ -227,7 +227,7 @@ fn multicast_has_one_durable_result_and_recovery_preserves_batched_delivery() {
         );
     }
     for id in ["good", "hub"] {
-        let _ = std::fs::remove_file(files.0.join("run").join(id).join("checkpoint.json"));
+        let _ = std::fs::remove_file(crate::shared::instance_dir(&files.0.join("run"), id).join("checkpoint.json"));
     }
     let replay = Runtime::restore(cfg, enc, model).unwrap().run().unwrap();
     for id in ["good", "hub"] {

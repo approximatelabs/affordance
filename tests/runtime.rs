@@ -528,8 +528,8 @@ fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
                 .collect::<Vec<_>>()
         );
         // ... but the runtime never writes the secret to disk.
-        let trace = std::fs::read_to_string(dir.join(&a.id).join("trace.jsonl")).unwrap();
-        let spec = std::fs::read_to_string(dir.join(&a.id).join("agent.json")).unwrap();
+        let trace = std::fs::read_to_string(crate::shared::instance_dir(&dir, &a.id).join("trace.jsonl")).unwrap();
+        let spec = std::fs::read_to_string(crate::shared::instance_dir(&dir, &a.id).join("agent.json")).unwrap();
         assert!(!trace.contains("tok-5ecret-value") && !spec.contains("tok-5ecret-value"));
         assert!(trace.contains("\"t\":\"render\""));
     }
@@ -899,13 +899,13 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
     let report = rt.run().unwrap();
     assert_eq!(again.wait(), Ok(()));
     assert_eq!(report.agents[0].metrics.turns, 2, "the same key is taken once");
-    let journal = std::fs::read_to_string(dir.join("agent-a/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "agent-a/journal.jsonl")).unwrap();
     assert_eq!(
         journal.matches("\"id\":\".post:abc123\"").count(),
         2,
         "the key is on the journaled event, not in the app's payload"
     );
-    let trace = std::fs::read_to_string(dir.join("agent-a/trace.jsonl")).unwrap();
+    let trace = std::fs::read_to_string(crate::shared::inst(&dir, "agent-a/trace.jsonl")).unwrap();
     assert!(
         trace.contains("duplicate_message"),
         "the second post is noted as a duplicate"
@@ -1004,7 +1004,7 @@ fn recovery_repairs_a_torn_tail_before_appending() {
     let dir = std::env::temp_dir().join(format!("aff-torn-tail-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     fleet_runtime(&dir, 40, Some(std::time::Duration::from_millis(300)), false);
-    let path = dir.join("agent-0/journal.jsonl");
+    let path = crate::shared::inst(&dir, "agent-0/journal.jsonl");
     let before = std::fs::read(&path).unwrap();
     std::fs::OpenOptions::new()
         .append(true)
@@ -1020,7 +1020,7 @@ fn recovery_repairs_a_torn_tail_before_appending() {
         serde_json::from_str::<Input>(line).unwrap();
     }
     assert!(
-        std::fs::read_dir(dir.join("agent-0"))
+        std::fs::read_dir(crate::shared::instance_dir(&dir, "agent-0"))
             .unwrap()
             .flatten()
             .any(|p| p.file_name().to_string_lossy().starts_with("torn-journal-"))
@@ -1090,7 +1090,8 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
     let original = root().join("views/demo/runtime/agent.tsx");
     let first = pinned_run(&dir, &original, false, false);
     assert_eq!(first.agents[0].metrics.turns, 3);
-    let pins: J = serde_json::from_slice(&std::fs::read(dir.join("agent-0/agent.json")).unwrap()).unwrap();
+    let pins: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "agent-0/agent.json")).unwrap()).unwrap();
     assert_eq!(pins["pins"]["contract"], affordance::runtime::host::CONTRACT_VERSION);
     assert_eq!(pins["pins"]["app"].as_str().unwrap().len(), 64);
     // The same app replays to the same prompts.
@@ -1118,7 +1119,8 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
         "{:?}",
         strict.agents[0].error
     );
-    let after: J = serde_json::from_slice(&std::fs::read(dir.join("agent-0/agent.json")).unwrap()).unwrap();
+    let after: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "agent-0/agent.json")).unwrap()).unwrap();
     assert_eq!(
         after["pins"], pins["pins"],
         "the journal keeps the pins it was written against"
@@ -1126,7 +1128,11 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
     // A journal of another contract is refused, not replayed.
     let mut old = after.clone();
     old["pins"]["contract"] = json!(1);
-    std::fs::write(dir.join("agent-0/agent.json"), serde_json::to_string(&old).unwrap()).unwrap();
+    std::fs::write(
+        crate::shared::inst(&dir, "agent-0/agent.json"),
+        serde_json::to_string(&old).unwrap(),
+    )
+    .unwrap();
     let refused = pinned_run(&dir, &original, true, false);
     let err = refused.agents[0].error.clone().unwrap_or_default();
     assert!(err.contains("restore refused") && err.contains("contract 1"), "{err}");
@@ -1765,7 +1771,7 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
     // The trace places each tool on the run's timeline under the model call that asked for it:
     // tool (`turn`) -> reply and render (`turn`) -> render (`task`) -> generate (`task`), every
     // record with its time (`at_ms`, the journal's clock), and a tool's start after its reply.
-    let trace: Vec<J> = std::fs::read_to_string(dir.join("a/trace.jsonl"))
+    let trace: Vec<J> = std::fs::read_to_string(crate::shared::inst(&dir, "a/trace.jsonl"))
         .unwrap()
         .lines()
         .map(|l| serde_json::from_str(l).unwrap())
@@ -1795,7 +1801,7 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
         at(&render) <= at(&generate) && at(&generate) <= at(&reply) && at(&reply) <= at(tool),
         "{render} {generate} {reply} {tool}"
     );
-    let b_journal = std::fs::read_to_string(dir.join("b/journal.jsonl")).unwrap();
+    let b_journal = std::fs::read_to_string(crate::shared::inst(&dir, "b/journal.jsonl")).unwrap();
     let msg = b_journal
         .lines()
         .find(|l| l.contains("\"name\":\"message\""))
@@ -1804,7 +1810,7 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
     let parsed: J = serde_json::from_str(msg).unwrap();
     assert!(parsed["id"].as_str().is_some_and(|id| id.starts_with("a:")), "{msg}");
     assert!(parsed["payload"].get("_msg").is_none(), "{msg}");
-    let a_journal = std::fs::read_to_string(dir.join("a/journal.jsonl")).unwrap();
+    let a_journal = std::fs::read_to_string(crate::shared::inst(&dir, "a/journal.jsonl")).unwrap();
     let ack = a_journal.lines().find(|l| l.contains("\"delivered\":true")).unwrap();
     let clock = |l: &str| serde_json::from_str::<J>(l).unwrap()["clock_ms"].as_i64().unwrap();
     assert!(clock(msg) <= clock(ack));
@@ -2784,7 +2790,7 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
     });
     rt.run().unwrap();
     closer.join().unwrap();
-    let journal = std::fs::read_to_string(dir.join("agent-a/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "agent-a/journal.jsonl")).unwrap();
     assert!(
         !journal.contains("model_error"),
         "a host cancel is not a model error: {journal}"
@@ -2911,7 +2917,7 @@ fn the_status_feed_counts_handler_errors() {
         "{seen}"
     );
     assert!(report.complete);
-    let trace = std::fs::read_to_string(dir.join("run/a/trace.jsonl")).unwrap();
+    let trace = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/trace.jsonl")).unwrap();
     assert!(
         trace
             .lines()
@@ -3014,7 +3020,7 @@ fn secrets_with_newlines_and_quotes_are_redacted() {
     let report = run(key);
     assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
     for file in ["agent.json", "trace.jsonl"] {
-        let text = std::fs::read_to_string(dir.join("run/a").join(file)).unwrap();
+        let text = std::fs::read_to_string(crate::shared::instance_dir(&dir.join("run"), "a").join(file)).unwrap();
         let escaped = serde_json::to_string(key).unwrap();
         assert!(
             !text.contains(key) && !text.contains(escaped.trim_matches('"')) && !text.contains("ab\\\"c"),
@@ -3022,7 +3028,7 @@ fn secrets_with_newlines_and_quotes_are_redacted() {
         );
     }
     assert!(
-        std::fs::read_to_string(dir.join("run/a/agent.json"))
+        std::fs::read_to_string(crate::shared::inst(&dir, "run/a/agent.json"))
             .unwrap()
             .contains("the key is [secret:KEY]")
     );

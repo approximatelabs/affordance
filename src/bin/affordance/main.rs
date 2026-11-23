@@ -31,7 +31,7 @@ Usage:
       --dir DIR               the journal directory (default .affordance beside the file)
       --app FILE              the app (overrides root.app or app.view)
       --restore                continue the run in the journal directory
-      --fresh                 start over (the previous run's files are kept under .retired)
+      --fresh                 start over (the previous run's instances are kept under retired/)
       --keep-running          stay up while agents are idle (a chat waiting for its user)
       --control PATH          a control socket: post, status, close (also on serve and host)
       --flag NAME=VALUE       one of this machine's flags, for this run (repeatable; below)
@@ -254,20 +254,16 @@ fn prepare_run(args: &[String], flags: &[&str]) -> Result<(Selection, deploy::De
     let dir = PathBuf::from(d.config["dir"].as_str().unwrap_or(deploy::STATE));
     if !has("--restore") && !has("--fresh") && holds_a_run(&dir) {
         return Err(format!(
-            "{} holds a run: --restore to continue it, or --fresh to start over (its files are kept under .retired)",
+            "{} holds a run: --restore to continue it, or --fresh to start over (its instances are kept under retired/)",
             dir.display()
         ));
     }
     Ok((s, d))
 }
 
-/// Whether `dir` holds an agent's files from an earlier run.
+/// Whether `dir` holds an earlier run.
 fn holds_a_run(dir: &Path) -> bool {
-    std::fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .any(|e| e.path().join("agent.json").is_file())
+    affordance::runtime::layout::holds_a_run(dir)
 }
 
 fn cmd_config(args: &[String]) -> Result<(), String> {

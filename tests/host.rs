@@ -201,7 +201,7 @@ fn a_frontend_drives_the_coding_chat_over_stdio() {
         .count();
     assert!(words < 200, "the stream stopped soon after the abort ({words} words)");
 
-    let journal = std::fs::read_to_string(dir.join("root/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "root/journal.jsonl")).unwrap();
     let aborted: Vec<&str> = journal.lines().filter(|l| l.contains(r#""aborted":true"#)).collect();
     assert_eq!(aborted.len(), 1, "{journal}");
 

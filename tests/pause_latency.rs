@@ -112,8 +112,11 @@ fn close_behind_a_backlog(batch: usize) {
             rt.add_agent(s).unwrap();
         }
     };
-    let journal =
-        |id: &str| std::fs::read_to_string(dir.join("run").join(id).join("journal.jsonl")).unwrap_or_default();
+    let journal = |id: &str| {
+        crate::shared::find_instance(&dir.join("run"), id)
+            .and_then(|d| std::fs::read_to_string(d.join("journal.jsonl")).ok())
+            .unwrap_or_default()
+    };
     let received = || {
         let text = journal("r");
         let mut ids: Vec<String> = text
@@ -131,9 +134,15 @@ fn close_behind_a_backlog(batch: usize) {
     add(&mut rt);
     let control = rt.control();
     let asked = Arc::new(std::sync::Mutex::new(None));
-    let (asked2, r_journal) = (asked.clone(), dir.join("run/r/journal.jsonl"));
+    let (asked2, run) = (asked.clone(), dir.join("run"));
+    // The receiver's journal, once the run has made its instance.
+    let r_journal = move || {
+        crate::shared::find_instance(&run, "r")
+            .and_then(|d| std::fs::read_to_string(d.join("journal.jsonl")).ok())
+            .unwrap_or_default()
+    };
     let closer = std::thread::spawn(move || {
-        while !std::fs::read_to_string(&r_journal).is_ok_and(|t| t.contains("\"id\":\"s")) {
+        while !r_journal().contains("\"id\":\"s") {
             std::thread::sleep(Duration::from_millis(2))
         }
         *asked2.lock().unwrap() = Some(Instant::now());

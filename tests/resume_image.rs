@@ -92,7 +92,7 @@ fn copy(from: &Path, to: &Path) {
 }
 
 fn restores(dir: &Path) -> Vec<J> {
-    std::fs::read_to_string(dir.join("agent-0/trace.jsonl"))
+    std::fs::read_to_string(crate::shared::inst(dir, "agent-0/trace.jsonl"))
         .unwrap()
         .lines()
         .filter_map(|l| serde_json::from_str::<J>(l).ok())
@@ -116,9 +116,10 @@ fn a_loop_agent_stopped_mid_step_resumes_from_its_last_step_boundary() {
     );
     assert!(first.agents[0].error.is_none(), "{:?}", first.agents[0].error);
     let journal = first.agents[0].journal_len;
-    let image: J =
-        serde_json::from_slice(&std::fs::read(a.join("agent-0/checkpoint.json")).expect("a loop agent is imaged"))
-            .unwrap();
+    let image: J = serde_json::from_slice(
+        &std::fs::read(crate::shared::inst(&a, "agent-0/checkpoint.json")).expect("a loop agent is imaged"),
+    )
+    .unwrap();
     let inputs = image["data"]["image"]["journaled"].as_u64().unwrap() as usize;
     assert!(
         inputs > 0 && inputs <= journal && journal - inputs <= 2,
@@ -126,7 +127,7 @@ fn a_loop_agent_stopped_mid_step_resumes_from_its_last_step_boundary() {
     );
     // A copy without the image resumes by full replay.
     copy(&a, &b);
-    std::fs::remove_file(b.join("agent-0/checkpoint.json")).unwrap();
+    std::fs::remove_file(crate::shared::inst(&b, "agent-0/checkpoint.json")).unwrap();
     // Each resumes, runs, and stops in the middle of a later step; the image path writes a new
     // image from a boundary its replay found, and the next restore uses it.
     // (Side by side: each waits out its own hang.)
@@ -135,7 +136,8 @@ fn a_loop_agent_stopped_mid_step_resumes_from_its_last_step_boundary() {
             scope.spawn(move || assert!(!run(d, true, Some(11)).complete));
         }
     });
-    let second: J = serde_json::from_slice(&std::fs::read(a.join("agent-0/checkpoint.json")).unwrap()).unwrap();
+    let second: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&a, "agent-0/checkpoint.json")).unwrap()).unwrap();
     let inputs_2 = second["data"]["image"]["journaled"].as_u64().unwrap() as usize;
     assert!(inputs_2 > inputs, "a newer image: {inputs_2} after {inputs}");
     let from_image = run(&a, true, None);
@@ -213,7 +215,7 @@ fn a_promise_used_during_render_does_not_stop_recovery_images() {
         let first = run(&image, false);
         assert!(first.agents[0].error.is_none(), "{name}: {:?}", first.agents[0].error);
         assert_eq!(first.agents[0].state["__ui"]["@n"], json!(3), "{name}");
-        let saved = std::fs::read(image.join("agent-0/checkpoint.json"))
+        let saved = std::fs::read(crate::shared::inst(&image, "agent-0/checkpoint.json"))
             .unwrap_or_else(|_| panic!("{name}: the agent was not imaged"));
         let saved: J = serde_json::from_slice(&saved).unwrap();
         assert_eq!(
@@ -222,7 +224,7 @@ fn a_promise_used_during_render_does_not_stop_recovery_images() {
             "{name}"
         );
         copy(&image, &full);
-        std::fs::remove_file(full.join("agent-0/checkpoint.json")).unwrap();
+        std::fs::remove_file(crate::shared::inst(&full, "agent-0/checkpoint.json")).unwrap();
         let (from_image, replayed) = (run(&image, true), run(&full, true));
         assert_eq!(restores(&image).len(), 1, "{name}: the restore used the image");
         assert!(restores(&full).is_empty(), "{name}");

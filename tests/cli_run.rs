@@ -115,8 +115,9 @@ fn run_finds_its_file_and_explains_what_it_will_not_do() {
     );
 
     std::fs::write(dir.join("affordance.yaml"), "app: {view: x.tsx}\n").unwrap();
-    std::fs::create_dir_all(dir.join(".affordance/a")).unwrap();
-    std::fs::write(dir.join(".affordance/a/agent.json"), "{}").unwrap();
+    // A directory that holds an earlier run (its record).
+    std::fs::create_dir_all(dir.join(".affordance")).unwrap();
+    std::fs::write(dir.join(".affordance/run.json"), "{}").unwrap();
     let rerun = stderr(&affordance(&dir, &["run"]));
     assert!(rerun.contains("--restore") && rerun.contains("--fresh"), "{rerun}");
     let _ = std::fs::remove_dir_all(&dir);
@@ -169,7 +170,7 @@ fn an_initialized_agent_runs_outside_a_checkout() {
     let out = affordance(&dir.join("agent"), &["run", "--set", &format!("model.url={url}")]);
     let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
     assert_eq!(report["per_agent"][0]["stopped"], json!({"answer": "done"}), "{report}");
-    assert!(dir.join("agent/.affordance/first/journal.jsonl").is_file());
+    assert!(crate::shared::inst(&dir, "agent/.affordance/first/journal.jsonl").is_file());
     let _ = std::fs::remove_dir_all(&dir);
 }
 

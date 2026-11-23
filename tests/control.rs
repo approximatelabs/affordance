@@ -105,7 +105,8 @@ fn a_controller_posts_reads_the_status_and_closes_a_run_over_its_socket() {
     assert_eq!(more["type"], "result", "{more}");
     c.close(0);
     summary(child);
-    let snapshot: J = serde_json::from_slice(&std::fs::read(dir.join("run/a/snapshot.json")).unwrap()).unwrap();
+    let snapshot: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "run/a/snapshot.json")).unwrap()).unwrap();
     assert_eq!(
         snapshot["state"]["__ui"]["@n"], 7,
         "2, then 5; the repeated key changed nothing: {snapshot}"
@@ -228,7 +229,7 @@ fn a_restored_agent_keeps_its_own_secret() {
     });
     c.close(0);
     summary(child);
-    let saved = std::fs::read_to_string(dir.join("run/a/agent.json")).unwrap();
+    let saved = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/agent.json")).unwrap();
     assert!(!saved.contains(a), "a secret value is never saved: {saved}");
     let child = start(&dir, true);
     let mut c = Controller::connect(&dir.join("control.sock"));
@@ -248,7 +249,7 @@ fn a_restored_agent_keeps_its_own_secret() {
     };
     assert_eq!((stopped("a"), stopped("b")), (json!(a.len()), json!(b.len())));
     // The app kept its secret in its state; the snapshot, which people read, shows it redacted.
-    let snapshot = std::fs::read_to_string(dir.join("run/a/snapshot.json")).unwrap();
+    let snapshot = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/snapshot.json")).unwrap();
     assert!(!snapshot.contains(a) && snapshot.contains("[secret:KEY]"), "{snapshot}");
     std::fs::remove_dir_all(&dir).unwrap();
 }
@@ -281,12 +282,12 @@ fn a_journal_missing_committed_inputs_fails_its_own_restore() {
     c.close(0);
     summary(child);
     // The last committed line of a's journal is gone.
-    let journal = dir.join("run/a/journal.jsonl");
+    let journal = crate::shared::inst(&dir, "run/a/journal.jsonl");
     let bytes = std::fs::read(&journal).unwrap();
     let body = &bytes[..bytes.len() - 1];
     let cut = body.iter().rposition(|&b| b == b'\n').map_or(0, |at| at + 1);
     std::fs::write(&journal, &bytes[..cut]).unwrap();
-    let _ = std::fs::remove_file(dir.join("run/a/checkpoint.json"));
+    let _ = std::fs::remove_file(crate::shared::inst(&dir, "run/a/checkpoint.json"));
     let child = start(&dir, true);
     let mut c = Controller::connect(&dir.join("control.sock"));
     let status = c.call(json!({"type": "status"}));
@@ -315,12 +316,56 @@ fn a_journal_missing_committed_inputs_fails_its_own_restore() {
         "{a}"
     );
     assert!(agent("b")["error"].is_null(), "{}", agent("b"));
-    let snapshot: J = serde_json::from_slice(&std::fs::read(dir.join("run/b/snapshot.json")).unwrap()).unwrap();
+    let snapshot: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "run/b/snapshot.json")).unwrap()).unwrap();
     assert_eq!(snapshot["state"]["__ui"]["@n"], 7, "{snapshot}");
     assert_eq!(
         std::fs::read(&journal).unwrap().len(),
         cut,
         "a's journal is left as it was"
     );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// "An instance's name is only a name." Instances named like the run's own files (`blobs`,
+/// `commit.jsonl`) and with a space run, close and restore with their state; the run's blob store
+/// and commit log are untouched by them, and every instance lives under an id the runtime chose.
+#[test]
+fn names_like_the_runs_own_files_are_only_names() {
+    let dir = std::env::temp_dir().join(format!("aff-control-names-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("app.tsx"), COUNTER).unwrap();
+    let names = ["blobs", "commit.jsonl", "a b"];
+    let d = json!({
+        "app": {"view": "app.tsx", "entry": "Main"},
+        "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
+        "agents": names.iter().map(|n| json!({"id": n, "model": null})).collect::<Vec<_>>(),
+        "dir": "run",
+        "keep_running": true,
+        "max_wall_s": 60
+    });
+    std::fs::write(dir.join("deployment.json"), d.to_string()).unwrap();
+    for (round, restore) in [(1, false), (2, true)] {
+        let child = start(&dir, restore);
+        let mut c = Controller::connect(&dir.join("control.sock"));
+        for (i, name) in names.iter().enumerate() {
+            let posted = c.call(json!({"type": "event", "target": name, "name": "add", "payload": {"by": i + 1}}));
+            assert_eq!(posted["type"], "result", "{name}: {posted}");
+        }
+        c.close(0);
+        summary(child);
+        for (i, name) in names.iter().enumerate() {
+            let home = crate::shared::instance_dir(&dir.join("run"), name);
+            assert!(
+                home.starts_with(dir.join("run/instances")),
+                "{name}: {}",
+                home.display()
+            );
+            let snapshot: J = serde_json::from_slice(&std::fs::read(home.join("snapshot.json")).unwrap()).unwrap();
+            assert_eq!(snapshot["state"]["__ui"]["@n"], json!((i + 1) * round), "{name}");
+        }
+    }
+    assert!(dir.join("run/blobs").is_dir() && dir.join("run/commit.jsonl").is_file());
     std::fs::remove_dir_all(&dir).unwrap();
 }

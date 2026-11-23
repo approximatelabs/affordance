@@ -600,7 +600,7 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
     rt.run().unwrap();
     closer.join().unwrap();
     let read = || {
-        std::fs::read_to_string(dir.join("agent-0000/trace.jsonl"))
+        std::fs::read_to_string(crate::shared::inst(&dir, "agent-0000/trace.jsonl"))
             .unwrap()
             .lines()
             .map(|s| serde_json::from_str::<J>(s).unwrap())
@@ -629,7 +629,7 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
         vec!["shell", "set_notes", "send_message"]
     );
     assert!(completed.iter().all(|e| e["status"] == "ok" && e["timed_out"] == false));
-    let before = std::fs::read(dir.join("agent-0000/trace.jsonl")).unwrap();
+    let before = std::fs::read(crate::shared::inst(&dir, "agent-0000/trace.jsonl")).unwrap();
     Runtime::restore(config(), e.clone(), model()).unwrap().run().unwrap();
     assert_eq!(
         read().iter().filter(|e| e["t"] == "tool").count(),
@@ -637,7 +637,7 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
         "completed restore must not re-append prior completions"
     );
     assert!(
-        std::fs::read(dir.join("agent-0000/trace.jsonl"))
+        std::fs::read(crate::shared::inst(&dir, "agent-0000/trace.jsonl"))
             .unwrap()
             .starts_with(&before)
     );

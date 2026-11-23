@@ -517,7 +517,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let stored = texts(&run) + &texts(&capture) + &String::from_utf8(first.stdout).unwrap();
     assert!(!stored.contains("fixture-secret-"));
     assert!(texts(&capture).contains("[redacted]"));
-    let pins: J = serde_json::from_slice(&std::fs::read(run.join("one/agent.json")).unwrap()).unwrap();
+    let pins: J = serde_json::from_slice(&std::fs::read(crate::shared::inst(&run, "one/agent.json")).unwrap()).unwrap();
     assert_eq!(pins["pins"]["model"].as_str().unwrap().len(), 64);
     // The digest does not depend on credential contents; rotation keeps completed recovery valid.
     config["models"]["A"]["provider_options"]["lora_path"] = json!("variant-a");
@@ -549,7 +549,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     );
     assert_eq!(native.requests().len(), 2);
     // A crash before the first reply leaves only that agent's generation outstanding.
-    let journal = run.join("one/journal.jsonl");
+    let journal = crate::shared::inst(&run, "one/journal.jsonl");
     let recorded = std::fs::read_to_string(&journal).unwrap();
     let prefix = recorded
         .lines()
@@ -562,8 +562,10 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     // prefix and every other file as it is.
     let mut journals = serde_json::Map::new();
     for id in ["one", "two", "three"] {
-        let saved: J = serde_json::from_slice(&std::fs::read(run.join(id).join("agent.json")).unwrap()).unwrap();
-        let len = std::fs::metadata(run.join(id).join("journal.jsonl")).map_or(0, |m| m.len());
+        let saved: J =
+            serde_json::from_slice(&std::fs::read(crate::shared::instance_dir(&run, id).join("agent.json")).unwrap())
+                .unwrap();
+        let len = std::fs::metadata(crate::shared::instance_dir(&run, id).join("journal.jsonl")).map_or(0, |m| m.len());
         journals.insert(id.into(), json!([saved["incarnation"], len]));
     }
     std::fs::write(
@@ -587,7 +589,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     assert!(last.headers.contains("Bearer rotated-fixture-secret"));
     assert_eq!(last.body["lora_path"], "variant-a");
     // Warning recovery of an unpinned journal cannot manufacture a strict identity pin.
-    let saved = run.join("one/agent.json");
+    let saved = crate::shared::inst(&run, "one/agent.json");
     let mut legacy: J = serde_json::from_slice(&std::fs::read(&saved).unwrap()).unwrap();
     legacy.as_object_mut().unwrap().remove("pins");
     std::fs::write(&saved, legacy.to_string()).unwrap();
@@ -907,7 +909,8 @@ fn one_retry_policy_is_stated_in_the_deployment_or_on_the_call() {
         let calls = peer.requests().iter().filter(|w| w.path == "/v1/completions").count();
         assert_eq!(calls, requests, "{name}");
         // Each failure is in the trace with its kind, and a restored run makes no new request.
-        let trace = std::fs::read_to_string(files.0.join(format!("run-{name}/a/trace.jsonl"))).unwrap();
+        let trace =
+            std::fs::read_to_string(crate::shared::inst(&files.0, &format!("run-{name}/a/trace.jsonl"))).unwrap();
         assert_eq!(
             trace.matches(r#""kind":"busy""#).count(),
             requests.min(2),
@@ -972,7 +975,8 @@ fn a_token_id_servers_retry_after_is_the_least_the_next_attempt_waits() {
             "{name}: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let trace = std::fs::read_to_string(files.0.join(format!("run-{name}/a/trace.jsonl"))).unwrap();
+        let trace =
+            std::fs::read_to_string(crate::shared::inst(&files.0, &format!("run-{name}/a/trace.jsonl"))).unwrap();
         assert!(trace.contains(r#""retry_in_ms":1000"#), "{name}: {trace}");
     }
 }
@@ -1011,7 +1015,7 @@ fn completions_capture_each_attempt_and_stream_event_without_credentials() {
         let report: J = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(report["per_agent"][0]["stopped"], "done", "{report}");
         let mut attempts = std::collections::BTreeMap::<String, std::collections::BTreeMap<String, J>>::new();
-        for entry in std::fs::read_dir(capture.join("native-agent")).unwrap() {
+        for entry in std::fs::read_dir(capture.join("i-native-agent")).unwrap() {
             let path = entry.unwrap().path();
             assert_eq!(path.extension().unwrap(), "json", "no temporary capture remains");
             let record: J = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
@@ -1090,11 +1094,11 @@ fn chat_captures_requests_responses_and_usage_without_credentials() {
     let report: J = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["model_errors"], 0, "{report}");
     assert!(
-        capture.join("chat-agent/child").is_dir(),
+        capture.join("i-chat-agent_2fchild").is_dir(),
         "model call did not capture: {report}; {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let paths: Vec<_> = std::fs::read_dir(capture.join("chat-agent/child"))
+    let paths: Vec<_> = std::fs::read_dir(capture.join("i-chat-agent_2fchild"))
         .unwrap()
         .map(|e| e.unwrap().path())
         .collect();
@@ -1343,7 +1347,7 @@ fn captures_are_best_effort_and_streams_capture_their_response() {
         assert_eq!(paths.len(), 1, "{name}: one request, no resend or abort: {paths:?}");
         if name == "captured" {
             assert_eq!(report["capture_errors"], 0);
-            let mut kinds: Vec<_> = std::fs::read_dir(capture.join("agent"))
+            let mut kinds: Vec<_> = std::fs::read_dir(capture.join("i-agent"))
                 .unwrap()
                 .map(|e| {
                     e.unwrap()

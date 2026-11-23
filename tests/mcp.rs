@@ -240,7 +240,7 @@ harness.stop({info, listed, results, required, continued});
     let calls = seen.len();
     drop(seen);
     assert_eq!(calls, 8);
-    let journal = std::fs::read_to_string(dir.0.join("run/a/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir.0, "run/a/journal.jsonl")).unwrap();
     assert!(!journal.contains("mcp-test-credential"));
     drop(server);
     let mut restored = Runtime::restore(config, encoder(), model()).unwrap();

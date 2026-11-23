@@ -278,7 +278,7 @@ fn generic_runtime_binary_runs_an_app_from_config() {
     );
     assert_eq!(report["exact_appends"], 9);
     // The journal of agent-0000 holds the messages from its two peers.
-    let journal = std::fs::read_to_string(dir.join("agent-0000/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "agent-0000/journal.jsonl")).unwrap();
     assert_eq!(journal.matches("\"name\":\"message\"").count(), 2, "{journal}");
     // A local command sees the agent's environ (DEPLOY_ENV) but not the runtime's (HOSTSECRET).
     assert!(journal.contains("hello\\nstaging\\n\\n"), "{journal}");
@@ -324,10 +324,13 @@ fn the_binary_runs_a_root_app_that_mounts_a_fleet_on_a_machine_pool() {
     assert_eq!(report["turns"], 12, "three agents, four turns each: {report}");
     // Each agent ran its shell on the machine the root handed it (one of the pool).
     for n in 0..3 {
-        let spec: J =
-            serde_json::from_slice(&std::fs::read(dir.join(format!("root/agent-{n}/agent.json"))).unwrap()).unwrap();
+        let spec: J = serde_json::from_slice(
+            &std::fs::read(crate::shared::inst(&dir, &format!("root/agent-{n}/agent.json"))).unwrap(),
+        )
+        .unwrap();
         assert_eq!(spec["machines"], json!([format!("vm-{n:02}")]));
-        let journal = std::fs::read_to_string(dir.join(format!("root/agent-{n}/journal.jsonl"))).unwrap();
+        let journal =
+            std::fs::read_to_string(crate::shared::inst(&dir, &format!("root/agent-{n}/journal.jsonl"))).unwrap();
         assert!(journal.contains("hello\\nstaging"), "{journal}");
     }
     let _ = std::fs::remove_dir_all(&dir);
@@ -387,7 +390,7 @@ export default function Main() {
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
-    let state = std::fs::read_to_string(dir.join("run/a/journal.jsonl")).unwrap();
+    let state = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/journal.jsonl")).unwrap();
     assert!(state.contains(&format!("{}", dir.join("homes/a").display())), "{state}");
     let _ = std::fs::remove_dir_all(&dir);
 }

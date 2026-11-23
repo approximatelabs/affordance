@@ -239,9 +239,9 @@ fn a_twelve_megabyte_tool_output_is_one_blob_and_reads_back_exactly() {
     assert!(text.len() > 12_000_000 && text.trim_end().ends_with(MARK));
     for f in ["journal.jsonl", "store.jsonl", "snapshot.json"] {
         assert!(
-            size(&dir.join("agent-0").join(f)) < 256 << 10,
+            size(&crate::shared::instance_dir(&dir, "agent-0").join(f)) < 256 << 10,
             "{f}: {} bytes",
-            size(&dir.join("agent-0").join(f))
+            size(&crate::shared::instance_dir(&dir, "agent-0").join(f))
         );
     }
     let records = affordance::scenario::log_records(&a.state);

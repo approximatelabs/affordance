@@ -15,6 +15,7 @@ pub mod exec;
 pub mod host;
 pub mod http;
 pub mod inspect;
+pub mod layout;
 pub mod model;
 mod model_config;
 pub mod store;

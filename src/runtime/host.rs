@@ -458,6 +458,10 @@ impl Shared {
     fn clock_ms(&self) -> i64 {
         self.clock.now()
     }
+    /// An existing instance's own directory (`layout.rs`), with a run directory.
+    fn instance_dir(&self, id: &str) -> Option<PathBuf> {
+        self.store.layout()?.dir(id)
+    }
     /// Begin closing: the clock stops at this moment, no new call starts, and calls still queued
     /// for a model are left outstanding for a restore.
     fn begin_closing(&self) {
@@ -749,8 +753,11 @@ impl Runtime {
         rt.owner = Some(durable::own(&dir)?);
         // A crash leaves the journals as the last commit made them, before anything reads them.
         rt.cut = Some(durable::recover(&dir)?);
-        let mut entries: Vec<_> = std::fs::read_dir(&dir)
-            .map_err(|e| format!("{}: {e}", dir.display()))?
+        // Every instance's directory (`instances/<id>/`); the roots among them are restored here,
+        // and each restores its children.
+        let mut entries: Vec<_> = std::fs::read_dir(dir.join(super::layout::INSTANCES))
+            .into_iter()
+            .flatten()
             .flatten()
             .map(|e| e.path())
             .filter(|p| p.join("agent.json").exists())
@@ -769,12 +776,15 @@ impl Runtime {
                     continue;
                 }
             };
-            if !super::agent::valid_instance_name(&spec.id)
-                || path.file_name().is_none_or(|name| name != spec.id.as_str())
-            {
+            // A child (`parent/key`) is restored by its parent.
+            if spec.id.contains('/') {
+                continue;
+            }
+            if !super::agent::valid_instance_name(&spec.id) {
                 return Err(format!(
-                    "{}: saved agent id does not match its directory",
-                    path.display()
+                    "{}: saved agent id {:?} is not a name",
+                    path.display(),
+                    spec.id
                 ));
             }
             let file = path.join("journal.jsonl");
@@ -861,6 +871,12 @@ impl Runtime {
                     .create(dir)
                     .map_err(|e| e.to_string())?;
             }
+        }
+        // The run's own record: the directory holds a run (`layout::holds_a_run`).
+        if let Some(dir) = &self.cfg.dir
+            && !dir.join(super::layout::RUN).exists()
+        {
+            atomic_value(&dir.join(super::layout::RUN), &json!({"contract": CONTRACT_VERSION}))?;
         }
         let blobs = match &self.cfg.dir {
             Some(d) => Some(Arc::new(
@@ -1397,7 +1413,7 @@ fn restore_instance(
     let mut cached = None;
     if allow_cache {
         let attempt = timed(1, || {
-            super::checkpoint::load(&dir.join(&cfg.id), &key, shared.store.blobs().map(AsRef::as_ref))
+            super::checkpoint::load(dir, &key, shared.store.blobs().map(AsRef::as_ref))
         })
         .and_then(|saved| {
             saved
@@ -1415,7 +1431,7 @@ fn restore_instance(
     }
     let offset = cached.as_ref().map_or(0, |(_, offset, _, _)| *offset);
     let mut refs = std::collections::BTreeSet::new();
-    let path = dir.join(&cfg.id).join("journal.jsonl");
+    let path = dir.join("journal.jsonl");
     // Validate the history this restore reads: from the image's offset (the image's own blobs
     // were checked when it loaded), or all of it for a full replay. An image does not excuse an
     // incomplete journal; a full replay, when one happens, still reads every record.
@@ -1675,19 +1691,18 @@ fn start_instance(
     if !restored {
         shared.store.forget_tree(&spec.id);
     }
-    if let Some(dir) = &shared.cfg.dir {
-        let d = dir.join(&spec.id);
-        if !restored && d.exists() {
-            let archive = dir.join(".retired").join(incarnation.to_string()).join(&spec.id);
-            std::fs::create_dir_all(archive.parent().unwrap()).map_err(|e| e.to_string())?;
-            std::fs::rename(&d, &archive).map_err(|e| format!("archive {}: {e}", d.display()))?;
-            for parent in [archive.parent().unwrap(), d.parent().unwrap()] {
-                std::fs::File::open(parent)
-                    .and_then(|f| f.sync_all())
-                    .map_err(|e| e.to_string())?;
+    // The instance's own directory (`layout.rs`): found by its name, never made from it. A fresh
+    // mount over an instance retires the old one's files (and its children's).
+    let inst: Option<PathBuf> = match shared.store.layout() {
+        Some(layout) => {
+            if !restored {
+                layout.retire_tree(&spec.id)?;
             }
+            Some(layout.dir_or_new(&spec.id)?)
         }
-        std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+        None => None,
+    };
+    if let Some(d) = &inst {
         let mut stored = spec.clone();
         for k in &shared.cfg.secrets {
             stored.env.remove(k);
@@ -1788,10 +1803,10 @@ fn start_instance(
             return fail(slots, cfg, spec, app, format!("store recovery failed: {e}"));
         }
     }
-    let dir = shared.cfg.dir.clone().filter(|_| restored);
+    let dir = inst.clone().filter(|_| restored);
     let (agent, commands, error, restored_from) = match &dir {
         Some(d) => {
-            let start = std::fs::read(d.join(&spec.id).join("agent.json"))
+            let start = std::fs::read(d.join("agent.json"))
                 .ok()
                 .and_then(|b| serde_json::from_slice::<J>(&b).ok())
                 .and_then(|v| v["start_ms"].as_i64())
@@ -1829,14 +1844,12 @@ fn start_instance(
             }
         }
     };
-    let checkpoint = shared
-        .cfg
-        .dir
+    let checkpoint = inst
         .as_ref()
         .filter(|_| secrets.is_empty() && error.is_none())
         .and_then(|d| {
             let key = checkpoint_identity(shared, &agent.cfg, &view, &enc);
-            match super::checkpoint::Checkpoint::new(&d.join(&spec.id), key, restored_from) {
+            match super::checkpoint::Checkpoint::new(d, key, restored_from) {
                 Ok(cache) => Some(cache),
                 Err(e) => {
                     eprintln!("{}: checkpoint cache unavailable: {e}", spec.id);
@@ -1851,11 +1864,8 @@ fn start_instance(
         vec![]
     };
     let incarnation = if restored {
-        shared
-            .cfg
-            .dir
-            .as_ref()
-            .and_then(|d| std::fs::read(d.join(&id).join("agent.json")).ok())
+        inst.as_ref()
+            .and_then(|d| std::fs::read(d.join("agent.json")).ok())
             .and_then(|b| serde_json::from_slice::<J>(&b).ok())
             .and_then(|v| v["incarnation"].as_u64())
             .unwrap_or(0)
@@ -1866,8 +1876,8 @@ fn start_instance(
         Some(file) => Some(Journal::new(file, &id, incarnation)?),
         None => None,
     };
-    if let (Some(journal), Some(dir), false) = (&journal, &shared.cfg.dir, restored) {
-        shared.durable.register(journal, &dir.join(&id));
+    if let (Some(journal), Some(d), false) = (&journal, &inst, restored) {
+        shared.durable.register(journal, d);
     }
     // Its start's effects wait for whatever caused it (a parent's mount) to be committed.
     let epoch = shared.durable.written();
@@ -2096,16 +2106,13 @@ fn worker(
         {
             images.push((slot.spec.id.clone(), image));
         }
-        if let Some(dir) = &shared.cfg.dir {
+        if let Some(dir) = shared.instance_dir(&slot.spec.id) {
             // Secrets redacted, as in the trace: a snapshot is diagnostics, read by people.
             let value = redact(
                 json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error}),
                 &slot.secrets,
             );
-            snapshots.push((
-                dir.join(&slot.spec.id).join("snapshot.json"),
-                value.to_string().into_bytes(),
-            ));
+            snapshots.push((dir.join("snapshot.json"), value.to_string().into_bytes()));
         }
     }
     // An image may refer to blobs no committed line refers to yet: they are synced first.
@@ -2216,19 +2223,15 @@ fn feed(
             let env = p.agent.cfg.env.clone();
             let restored = restore
                 && shared
-                    .cfg
-                    .dir
-                    .as_ref()
-                    .is_some_and(|d| d.join(id).join("journal.jsonl").exists());
+                    .instance_dir(id)
+                    .is_some_and(|d| d.join("journal.jsonl").exists());
             // A restored child replays from the props it started with; the parent's current props,
             // if different, are then one more input.
             let current = spec.props.clone();
             if restored
                 && let Some(first) = shared
-                    .cfg
-                    .dir
-                    .as_ref()
-                    .and_then(|d| std::fs::read(d.join(id).join("agent.json")).ok())
+                    .instance_dir(id)
+                    .and_then(|d| std::fs::read(d.join("agent.json")).ok())
                     .and_then(|b| serde_json::from_slice::<J>(&b).ok())
                     .map(|v| v["props"].clone())
             {
@@ -2277,9 +2280,9 @@ fn feed(
                 for e in entries {
                     trace(&mut slot, e);
                 }
-                if let Some(dir) = &shared.cfg.dir {
+                if let Some(dir) = shared.instance_dir(&k) {
                     let _ = atomic_value(
-                        &dir.join(&k).join("snapshot.json"),
+                        &dir.join("snapshot.json"),
                         &redact(
                             json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error}),
                             &slot.secrets,
@@ -2628,15 +2631,9 @@ fn dispatch(
     let waits = match &cmd {
         Command::Generate { .. } => true,
         Command::Call { name, .. } => name.starts_with("machine:"),
-        // A fresh mount over an old directory archives it, which no recovery undoes: the worker
+        // A fresh mount over an old instance retires it, which no recovery undoes: the worker
         // waits for the commit of the input that mounts it (rare, and in order with the tree).
-        Command::Mount { key, .. }
-            if shared
-                .cfg
-                .dir
-                .as_ref()
-                .is_some_and(|d| d.join(&slot.spec.id).join(key).exists()) =>
-        {
+        Command::Mount { key, .. } if shared.instance_dir(&format!("{}/{key}", slot.spec.id)).is_some() => {
             if let Err(error) = shared.durable.wait(slot.epoch) {
                 slot.error = Some(error);
                 return flush(shared, slot, timers);

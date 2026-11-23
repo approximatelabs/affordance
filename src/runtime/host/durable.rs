@@ -598,35 +598,9 @@ impl Drop for Owner {
     }
 }
 
-/// Every instance directory under the run directory (children inside their parents'), by id.
+/// Every instance directory of the run directory, by name (`layout::scan`).
 fn instances(dir: &Path) -> Vec<(String, PathBuf)> {
-    let mut found = vec![];
-    let mut stack = vec![(String::new(), dir.to_path_buf())];
-    while let Some((prefix, at)) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&at) else { continue };
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with('.') || !entry.file_type().is_ok_and(|t| t.is_dir()) {
-                continue;
-            }
-            if prefix.is_empty() && (name == "blobs" || name == "control") {
-                continue;
-            }
-            let path = entry.path();
-            if !path.join("agent.json").exists() {
-                continue;
-            }
-            let id = if prefix.is_empty() {
-                name
-            } else {
-                format!("{prefix}/{name}")
-            };
-            found.push((id.clone(), path.clone()));
-            stack.push((id, path));
-        }
-    }
-    found.sort();
-    found
+    crate::runtime::layout::scan(dir)
 }
 
 /// Truncate every journal and store under `dir` to the last committed cut and return the cut
@@ -701,6 +675,15 @@ pub(super) fn recover(dir: &Path) -> Result<Cut, String> {
             cut.of_mut(kind).insert(id.clone(), (incarnation, keep));
         }
     }
+    // What the log says of an instance not found (its record unreadable, so its name unknown) is
+    // kept as it is: its files stay untouched, and a later recovery still knows their commit.
+    if let Some(c) = &committed {
+        for kind in [Kind::Journal, Kind::Store] {
+            for (id, at) in c.of(kind) {
+                cut.of_mut(kind).entry(id.clone()).or_insert(*at);
+            }
+        }
+    }
     Ok(cut)
 }
 
@@ -748,8 +731,13 @@ mod tests {
         std::fs::create_dir_all(&d).unwrap();
         d
     }
+    /// An instance's directory in a test run directory (its id is a label: any directory name).
+    fn at(root: &Path, id: &str) -> PathBuf {
+        root.join("instances")
+            .join(crate::runtime::exec::instance_component(id))
+    }
     fn instance(root: &Path, id: &str, incarnation: u64, journal: &str) {
-        let d = root.join(id);
+        let d = at(root, id);
         std::fs::create_dir_all(&d).unwrap();
         std::fs::write(
             d.join("agent.json"),
@@ -769,7 +757,7 @@ mod tests {
         instance(&d, "a/kid", 8, "k1\nk2\n");
         instance(&d, "b", 9, "x\n");
         instance(&d, "c", 3, "new\n");
-        std::fs::write(d.join("a/store.jsonl"), "s1\ns2\n").unwrap();
+        std::fs::write(at(&d, "a").join("store.jsonl"), "s1\ns2\n").unwrap();
         std::fs::write(
             d.join(LOG),
             concat!(
@@ -790,23 +778,32 @@ mod tests {
             ])
         );
         assert_eq!(cut.stores, Files::from([("a".into(), (7, 3))]));
-        assert_eq!(std::fs::read_to_string(d.join("a/store.jsonl")).unwrap(), "s1\n");
         assert_eq!(
-            std::fs::read_to_string(d.join("a/uncommitted-store-3.bin")).unwrap(),
+            std::fs::read_to_string(at(&d, "a").join("store.jsonl")).unwrap(),
+            "s1\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(at(&d, "a").join("uncommitted-store-3.bin")).unwrap(),
             "s2\n"
         );
-        assert_eq!(std::fs::read_to_string(d.join("a/journal.jsonl")).unwrap(), "1\n2\n");
         assert_eq!(
-            std::fs::read_to_string(d.join("a/uncommitted-journal-4.bin")).unwrap(),
+            std::fs::read_to_string(at(&d, "a").join("journal.jsonl")).unwrap(),
+            "1\n2\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(at(&d, "a").join("uncommitted-journal-4.bin")).unwrap(),
             "3\n"
         );
-        assert_eq!(std::fs::read_to_string(d.join("a/kid/journal.jsonl")).unwrap(), "k1\n");
-        assert_eq!(std::fs::read_to_string(d.join("b/journal.jsonl")).unwrap(), "");
-        assert_eq!(std::fs::read_to_string(d.join("c/journal.jsonl")).unwrap(), "");
+        assert_eq!(
+            std::fs::read_to_string(at(&d, "a/kid").join("journal.jsonl")).unwrap(),
+            "k1\n"
+        );
+        assert_eq!(std::fs::read_to_string(at(&d, "b").join("journal.jsonl")).unwrap(), "");
+        assert_eq!(std::fs::read_to_string(at(&d, "c").join("journal.jsonl")).unwrap(), "");
         // Recovering again changes nothing; without a log nothing is cut.
         assert_eq!(recover(&d).unwrap(), cut);
         std::fs::remove_file(d.join(LOG)).unwrap();
-        std::fs::write(d.join("a/journal.jsonl"), "1\n2\n3\n").unwrap();
+        std::fs::write(at(&d, "a").join("journal.jsonl"), "1\n2\n3\n").unwrap();
         assert_eq!(recover(&d).unwrap().journals["a"], (7, 6));
         let _ = std::fs::remove_dir_all(&d);
     }
@@ -827,8 +824,14 @@ mod tests {
         .unwrap();
         let error = recover(&d).unwrap_err();
         assert!(error.contains(&format!("byte {}", first.len())), "{error}");
-        assert_eq!(std::fs::read_to_string(d.join("a/journal.jsonl")).unwrap(), "1\n2\n3\n");
-        assert_eq!(std::fs::read_to_string(d.join("b/journal.jsonl")).unwrap(), "x\ny\n");
+        assert_eq!(
+            std::fs::read_to_string(at(&d, "a").join("journal.jsonl")).unwrap(),
+            "1\n2\n3\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(at(&d, "b").join("journal.jsonl")).unwrap(),
+            "x\ny\n"
+        );
         // A record of the wrong shape is refused the same way.
         std::fs::write(d.join(LOG), format!("{first}[1]\n{first}")).unwrap();
         assert!(recover(&d).is_err());
@@ -838,7 +841,10 @@ mod tests {
             recover(&d).unwrap().journals,
             Files::from([("a".into(), (7, 2)), ("b".into(), (9, 0))])
         );
-        assert_eq!(std::fs::read_to_string(d.join("a/journal.jsonl")).unwrap(), "1\n");
+        assert_eq!(
+            std::fs::read_to_string(at(&d, "a").join("journal.jsonl")).unwrap(),
+            "1\n"
+        );
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -849,12 +855,18 @@ mod tests {
         let d = dir("unreadable");
         instance(&d, "a", 7, "1\n2\n3\n");
         instance(&d, "b", 9, "x\ny\n");
-        std::fs::write(d.join("a/agent.json"), "{\"id\":\"a\",\"incarn").unwrap();
+        std::fs::write(at(&d, "a").join("agent.json"), "{\"id\":\"a\",\"incarn").unwrap();
         std::fs::write(d.join(LOG), "{\"epoch\":0,\"journals\":{\"a\":[7,2],\"b\":[9,2]}}\n").unwrap();
         let cut = recover(&d).unwrap();
         assert_eq!(cut.journals, Files::from([("a".into(), (7, 2)), ("b".into(), (9, 2))]));
-        assert_eq!(std::fs::read_to_string(d.join("a/journal.jsonl")).unwrap(), "1\n2\n3\n");
-        assert_eq!(std::fs::read_to_string(d.join("b/journal.jsonl")).unwrap(), "x\n");
+        assert_eq!(
+            std::fs::read_to_string(at(&d, "a").join("journal.jsonl")).unwrap(),
+            "1\n2\n3\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(at(&d, "b").join("journal.jsonl")).unwrap(),
+            "x\n"
+        );
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -885,7 +897,7 @@ mod tests {
             .unwrap();
         let file = std::fs::OpenOptions::new()
             .append(true)
-            .open(d.join("a/journal.jsonl"))
+            .open(at(&d, "a").join("journal.jsonl"))
             .unwrap();
         let mut journal = Journal::new(file, "a", 1).unwrap();
         assert!(matches!(durable.watch(0, "a", 0), Ready::Now));
