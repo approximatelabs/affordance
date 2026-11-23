@@ -37,6 +37,9 @@ pub(super) type Files = BTreeMap<String, (u64, u64)>;
 pub(super) struct Cut {
     pub journals: Files,
     pub stores: Files,
+    /// Instances whose files are shorter than their last commit says (bytes the commit made
+    /// durable are gone), with what is missing: each fails its own restore (`recover`).
+    pub damaged: BTreeMap<String, String>,
 }
 
 /// The append-only files a cut covers, and their names in an instance's directory.
@@ -519,11 +522,12 @@ fn sync(jobs: &[Sync]) -> std::io::Result<()> {
     })
 }
 
-/// The last committed cut in a commit log (`None`: there is no log, or the run that wrote it
-/// shut down with everything committed). Only the final line may be torn: it is the barrier a
-/// crash interrupted, whose cut was never committed. A bad line before it is damage, not an
-/// older cut, and is refused (as `jsonl.rs` refuses a bad journal line).
-fn read_log(path: &Path) -> Result<Option<Cut>, String> {
+/// The last committed cut in a commit log (`None`: there is no log), and whether the run that
+/// wrote it shut down with everything committed (`closed`: nothing is past the cut). Only the
+/// final line may be torn: it is the barrier a crash interrupted, whose cut was never committed.
+/// A bad line before it is damage, not an older cut, and is refused (as `jsonl.rs` refuses a bad
+/// journal line).
+fn read_log(path: &Path) -> Result<Option<(Cut, bool)>, String> {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -546,7 +550,7 @@ fn read_log(path: &Path) -> Result<Option<Cut>, String> {
             ));
         };
         if value["closed"] == true {
-            return Ok(None);
+            return Ok(Some((cut, true)));
         }
         for kind in [Kind::Journal, Kind::Store] {
             for (id, file) in value[kind.key()].as_object().into_iter().flatten() {
@@ -558,7 +562,7 @@ fn read_log(path: &Path) -> Result<Option<Cut>, String> {
         }
         at += line.len();
     }
-    Ok(Some(cut))
+    Ok(Some((cut, false)))
 }
 
 /// The lock on a run directory, held until dropped. Recovery truncates the journals and the
@@ -632,7 +636,11 @@ fn instances(dir: &Path) -> Vec<(String, PathBuf)> {
 /// An instance whose `agent.json` cannot be read is left as it is, and keeps its place in the cut:
 /// its own restore fails, not the run.
 pub(super) fn recover(dir: &Path) -> Result<Cut, String> {
-    let committed = read_log(&dir.join(LOG))?;
+    // After a clean shutdown nothing is cut, but committed bytes must still be there.
+    let (committed, closed) = match read_log(&dir.join(LOG))? {
+        Some((cut, closed)) => (Some(cut), closed),
+        None => (None, false),
+    };
     let mut cut = Cut::default();
     for (id, path) in instances(dir) {
         let saved = std::fs::read(path.join("agent.json"))
@@ -652,28 +660,45 @@ pub(super) fn recover(dir: &Path) -> Result<Cut, String> {
         };
         for kind in [Kind::Journal, Kind::Store] {
             let file = path.join(kind.file());
-            let Ok(meta) = std::fs::metadata(&file) else { continue };
-            let len = meta.len();
-            let keep = match &committed {
-                None => len,
-                Some(c) => match c.of(kind).get(&id) {
-                    Some(&(i, n)) if i == incarnation => n,
-                    _ => 0,
-                },
+            let len = std::fs::metadata(&file).map(|m| m.len()).ok();
+            let named = committed
+                .as_ref()
+                .and_then(|c| c.of(kind).get(&id))
+                .and_then(|&(i, n)| (i == incarnation).then_some(n));
+            let keep = match (&committed, named) {
+                (None, _) => len.unwrap_or(0),
+                (Some(_), Some(n)) => n,
+                (Some(_), None) => 0,
             };
+            // Committed bytes that are gone: what they recorded (a tool that ran, a message
+            // taken) is lost, and replaying the rest would do it again. The instance fails its
+            // restore, and the commit keeps its record of what should be there.
+            if len.unwrap_or(0) < keep {
+                let why = format!(
+                    "{} is {} bytes, shorter than its last commit ({keep} bytes): committed inputs are missing, so it is not restored (restore its files from a copy)",
+                    kind.file(),
+                    len.unwrap_or(0)
+                );
+                eprintln!("{id}: {why}");
+                cut.damaged.insert(id.clone(), why);
+                cut.of_mut(kind).insert(id.clone(), (incarnation, keep));
+                continue;
+            }
+            let Some(len) = len else { continue };
+            // Closed cleanly: the files stand as they are (lines added since are taken); the
+            // baseline stays what was committed.
+            if closed {
+                cut.of_mut(kind).insert(id.clone(), (incarnation, keep.min(len)));
+                continue;
+            }
             if keep < len {
                 let saved = set_aside(&file, keep).map_err(|e| format!("{}: {e}", file.display()))?;
                 eprintln!(
                     "{id}: {} cut to its last commit, {len} -> {keep} bytes (the rest is in {saved})",
                     kind.file()
                 );
-            } else if keep > len {
-                eprintln!(
-                    "{id}: {} ({len} bytes) is shorter than its last commit ({keep} bytes)",
-                    kind.file()
-                );
             }
-            cut.of_mut(kind).insert(id.clone(), (incarnation, keep.min(len)));
+            cut.of_mut(kind).insert(id.clone(), (incarnation, keep));
         }
     }
     Ok(cut)
@@ -871,14 +896,14 @@ mod tests {
         let e2 = durable.append(&mut journal, b"two\n").unwrap();
         assert!(e2 > e);
         durable.finish(false).unwrap();
-        assert_eq!(read_log(&d.join(LOG)).unwrap().unwrap().journals["a"], (1, 8));
+        assert_eq!(read_log(&d.join(LOG)).unwrap().unwrap().0.journals["a"], (1, 8));
         // A clean shutdown closes the log: the journals are complete as they stand.
         let durable = Arc::new(Durable::new());
         durable
             .start(&d, recover(&d).unwrap(), Default::default(), Weak::new())
             .unwrap();
         durable.finish(true).unwrap();
-        assert_eq!(read_log(&d.join(LOG)).unwrap(), None);
+        assert!(read_log(&d.join(LOG)).unwrap().unwrap().1, "closed");
         let _ = std::fs::remove_dir_all(&d);
     }
 }

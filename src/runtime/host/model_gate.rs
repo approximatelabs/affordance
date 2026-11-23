@@ -306,6 +306,7 @@ mod model_gate_tests {
             started: Instant::now(),
             clock: Clock::new(0),
             diagnostics: Default::default(),
+            damaged: Default::default(),
             retired: Default::default(),
             booting: Default::default(),
             durable: Default::default(),

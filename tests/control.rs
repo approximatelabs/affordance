@@ -248,3 +248,75 @@ fn a_restored_agent_keeps_its_own_secret() {
     assert_eq!((stopped("a"), stopped("b")), (json!(a.len()), json!(b.len())));
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+/// "A journal missing committed inputs is not replayed as if they never happened." After a clean
+/// close, one agent's journal loses its last line (a disk that lost what it said it had written).
+/// Restored, that agent fails with what is missing and runs nothing again; the other agent is
+/// restored and goes on.
+#[test]
+fn a_journal_missing_committed_inputs_fails_its_own_restore() {
+    let dir = std::env::temp_dir().join(format!("aff-control-short-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("app.tsx"), COUNTER).unwrap();
+    let d = json!({
+        "app": {"view": "app.tsx", "entry": "Main"},
+        "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
+        "agents": [{"id": "a", "model": null}, {"id": "b", "model": null}],
+        "dir": "run",
+        "keep_running": true,
+        "max_wall_s": 60
+    });
+    std::fs::write(dir.join("deployment.json"), d.to_string()).unwrap();
+    let child = start(&dir, false);
+    let mut c = Controller::connect(&dir.join("control.sock"));
+    for id in ["a", "b"] {
+        let posted = c.call(json!({"type": "event", "target": id, "name": "add", "payload": {"by": 3}}));
+        assert_eq!(posted["type"], "result", "{posted}");
+    }
+    c.close(0);
+    summary(child);
+    // The last committed line of a's journal is gone.
+    let journal = dir.join("run/a/journal.jsonl");
+    let bytes = std::fs::read(&journal).unwrap();
+    let body = &bytes[..bytes.len() - 1];
+    let cut = body.iter().rposition(|&b| b == b'\n').map_or(0, |at| at + 1);
+    std::fs::write(&journal, &bytes[..cut]).unwrap();
+    let _ = std::fs::remove_file(dir.join("run/a/checkpoint.json"));
+    let child = start(&dir, true);
+    let mut c = Controller::connect(&dir.join("control.sock"));
+    let status = c.call(json!({"type": "status"}));
+    wait_for("the run starts", || {
+        c.call(json!({"type": "status"}))["value"]["state"] == "running"
+    });
+    let posted = c.call(json!({"type": "event", "target": "b", "name": "add", "payload": {"by": 4}}));
+    assert_eq!(posted["type"], "result", "{posted} {status}");
+    c.close(0);
+    let out = child.wait_with_output().unwrap();
+    let report: J = serde_json::from_slice(&out.stdout).unwrap();
+    let agent = |id: &str| {
+        report["per_agent"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["id"] == id)
+            .unwrap()
+            .clone()
+    };
+    let a = agent("a");
+    assert!(
+        a["error"]
+            .as_str()
+            .is_some_and(|e| e.contains("shorter than its last commit")),
+        "{a}"
+    );
+    assert!(agent("b")["error"].is_null(), "{}", agent("b"));
+    let snapshot: J = serde_json::from_slice(&std::fs::read(dir.join("run/b/snapshot.json")).unwrap()).unwrap();
+    assert_eq!(snapshot["state"]["__ui"]["@n"], 7, "{snapshot}");
+    assert_eq!(
+        std::fs::read(&journal).unwrap().len(),
+        cut,
+        "a's journal is left as it was"
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}

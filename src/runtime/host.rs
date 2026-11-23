@@ -359,6 +359,8 @@ struct Shared {
     clock: Clock,
     /// What this run notes about its model calls, and where it captures them.
     diagnostics: super::model::Diagnostics,
+    /// Instances whose committed files recovery found short (`durable::Cut::damaged`).
+    damaged: BTreeMap<String, String>,
     /// Instances no worker holds: unmounted ones as they were when they left, and lost ones
     /// (`lost`). The run's report includes them.
     retired: Mutex<BTreeMap<String, AgentReport>>,
@@ -900,6 +902,7 @@ impl Runtime {
             started,
             clock: Clock::new(clock_base),
             diagnostics: super::model::Diagnostics::new(self.cfg.capture_dir.clone()),
+            damaged: cut.as_ref().map(|c| c.damaged.clone()).unwrap_or_default(),
             retired: Default::default(),
             booting: Default::default(),
             durable: durable.clone(),
@@ -1651,6 +1654,9 @@ fn start_instance(
         slots.insert(id, slot);
         Ok(())
     };
+    if let Some(why) = shared.damaged.get(&spec.id).filter(|_| restored) {
+        return fail(slots, cfg, spec, app, why.clone());
+    }
     if let Some((k, _)) = secrets.iter().find(|(_, v)| v.len() < MIN_SECRET) {
         return fail(
             slots,
