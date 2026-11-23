@@ -249,8 +249,17 @@ impl Executor for Exec {
             _ => return Err("exec stdin must be a string".into()),
         };
         // Variables the app passes go to the child's environment, not the command text.
-        // stderr joins stdout inside the shell, so the two keep their order.
+        // stderr joins stdout inside the shell, so the two keep their order. A remote machine
+        // (ssh, docker) is given the agent's environ the same way, in the script on stdin: never
+        // on a command line, where another user of the host could read it in the process list.
         let mut prelude = String::from("exec 2>&1\n");
+        let remote_env = matches!(self.target, Target::Ssh { .. } | Target::Docker { .. });
+        for (k, v) in ctx.env.iter().filter(|_| remote_env) {
+            if !k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') || k.is_empty() {
+                return Err(format!("bad env name {k:?}"));
+            }
+            prelude.push_str(&format!("export {k}='{}'\n", v.replace('\'', "'\\''")));
+        }
         for (k, v) in args["env"].as_object().into_iter().flatten() {
             if !k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
                 return Err(format!("bad env name {k:?}"));
@@ -289,15 +298,16 @@ impl Executor for Exec {
                 c.args(["-l", "-s"]).process_group(0).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()
             }
             Target::Ssh { target, key, control_dir, known_hosts } => {
-                let target = target.replace("{agent}", &ctx.agent);
+                let target = target.replace("{agent}", &instance_component(&ctx.agent));
                 let mut c = Proc::new("ssh");
                 // A guest sharing a CPU quota with thousands of others can take tens of seconds to
                 // answer a handshake or a keepalive; those are not dead hosts, so the limits are loose.
                 c.args(["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
                         "-o", &format!("UserKnownHostsFile={known_hosts}"), "-o", "ConnectTimeout=30", "-o", "ControlMaster=auto",
                         "-o", &format!("ControlPath={control_dir}/%r@%h:%p"), "-o", "ControlPersist=600", "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=6"]);
-                if let Some(k) = key { c.args(["-i", &k.replace("{agent}", &ctx.agent)]); }
-                c.arg(target).arg("--").arg(&remote).process_group(0).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()
+                if let Some(k) = key { c.args(["-i", &k.replace("{agent}", &instance_component(&ctx.agent))]); }
+                // `--` before the host: a target that starts with `-` is a host name, never an option.
+                c.arg("--").arg(target).arg(&remote).process_group(0).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()
             }
             Target::Docker { image, name } => {
                 let name = name.replace("{agent}", &instance_component(&ctx.agent));

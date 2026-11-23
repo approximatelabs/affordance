@@ -199,7 +199,8 @@ fn a_restored_agent_keeps_its_own_secret() {
     std::fs::write(
         dir.join("app.tsx"),
         r#"export function Main() {
-  useEvent("check", () => harness.stop({length: harness.env.KEY.length}));
+  const [seen, setSeen] = useState("", "seen");
+  useEvent("check", () => { setSeen(harness.env.KEY); harness.stop({length: harness.env.KEY.length}); });
   return <box>waiting</box>;
 }"#,
     )
@@ -246,6 +247,9 @@ fn a_restored_agent_keeps_its_own_secret() {
             .clone()
     };
     assert_eq!((stopped("a"), stopped("b")), (json!(a.len()), json!(b.len())));
+    // The app kept its secret in its state; the snapshot, which people read, shows it redacted.
+    let snapshot = std::fs::read_to_string(dir.join("run/a/snapshot.json")).unwrap();
+    assert!(!snapshot.contains(a) && snapshot.contains("[secret:KEY]"), "{snapshot}");
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

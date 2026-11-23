@@ -2097,7 +2097,11 @@ fn worker(
             images.push((slot.spec.id.clone(), image));
         }
         if let Some(dir) = &shared.cfg.dir {
-            let value = json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error});
+            // Secrets redacted, as in the trace: a snapshot is diagnostics, read by people.
+            let value = redact(
+                json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error}),
+                &slot.secrets,
+            );
             snapshots.push((
                 dir.join(&slot.spec.id).join("snapshot.json"),
                 value.to_string().into_bytes(),
@@ -2276,7 +2280,10 @@ fn feed(
                 if let Some(dir) = &shared.cfg.dir {
                     let _ = atomic_value(
                         &dir.join(&k).join("snapshot.json"),
-                        &json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error}),
+                        &redact(
+                            json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error}),
+                            &slot.secrets,
+                        ),
                     );
                 }
                 shared

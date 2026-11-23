@@ -57,10 +57,12 @@ impl Executor for Ui {
         let request = self.next.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = channel();
         self.questions.lock().unwrap().insert(request, tx);
-        let mut event = json!({"type": "question", "agent": ctx.agent, "request": request});
-        for (k, v) in args.as_object().into_iter().flatten() {
-            event[k] = v.clone();
-        }
+        // The app's fields first, the protocol's last: an app cannot set the frame's type, agent or
+        // request (a forged `exit`, another question's number).
+        let mut event = args.as_object().cloned().map(J::Object).unwrap_or_else(|| json!({}));
+        event["type"] = json!("question");
+        event["agent"] = json!(ctx.agent);
+        event["request"] = json!(request);
         self.out.send(event);
         // Until the frontend answers, or the call is no longer wanted (an abort, the run's end).
         loop {
