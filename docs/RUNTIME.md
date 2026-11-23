@@ -113,8 +113,8 @@ For a fleet with bursty messages, set deployment `"input_batch": 64` and use
 `harness.send(memberIds, payload)` for one durable multicast result. A hub that is a top-level
 spec can set `"dedicated_worker": true`; its descendants share the isolated worker. The
 shared `workers` pool remains available to other roots. Channels and membership stay app code.
-Batching is opt-in because listeners keep one frame's captures; use functional state updates
-when combining multiple events. Details and replay rules are in [HARNESS.md §3](../spec/HARNESS.md#3-the-loop).
+Batching groups journal writes only: each event still takes its own turn, so an app computes the
+same with or without it. Details and replay rules are in [HARNESS.md §3](../spec/HARNESS.md#3-the-loop).
 
 The runtime keeps no conversation. `useLog()` keeps one
 in app state, writing records from `model()`'s output and `dispatch()`'s results:

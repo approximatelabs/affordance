@@ -563,8 +563,6 @@ pub struct Agent {
     /// The latest complete document, shared by lifecycle, model calls and mounts while all
     /// render inputs still match. Probes never publish or reuse this snapshot.
     last_render: Option<RenderSnapshot>,
-    /// Committed listeners for the current explicitly journaled frame; never checkpointed.
-    batch_document: Option<Rc<crate::Prepared>>,
     next_task: u64,
     next_handler: u64,
     stopped: Option<J>,
@@ -721,7 +719,6 @@ impl Agent {
             version: 1,
             effects_version: 0,
             last_render: None,
-            batch_document: None,
             next_task: 0,
             realm: crate::microtasks::Queue::new(),
             ran: HashMap::new(),
@@ -1226,20 +1223,25 @@ impl Agent {
 
     fn handle_inner(&mut self, view: &View, enc: &Encoder, mut input: Input) -> Result<Vec<Command>, String> {
         self.lower_input(&mut input)?;
+        // A batch is one journal record of several inputs, written together; each input still takes
+        // its own turn (its render, its handlers, their microtasks, its effects pass), as it would
+        // arriving alone, so how inputs are batched never changes what an app computes. One that
+        // stops the instance ends the frame (the rest are journaled and not taken, as after a stop).
         if let Input::Batch { inputs } = input {
-            self.clock_ms = self.clock_ms.max(inputs.first().map_or(self.clock_ms, Input::clock_ms));
-            self.batch_document = Some(self.evaluate(view, enc)?);
-            let result = (|| {
-                let mut commands = vec![];
-                for input in inputs {
-                    self.realm.borrow_mut().fuel = 0;
-                    commands.extend(self.handle_lowered(view, enc, input)?);
-                    commands.extend(self.drain_jobs(view, enc)?);
+            let last = inputs.len().saturating_sub(1);
+            let mut commands = vec![];
+            for (i, input) in inputs.into_iter().enumerate() {
+                if self.stopped.is_some() {
+                    self.journaled += 1;
+                    continue;
                 }
-                Ok(commands)
-            })();
-            self.batch_document = None;
-            return result;
+                self.realm.borrow_mut().fuel = 0;
+                commands.extend(self.handle_lowered(view, enc, input)?);
+                if i < last {
+                    commands.extend(self.checkpoint(view, enc)?);
+                }
+            }
+            return Ok(commands);
         }
         self.handle_lowered(view, enc, input)
     }
@@ -1715,14 +1717,13 @@ impl Agent {
             // cropped or hidden box is live), and run from it while the state is the one it
             // rendered (a listener that changed it makes the next one render again).
             let version = self.version;
-            // A batch's document, or the one the event was raised on (a prompt's `layout` goes to
-            // the listeners of the document that was laid out, as an event goes to the listeners
-            // registered when it fired), or the current one.
+            // The document the event was raised on (a prompt's `layout` goes to the listeners of
+            // the document that was laid out, as an event goes to the listeners registered when it
+            // fired), or the current one.
             let raised = doc.is_some();
-            let prepared = match (&self.batch_document, doc) {
-                (Some(prepared), _) => prepared.with_context(self.context(), date(self.clock_ms)?),
-                (None, Some(prepared)) => prepared.with_context(self.context(), date(self.clock_ms)?),
-                (None, None) => self.evaluate(view, enc)?,
+            let prepared = match doc {
+                Some(prepared) => prepared.with_context(self.context(), date(self.clock_ms)?),
+                None => self.evaluate(view, enc)?,
             };
             // A child's callback (`mount:<key>:onX`) runs that `<Mount>`'s handler.
             if event.starts_with("mount:") {
@@ -1761,8 +1762,7 @@ impl Agent {
             let ctx = self.context();
             for which in listeners {
                 let (state, clock) = (self.state.clone(), self.clock_ms);
-                let kept =
-                    (self.batch_document.is_some() || raised || self.version == version).then(|| prepared.clone());
+                let kept = (raised || self.version == version).then(|| prepared.clone());
                 out.extend(self.start_handler_at(
                     view,
                     enc,

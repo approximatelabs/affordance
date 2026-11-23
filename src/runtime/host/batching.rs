@@ -151,6 +151,12 @@ pub(super) fn feed_group(
     };
     if bytes > MAX_BYTES || inputs.len() == 1 {
         for (input, ack) in inputs.into_iter().zip(acks) {
+            // A member that failed the instance ends the group: the rest are not journaled (their
+            // senders are told, as for any input to a failed instance).
+            if slot.error.is_some() {
+                settle(shared, w, slot, ack, false, timers, local);
+                continue;
+            }
             let journaled = apply(shared, w, &view, &enc, slot, input, timers, local);
             settle(shared, w, slot, ack, journaled, timers, local);
         }

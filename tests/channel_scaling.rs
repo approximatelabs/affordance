@@ -4,7 +4,7 @@ use affordance::{
     View,
     runtime::{Agent, AgentConfig, Command, Input},
 };
-use serde_json::json;
+use serde_json::{Value as J, json};
 use std::{collections::BTreeMap, path::PathBuf};
 
 struct Files(PathBuf);
@@ -119,10 +119,25 @@ fn an_input_frame_drains_member_microtasks_and_commits_effects_once_and_replays(
     };
     let next = agent.handle(&view, &enc, input.clone()).unwrap();
     let state = agent.state();
+    // How inputs are batched never changes what the app computes: the batch gives what the same
+    // two events give one at a time (a captured `direct` too), with each one's effects pass.
+    let mut alone = Agent::new(config()).unwrap();
+    alone.start(&view, &enc).unwrap();
+    let mut each = alone.handle(&view, &enc, event("inc", 10)).unwrap();
+    each.extend(alone.handle(&view, &enc, event("inc", 20)).unwrap());
+    assert_eq!(state, alone.state());
     assert_eq!(state["__ui"]["@n"], 4);
-    assert_eq!(state["__ui"]["@direct"], 1);
-    assert_eq!(next.iter().filter(|c| matches!(c, Command::Call { .. })).count(), 1);
-    assert!(next.iter().any(|c| matches!(c,Command::Call {args,..} if args["n"]==4)));
+    assert_eq!(state["__ui"]["@direct"], 2);
+    let calls = |cs: &[Command]| -> Vec<J> {
+        cs.iter()
+            .filter_map(|c| match c {
+                Command::Call { args, .. } => Some(args["n"].clone()),
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(calls(&next), calls(&each));
+    assert_eq!(calls(&next), vec![json!(2), json!(4)]);
     assert_eq!(agent.journal_len(), 2);
     let (restored, _) = Agent::restore(config(), [input], &view, &enc).unwrap();
     assert_eq!(restored.state(), state);

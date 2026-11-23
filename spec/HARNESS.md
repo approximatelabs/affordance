@@ -125,12 +125,11 @@ acknowledgement and committed like any record (§7). Oversized groups use indivi
 operations and inspection are scheduling barriers; nested batches are
 invalid. No timer delays incoming work to fill a batch.
 
-Members run in order and drain their microtasks, with a fresh execution allowance per member.
-Listeners retain the frame's committed captures; functional setters see current state. Thus
-two `setN(n + 1)` calls using one captured `n` replace it with the same value, while two
-`setN(n => n + 1)` calls increment twice. Scheduled effects and reconciliation run at the frame
-boundary; explicit model/render calls still evaluate the requested document. Recorded
-batch boundaries govern replay. Agent `journal_len` counts logical members; JSONL line count
+Each member takes its own turn, as if it had arrived alone: its listeners run from a render of
+the current state, its microtasks drain, and its effects and reconciliation run, with a fresh
+execution allowance. A frame is a journal record, not an app-visible unit: batching never changes
+what an app computes (two queued `setN(n + 1)` give `n + 2`, as without it). A member that stops
+the instance ends the frame. Recorded batch boundaries govern replay. Agent `journal_len` counts logical members; JSONL line count
 counts physical frames. Checkpoint offsets and hashes remain byte-based. Existing individual
 records retain their semantics; older binaries cannot read the new batch shape.
 Every await yields to the instance's FIFO microtask queue. The current input's listeners run
