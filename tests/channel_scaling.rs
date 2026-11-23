@@ -51,7 +51,7 @@ fn event(name: &str, clock_ms: i64) -> Input {
     Input::Event {
         name: name.into(),
         payload: json!({}),
-        op: None,
+        id: None,
         clock_ms,
     }
 }

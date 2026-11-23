@@ -17,7 +17,6 @@
 //! results, call arguments. Writing a blob is the agent's only I/O; blobs
 //! are content-addressed, so replaying the journal writes nothing new and reads the same text.
 use super::blobs::Blobs;
-use super::model::FailureKind;
 use crate::View;
 use crate::effects::{Outcome, Request};
 use crate::emit::{Encoder, RunCache};
@@ -85,12 +84,8 @@ pub enum Input {
         task: u64,
         /// What failed.
         error: String,
-        /// The failure may pass. What a journal written before failures had kinds says of it;
-        /// `kind` is read first.
-        transient: bool,
         /// What kind of failure it was.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        kind: Option<super::model::FailureKind>,
+        kind: super::model::FailureKind,
         /// How long the server asked the caller to wait before trying again.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         retry_after_ms: Option<u64>,
@@ -99,16 +94,16 @@ pub enum Input {
     },
     /// The outcome of a `Call` command.
     Result { task: u64, outcome: Outcome, clock_ms: i64 },
-    /// Something from outside (a message from another agent, a process exit, ...). `op`: the
-    /// operator's id for an event delivered through the control inbox (receipts, dedupe).
+    /// Something from outside (a message from another agent, a post, a process exit, ...).
     Event {
         /// The event's name, as `useEvent(name)` hears it.
         name: String,
         /// What it carries.
         payload: J,
+        /// Its delivery id, when it has one (a `send`'s message, a keyed post): an event whose id
+        /// this instance has already taken is journaled but not taken again.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        /// The operator's id for it, when it came through the control inbox.
-        op: Option<String>,
+        id: Option<String>,
         /// When it arrived, on the instance's clock.
         clock_ms: i64,
     },
@@ -155,11 +150,9 @@ fn validate_batch(inputs: &[Input]) -> Result<(), String> {
         || inputs.len() > MAX_INPUT_BATCH
         || inputs
             .iter()
-            .any(|input| !matches!(input, Input::Event { op: None, .. } | Input::Result { .. }))
+            .any(|input| !matches!(input, Input::Event { .. } | Input::Result { .. }))
     {
-        return Err(
-            "an input batch requires 1..64 event/result members without control receipts or nested batches".into(),
-        );
+        return Err("an input batch requires 1..64 event/result members and no nested batches".into());
     }
     Ok(())
 }
@@ -602,7 +595,7 @@ pub struct Agent {
     children: BTreeMap<String, J>,
     /// Its parent has been told it stopped (`onStop`).
     stop_reported: bool,
-    /// Ids (`_msg`) of the messages already taken: a resend after a crash is not taken twice.
+    /// Delivery ids (`Input::Event.id`) of the events already taken: a resend after a crash is not taken twice.
     seen_msgs: std::collections::BTreeSet<String>,
     /// A journaled reply answered a prompt this app no longer renders: the first such turn.
     diverged_at: Option<u64>,
@@ -1322,7 +1315,6 @@ impl Agent {
             Input::ModelError {
                 task,
                 error,
-                transient,
                 kind,
                 retry_after_ms,
                 ..
@@ -1343,11 +1335,6 @@ impl Agent {
                     // says whether there is another and after how long, from the kind of failure,
                     // how many there have been, how long since the first, and the wait the server
                     // asked for. All of that is journaled, so a replay decides the same.
-                    let kind = kind.unwrap_or(if transient {
-                        FailureKind::Interrupted
-                    } else {
-                        FailureKind::Refused
-                    });
                     let slot = self.open.entry((h, i)).or_default();
                     let (failures, since) = slot
                         .retry
@@ -1390,12 +1377,8 @@ impl Agent {
                 }
                 _ => self.note(json!({"t": "late_result", "task": task})),
             },
-            Input::Event { name, payload, .. }
-                if payload["_msg"]
-                    .as_str()
-                    .is_some_and(|m| !self.seen_msgs.insert(m.to_owned())) =>
-            {
-                self.note(json!({"t": "duplicate_message", "event": name, "msg": payload["_msg"]}));
+            Input::Event { name, id: Some(id), .. } if !self.seen_msgs.insert(id.clone()) => {
+                self.note(json!({"t": "duplicate_message", "event": name, "id": id}));
             }
             Input::Event { name, payload, .. } => {
                 // A matching wait resolves at once (it consumes the event for its task); the event

@@ -63,7 +63,7 @@ export default function Main() {{
             Input::Event {
                 name: "add".into(),
                 payload: json!({}),
-                op: None,
+                id: None,
                 clock_ms: 1_791_000_000_100 + n,
             },
         )

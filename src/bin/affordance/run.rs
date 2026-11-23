@@ -286,13 +286,15 @@ fn duration(value: &J, name: &str) -> Result<Duration, String> {
 }
 
 /// Run a loaded deployment (`deploy::load`): fresh, or `resume` from its journals. `prepare` sees
-/// the runtime before it starts (`serve` binds its `client` machine and takes an inbox there).
+/// the runtime before it starts (`serve` binds its `client` machine and takes its control there).
 /// The summary at the end goes to stdout, or to stderr when stdout is a protocol's (`host`).
+/// SIGINT and SIGTERM close the run; with `control_socket`, controllers connect there.
 pub fn run(
     cfg: J,
     resume: bool,
     keep_running: bool,
     summary_on_stdout: bool,
+    control_socket: Option<&std::path::Path>,
     prepare: impl FnOnce(&mut Runtime) -> Result<(), String>,
 ) -> Result<(), String> {
     crate::format::validate(&cfg)?;
@@ -380,6 +382,7 @@ pub fn run(
     // The summary printed at the end reads no state (each agent's snapshot.json has it).
     rc.report_state = false;
     rc.serve = keep_running || cfg["keep_running"].as_bool().unwrap_or(false);
+    rc.capture_dir = std::env::var_os("AFFORDANCE_CAPTURE_DIR").map(Into::into);
     rc.env = cfg["env"]
         .as_object()
         .into_iter()
@@ -490,18 +493,32 @@ pub fn run(
     }
     affordance::runtime::host::tune_allocator(cfg["workers"].as_u64().unwrap_or(WORKERS) as usize);
     prepare(&mut rt)?;
-    let report = rt.run()?;
+    let control = rt.control();
+    crate::control::close_on_signals(control.clone());
+    let socket = match control_socket {
+        Some(path) => {
+            let target = rt.specs().first().map(|s| s.id.clone()).unwrap_or_default();
+            Some(crate::control::listen(path, control, target)?)
+        }
+        None => None,
+    };
+    let report = rt.run();
+    if let (Some(socket), Ok(report)) = (&socket, &report) {
+        *socket.ended.lock().unwrap() = json!(report.ended);
+    }
+    drop(socket);
+    let report = report?;
     let total =
         |f: &dyn Fn(&affordance::runtime::Metrics) -> u64| report.agents.iter().map(|a| f(&a.metrics)).sum::<u64>();
     let prompt = total(&|m| m.prompt_tokens);
     let summary = serde_json::to_string_pretty(&json!({
-        "complete": report.complete, "wall_s": report.wall_s, "agents": report.agents.len(),
+        "complete": report.complete, "ended": report.ended, "wall_s": report.wall_s, "agents": report.agents.len(),
         "turns": total(&|m| m.turns), "exact_appends": total(&|m| m.exact_appends), "rewrites": total(&|m| m.rewrites),
         "prompt_tokens": prompt, "uncached_tokens": total(&|m| m.uncached_tokens), "generated_tokens": total(&|m| m.generated_tokens),
         "prefix_reuse": if prompt > 0 { 1.0 - total(&|m| m.uncached_tokens) as f64 / prompt as f64 } else { 0.0 },
         "handler_errors": total(&|m| m.handler_errors), "model_errors": total(&|m| m.model_errors),
-        "capture_errors": affordance::runtime::model::capture_errors(),
-        "token_mismatches": affordance::runtime::model::token_mismatches(),
+        "capture_errors": report.capture_errors,
+        "token_mismatches": report.token_mismatches,
         "render_stats": {"evaluations": report.agents.iter().map(|a| a.render_stats.evaluations).sum::<u64>(), "reused": report.agents.iter().map(|a| a.render_stats.reused).sum::<u64>()},
         "per_agent": report.agents.iter().map(|a| json!({"id": a.id, "worker":a.worker, "turns": a.metrics.turns, "stopped": a.stopped, "error": a.error})).collect::<Vec<_>>(),
     })).unwrap();

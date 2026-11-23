@@ -78,7 +78,7 @@ fn run(tss: &str, name: &str, turns: usize) -> (Vec<Vec<u32>>, Encoder, Agent) {
                 Input::Event {
                     name: "message".into(),
                     payload: json!({"text": text}),
-                    op: None,
+                    id: None,
                     clock_ms: clock,
                 },
             )

@@ -152,7 +152,7 @@ export default function Main({{denied,reverse,name}}){{
 }
 
 #[test]
-fn busy_local_calls_allow_timers_inspection_pause_and_shutdown() {
+fn busy_local_calls_allow_timers_inspection_close_and_shutdown() {
     const CHILD: &str = "AFFORDANCE_FAIR_WORKER_CHILD";
     if std::env::var_os(CHILD).is_none() {
         // The scenario runs in a child with a 15 s limit: a runtime that cannot shut down would
@@ -160,7 +160,7 @@ fn busy_local_calls_allow_timers_inspection_pause_and_shutdown() {
         let mut child = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "reliability::busy_local_calls_allow_timers_inspection_pause_and_shutdown",
+                "reliability::busy_local_calls_allow_timers_inspection_close_and_shutdown",
                 "--test-threads=1",
             ])
             .env(CHILD, "1")
@@ -183,7 +183,7 @@ fn busy_local_calls_allow_timers_inspection_pause_and_shutdown() {
         );
         return;
     }
-    for pause in [false, true] {
+    for close in [false, true] {
         let dir = Scratch::new();
         let app = dir.app(
             r#"
@@ -204,15 +204,14 @@ export default function Main(){
         );
         let mut cfg = config(&app);
         cfg.dir = Some(dir.0.join("run"));
-        cfg.max_wall = if pause { None } else { Some(Duration::from_secs(1)) };
-        let control = dir.0.join("run/control");
-        std::fs::create_dir_all(&control).unwrap();
+        cfg.max_wall = if close { None } else { Some(Duration::from_secs(1)) };
         let mut rt = Runtime::new(cfg.clone(), encoder(), model());
+        let control = rt.control();
         rt.bind_machine(
             "control",
             Arc::new(move |_: &affordance::runtime::CallContext, _: &J| {
-                if pause {
-                    std::fs::write(control.join("pause.json"), r#"{"mode":"immediate"}"#).unwrap();
+                if close {
+                    control.close(Duration::ZERO);
                 }
                 Ok(json!({}))
             }),
@@ -230,31 +229,29 @@ export default function Main(){
         let watcher = report.agents.iter().find(|a| a.id == "watcher").unwrap();
         assert!(watcher.error.is_none(), "{:?}", watcher.error);
         assert!(watcher.stopped.as_ref().and_then(J::as_u64).is_some_and(|n| n > 0));
-        if pause {
+        if close {
             let before = report.agents.iter().find(|a| a.id == "busy").unwrap();
-            let pause_file = dir.0.join("run/control/pause.json");
-            std::fs::remove_file(&pause_file).unwrap();
-            // The resumed run ends as soon as the busy agent's journal has grown (a graceful
-            // pause from the controller); the wall limit only bounds a failure, so a slow
-            // restore under load cannot end the run before the held work continues.
+            // The restored run ends as soon as the busy agent's journal has grown (a close from
+            // the controller); the wall limit only bounds a failure, so a slow restore under load
+            // cannot end the run before the held work continues.
             cfg.max_wall = Some(Duration::from_secs(2));
             let journal = dir.0.join("run/busy/journal.jsonl");
             let lines = |p: &std::path::Path| std::fs::read(p).map_or(0, |b| b.iter().filter(|&&c| c == b'\n').count());
             let start = lines(&journal).max(before.journal_len);
             let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let mut rt = Runtime::resume(cfg, encoder(), model()).unwrap();
             let watch = {
-                let done = done.clone();
+                let (done, control) = (done.clone(), rt.control());
                 std::thread::spawn(move || {
                     while !done.load(Ordering::SeqCst) {
                         if lines(&journal) > start {
-                            std::fs::write(&pause_file, r#"{"mode":"graceful"}"#).unwrap();
+                            control.close(Duration::from_secs(150));
                             return;
                         }
                         std::thread::sleep(Duration::from_millis(5));
                     }
                 })
             };
-            let mut rt = Runtime::resume(cfg, encoder(), model()).unwrap();
             rt.bind_machine(
                 "control",
                 Arc::new(|_: &affordance::runtime::CallContext, _: &J| Ok(json!({}))),
@@ -485,7 +482,7 @@ export default function Main(){
         let input = affordance::runtime::Input::Event {
             name: name.into(),
             payload,
-            op: None,
+            id: None,
             clock_ms: clock,
         };
         writeln!(
@@ -640,7 +637,7 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
         let input = affordance::runtime::Input::Event {
             name: "bump".into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: clock,
         };
         writeln!(

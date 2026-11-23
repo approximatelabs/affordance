@@ -256,7 +256,7 @@ fn renders_free_their_closures_and_closures_behave_as_in_javascript() {
                 Input::Event {
                     name: "install".into(),
                     payload: json!({"source":source}),
-                    op: None,
+                    id: None,
                     clock_ms: n,
                 },
             )

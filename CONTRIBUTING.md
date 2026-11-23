@@ -46,7 +46,7 @@ shows the test applied to decisions already made.
    that runs Affordance. Only a genuinely missing primitive belongs in the engine.
 3. **The smallest general primitive.** Generic (no product, vendor or one client's feature),
    useful beyond the case at hand, deterministic under replay, and consistent with cancellation,
-   pause and restore.
+   close and restore.
 4. **The standard cases still read naturally:** a chat bot, an autonomous tool-using agent, a
    multi-agent fleet, and a resumed journal. If one needs a workaround, the change is wrong.
 

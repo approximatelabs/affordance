@@ -61,22 +61,43 @@ fn asked(result: Result<(u16, J, Option<String>), HttpError>) -> (Result<(u16, J
 
 static RID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-static CAPTURE_ERRORS: AtomicU64 = AtomicU64::new(0);
+/// What one run notes about its model calls, and where it captures them: each runtime has its own
+/// (`RuntimeConfig.capture_dir`), so two runs in one process never count each other's calls. A
+/// request carries its run's (`GenRequest.diagnostics`); the default captures nothing.
+#[derive(Debug, Clone, Default)]
+pub struct Diagnostics(std::sync::Arc<DiagnosticsInner>);
 
-static TOKEN_MISMATCHES: AtomicU64 = AtomicU64::new(0);
+#[derive(Debug, Default)]
+struct DiagnosticsInner {
+    capture_dir: Option<std::path::PathBuf>,
+    capture_errors: AtomicU64,
+    token_mismatches: AtomicU64,
+}
 
-/// Model calls whose prompt the server counted differently from the tokens laid out (the run
-/// summary's `token_mismatches`). It should be zero: the tokens laid out are the tokens the
-/// model reads. A file whose size the layout has wrong, or a server that tokenizes a prompt
-/// again, shows here.
-pub fn token_mismatches() -> u64 {
-    TOKEN_MISMATCHES.load(Ordering::Relaxed)
+impl Diagnostics {
+    /// Counters for one run, writing every request and response under `capture_dir` if given.
+    pub fn new(capture_dir: Option<std::path::PathBuf>) -> Self {
+        Diagnostics(std::sync::Arc::new(DiagnosticsInner {
+            capture_dir,
+            ..Default::default()
+        }))
+    }
+    /// Model calls whose prompt the server counted differently from the tokens laid out. It
+    /// should be zero: the tokens laid out are the tokens the model reads. A file whose size the
+    /// layout has wrong, or a server that tokenizes a prompt again, shows here.
+    pub fn token_mismatches(&self) -> u64 {
+        self.0.token_mismatches.load(Ordering::Relaxed)
+    }
+    /// Captures that could not be written.
+    pub fn capture_errors(&self) -> u64 {
+        self.0.capture_errors.load(Ordering::Relaxed)
+    }
 }
 
 /// A token-id server reported how many prompt tokens it processed for `req`.
 fn prompt_counted(req: &GenRequest, counted: Option<u64>) {
     let Some(counted) = counted else { return };
-    if counted != req.ids.len() as u64 && TOKEN_MISMATCHES.fetch_add(1, Ordering::Relaxed) < 5 {
+    if counted != req.ids.len() as u64 && req.diagnostics.0.token_mismatches.fetch_add(1, Ordering::Relaxed) < 5 {
         eprintln!(
             "affordance: {}: the prompt was laid out as {} tokens and the server counted {counted}. The model did not read the tokens that were laid out (a picture, clip or video whose size is wrong, or a server that tokenized the prompt again)",
             req.agent,
@@ -85,12 +106,8 @@ fn prompt_counted(req: &GenRequest, counted: Option<u64>) {
     }
 }
 
-/// Captures this process failed to write (the status feed's `capture_errors`).
-pub fn capture_errors() -> u64 {
-    CAPTURE_ERRORS.load(Ordering::Relaxed)
-}
-
-/// AFFORDANCE_CAPTURE_DIR: every request and response (and stream event) is written there, by agent.
+/// The run's capture directory (`RuntimeConfig.capture_dir`): every request and response (and
+/// stream event) is written there, by agent.
 /// `data` (the JSON of what is captured) is only built when capturing is on: a request body holds
 /// the whole prompt. A capture is diagnostics, like a browser's network log: a failed write (a
 /// full disk) never fails the call. It is counted, logged at the 1st, 2nd, 4th, ... failure, and
@@ -98,10 +115,10 @@ pub fn capture_errors() -> u64 {
 /// synced: a crash can lose the last captures, which a journal would need and a log does not.
 fn capture(req: &GenRequest, rid: &str, kind: &str, data: impl FnOnce() -> Vec<u8>) {
     let agent = req.agent.as_str();
-    let Ok(root) = std::env::var("AFFORDANCE_CAPTURE_DIR") else {
+    let Some(root) = &req.diagnostics.0.capture_dir else {
         return;
     };
-    let dir = std::path::Path::new(&root).join(agent);
+    let dir = root.join(agent);
     let path = dir.join(format!("{rid}.{kind}.json"));
     let temporary = path.with_extension("tmp");
     let written = std::fs::create_dir_all(&dir).and_then(|_| {
@@ -116,7 +133,7 @@ fn capture(req: &GenRequest, rid: &str, kind: &str, data: impl FnOnce() -> Vec<u
     });
     if let Err(e) = written {
         let _ = std::fs::remove_file(&temporary);
-        let n = CAPTURE_ERRORS.fetch_add(1, Ordering::Relaxed) + 1;
+        let n = req.diagnostics.0.capture_errors.fetch_add(1, Ordering::Relaxed) + 1;
         if n.is_power_of_two() {
             eprintln!("request capture failed ({n} so far; the calls go on): {e}")
         }
@@ -248,6 +265,8 @@ pub struct GenRequest {
     /// Where each media element's tokens are in `ids`, and its placeholder: (start, count,
     /// placeholder).
     pub media: Vec<(usize, usize, u32)>,
+    /// The run's counters and capture directory.
+    pub diagnostics: Diagnostics,
 }
 
 impl GenRequest {
@@ -271,6 +290,7 @@ impl GenRequest {
             tag: None,
             images: vec![],
             media: vec![],
+            diagnostics: Diagnostics::default(),
         }
     }
 }

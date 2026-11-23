@@ -83,8 +83,8 @@ A `chat` binding with no `context` asks its server the same way (`GET {url}/mode
 OpenAI-compatible server (vLLM, SGLang) reports its window there. Hosted APIs (and the Anthropic
 and Responses bindings) do not report one: such a binding needs `context` (or `"none"`), and the
 error says so. The runtime logs each binding's window on stderr
-(`model binding "default": window 262144 tokens (server /v1/models)`), and `observed.json` shows
-it under `models` (`{"default": {"context": 262144, "source": "server /v1/models"}}`).
+(`model binding "default": window 262144 tokens (server /v1/models)`), and the run's status
+(`Control::status`) shows it under `models` (`{"default": {"context": 262144, "source": "server /v1/models"}}`).
 
 ## Provider options and sampling
 

@@ -79,7 +79,7 @@ impl Rig {
         self.input(Input::Event {
             name: name.into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: self.clock,
         })
     }
@@ -133,7 +133,7 @@ impl Rig {
         self.input(Input::Event {
             name: "message".into(),
             payload: json!({"text":"find it"}),
-            op: None,
+            id: None,
             clock_ms: self.clock,
         })
     }
@@ -691,7 +691,7 @@ fn source_components_install_replace_undo_remove_and_recover_from_recorded_sourc
         rig.input(Input::Event {
             name: "install".into(),
             payload: json!({"source":source}),
-            op: None,
+            id: None,
             clock_ms: rig.clock + 1,
         });
         let trace = rig.agent.take_trace();
@@ -947,7 +947,7 @@ export default function Main(){
     rig.input(Input::Event {
         name: "mount:worker:onDone".into(),
         payload: json!({"$args":["still mounted"]}),
-        op: None,
+        id: None,
         clock_ms: 2,
     });
     assert_eq!(rig.agent.state()["__ui"]["@seen"], "still mounted");

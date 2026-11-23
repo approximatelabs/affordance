@@ -118,8 +118,6 @@ pub(super) struct Seed {
     pub saved: Option<usize>,
     pub bytes: u64,
     pub boundary: Option<(usize, u64)>,
-    /// The image's offset: the suffix replayed from it starts here (0: a full replay).
-    pub offset: u64,
     /// The blobs the journal refers to.
     pub refs: BTreeSet<String>,
 }

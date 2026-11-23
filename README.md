@@ -118,7 +118,7 @@ Or drive one from a frontend over stdio. [`views/demo/host`](views/demo/host) is
 streams its replies, asks before each command, and stops a turn on Escape (`{"type":"abort"}`):
 
 ```sh
-affordance host views/demo/host   # JSON lines: {"type":"prompt","text":"..."} in; deltas, output, questions out
+affordance host views/demo/host   # JSON lines: {"type":"event","name":"user","payload":{"text":"..."}} in; deltas, output, questions out
 ```
 
 [Getting started](docs/GETTING_STARTED.md) walks through it; [examples](examples/README.md) has more.

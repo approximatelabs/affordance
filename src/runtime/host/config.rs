@@ -17,9 +17,12 @@ pub struct RuntimeConfig {
     /// Threads that run machine commands and other host calls.
     pub exec_threads: usize,
     /// Model calls in flight at once (the rest wait in arrival order); `None`: `model_threads`.
-    /// With `dir`, the file `<dir>/model_inflight` (one integer) overrides it while running, so a
-    /// controller outside the runtime can steer it from the model server's own metrics.
+    /// `Control::set_model_limit` changes it while running, so a controller outside the runtime
+    /// can steer it from the model server's own metrics.
     pub model_inflight: Option<usize>,
+    /// Where every model request and response is written, by agent (diagnostics, like a browser's
+    /// network log; the command sets it from `AFFORDANCE_CAPTURE_DIR`).
+    pub capture_dir: Option<PathBuf>,
     /// Instances restoring at once (replaying a journal or loading an image); the others wait
     /// their turn. Each restore holds its whole journal's working set for a moment, so the boot
     /// peak is the steady heap plus this many of them. `None`: the CPUs this process may use.
@@ -46,9 +49,9 @@ pub struct RuntimeConfig {
     pub secrets: BTreeSet<String>,
     /// Give up after this long (agents keep their journals; `resume` continues them).
     pub max_wall: Option<Duration>,
-    /// Serve: keep running while instances are idle (a chat waiting for its user), reading the
-    /// control inbox, until every instance stops, `max_wall`, or a pause. Without it (batch), the
-    /// run returns once nothing is in flight and no instance waits on anything.
+    /// Keep running while instances are idle (a chat waiting for its user, a server waiting for
+    /// requests), until every instance stops, `max_wall`, or `Control::close`. Without it (batch),
+    /// the run returns once nothing is in flight and no instance waits on anything.
     pub serve: bool,
     /// Bound on a single executor call.
     pub call_timeout: Duration,
@@ -132,6 +135,7 @@ impl RuntimeConfig {
             model_threads: 64,
             exec_threads: 64,
             model_inflight: None,
+            capture_dir: None,
             restore_concurrency: None,
             library: None,
             dir: None,

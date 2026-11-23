@@ -1489,8 +1489,8 @@ fn a_hosted_request_ignores_the_users_curlrc() {
     assert_eq!(peer.requests().len(), 1, "the provider saw the request");
 }
 
-/// While an agent's model call retries a transient failure (here a serving outage), the status
-/// feed (`observed.json`) shows it `retrying`, with its failures so far and their kind, and
+/// While an agent's model call retries a transient failure (here a serving outage), the run's
+/// status (`Control::status`) shows it `retrying`, with its failures so far and their kind, and
 /// healthy: an outage is retried for as long as it lasts. Once the server answers, it goes on.
 #[test]
 fn a_retrying_agent_shows_in_the_status_feed() {
@@ -1517,15 +1517,12 @@ fn a_retrying_agent_shows_in_the_status_feed() {
     model.stream = false;
     let mut rt = Runtime::new(cfg, Arc::new(tokenizer::encoder()), Arc::new(model));
     rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    let control = rt.control();
     let run = std::thread::spawn(move || rt.run().unwrap());
-    let observed = files.0.join("run/observed.json");
     let started = std::time::Instant::now();
     let agent = loop {
         assert!(started.elapsed() < Duration::from_secs(30), "never shown retrying");
-        let status: J = std::fs::read(&observed)
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or(J::Null);
+        let status = control.status();
         let agent = status["agents"][0].clone();
         if agent["state"] == "retrying" && agent["retrying"]["failures"].as_u64() >= Some(2) {
             break agent;
@@ -1570,7 +1567,7 @@ fn served(window: usize) -> J {
 }
 
 /// A native binding's window is the server's (a page's viewport is its screen's): asked once,
-/// when the binding is validated. The runtime reports it (stderr, `observed.json`), lays prompts
+/// when the binding is validated. The runtime reports it (stderr, `Control::status`), lays prompts
 /// out in it, and never sends a prompt over it: the call fails with a ContextError instead.
 #[test]
 fn a_native_binding_takes_its_window_from_the_server_and_never_sends_a_prompt_over_it() {
@@ -1608,6 +1605,7 @@ fn a_native_binding_takes_its_window_from_the_server_and_never_sends_a_prompt_ov
         spec.max_new = 256;
         rt.add_agent(spec).unwrap();
     }
+    let control = rt.control();
     let report = rt.run().unwrap();
     let stopped = |id: &str| {
         let a = report.agents.iter().find(|a| a.id == id).unwrap();
@@ -1630,9 +1628,8 @@ fn a_native_binding_takes_its_window_from_the_server_and_never_sends_a_prompt_ov
         1,
         "only the prompt in the window was sent"
     );
-    let observed: J = serde_json::from_slice(&std::fs::read(files.0.join("run/observed.json")).unwrap()).unwrap();
     assert_eq!(
-        observed["models"],
+        control.status()["models"],
         json!({"default": {"context": 4096, "source": "server /v1/models"}})
     );
 }

@@ -101,7 +101,7 @@ impl Rig {
                 Input::Event {
                     name: name.into(),
                     payload,
-                    op: None,
+                    id: None,
                     clock_ms: self.clock,
                 },
             )

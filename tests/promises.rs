@@ -126,7 +126,7 @@ fn agent(view: &View, enc: &affordance::emit::Encoder) -> J {
     let mut journal = vec![Input::Event {
         name: "go".into(),
         payload: json!({}),
-        op: None,
+        id: None,
         clock_ms: 1,
     }];
     let mut commands = agent.handle(view, enc, journal[0].clone()).unwrap();

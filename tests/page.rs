@@ -97,7 +97,7 @@ impl Rig {
         self.feed(Input::Event {
             name: "message".into(),
             payload: json!({"text": text}),
-            op: None,
+            id: None,
             clock_ms: clock,
         })
     }
@@ -267,14 +267,14 @@ export default function Main() {
     rig.feed(Input::Event {
         name: "next".into(),
         payload: json!({}),
-        op: None,
+        id: None,
         clock_ms: clock,
     });
     let clock = rig.clock + 10;
     rig.feed(Input::Event {
         name: "next".into(),
         payload: json!({}),
-        op: None,
+        id: None,
         clock_ms: clock,
     });
     assert_eq!(rig.agent.state()["__ui"]["@round"], 2);
@@ -298,7 +298,7 @@ fn the_chat_replays_from_its_journal() {
     let ev = |t: &str, c: i64| Input::Event {
         name: "message".into(),
         payload: json!({"text": t}),
-        op: None,
+        id: None,
         clock_ms: c,
     };
     let g = generates(&feed(&mut rig, ev("m1", T0 + 10)));
@@ -401,7 +401,7 @@ export default function Main() {
     rig.feed(Input::Event {
         name: "go".into(),
         payload: json!({}),
-        op: None,
+        id: None,
         clock_ms: clock,
     });
     let clock = rig.clock + 2000;
@@ -460,7 +460,7 @@ export default function Main() {
     rig.feed(Input::Event {
         name: "ping".into(),
         payload: json!({}),
-        op: None,
+        id: None,
         clock_ms: clock,
     });
     let heard = rig.agent.state()["__ui"]["@heard"].clone();
@@ -486,7 +486,7 @@ export default function Main() {
         rig.feed(Input::Event {
             name: "ping".into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: clock,
         });
     }

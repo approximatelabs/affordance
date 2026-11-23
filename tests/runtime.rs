@@ -148,7 +148,7 @@ impl<'a> Host<'a> {
                                     Input::Event {
                                         name: "message".into(),
                                         payload,
-                                        op: None,
+                                        id: None,
                                         clock_ms: self.clock,
                                     },
                                 );
@@ -583,8 +583,7 @@ fn model_errors_retry_with_backoff_then_stop() {
                 Input::ModelError {
                     task,
                     error: "HTTP 400 invalid request".into(),
-                    transient: false,
-                    kind: None,
+                    kind: affordance::runtime::model::FailureKind::Refused,
                     retry_after_ms: None,
                     clock_ms: clock,
                 },
@@ -614,8 +613,7 @@ fn model_errors_retry_with_backoff_then_stop() {
             Input::ModelError {
                 task,
                 error: "HTTP 400 invalid request".into(),
-                transient: false,
-                kind: None,
+                kind: affordance::runtime::model::FailureKind::Refused,
                 retry_after_ms: None,
                 clock_ms: clock,
             },
@@ -658,8 +656,7 @@ fn inference_outage_preserves_agent_and_retry_across_restore() {
             Input::ModelError {
                 task,
                 error: "connection refused".into(),
-                transient: true,
-                kind: None,
+                kind: affordance::runtime::model::FailureKind::Interrupted,
                 retry_after_ms: None,
                 clock_ms: clock,
             },
@@ -856,28 +853,30 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
         report.agents[0].metrics.turns, 1,
         "suspended time must not expire the wait"
     );
-    let inbox = dir.join("control/inbox");
-    std::fs::create_dir_all(&inbox).unwrap();
-    std::fs::write(
-        inbox.join("abc123.json"),
-        json!({"operation_id":"abc123","targets":["agent-a"],"payload":{"from":"operator","text":"Please wake up."}})
-            .to_string(),
-    )
-    .unwrap();
-    let report = Runtime::resume(config(1500), enc.clone(), make_model())
-        .unwrap()
-        .run()
-        .unwrap();
+    // A post with a key is answered once its line is committed; posted again (its answer lost,
+    // say), it is journaled but not taken a second time.
+    let mail = json!({"from":"operator","text":"Please wake up."});
+    let mut rt = Runtime::resume(config(1500), enc.clone(), make_model()).unwrap();
+    let delivered = rt.control().post("agent-a", "message", mail.clone(), Some("abc123"));
+    let report = rt.run().unwrap();
+    assert_eq!(delivered.wait(), Ok(()));
     assert_eq!(report.agents[0].metrics.turns, 2);
-    assert!(dir.join("control/receipts/agent-a/abc123.json").exists());
+    let mut rt = Runtime::resume(config(400), enc.clone(), make_model()).unwrap();
+    let again = rt.control().post("agent-a", "message", mail, Some("abc123"));
+    let report = rt.run().unwrap();
+    assert_eq!(again.wait(), Ok(()));
+    assert_eq!(report.agents[0].metrics.turns, 2, "the same key is taken once");
     let journal = std::fs::read_to_string(dir.join("agent-a/journal.jsonl")).unwrap();
     assert_eq!(
-        journal.matches("\"op\":\"abc123\"").count(),
-        1,
-        "the operation id is on the journaled event, not in the app's payload"
+        journal.matches("\"id\":\"abc123\"").count(),
+        2,
+        "the key is on the journaled event, not in the app's payload"
     );
-    assert!(!journal.contains("_control_operation"));
-    let _ = Runtime::resume(config(200), enc.clone(), make_model()).unwrap();
+    let trace = std::fs::read_to_string(dir.join("agent-a/trace.jsonl")).unwrap();
+    assert!(
+        trace.contains("duplicate_message"),
+        "the second post is noted as a duplicate"
+    );
     std::fs::remove_dir_all(dir).unwrap();
 }
 
@@ -922,9 +921,11 @@ fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
         "max_wall_s": 20
     });
     std::fs::write(dir.join("deployment.json"), deployment.to_string()).unwrap();
+    let socket = dir.join("control.sock");
     let run = |resume: bool| {
         let mut command = Process::new(env!("CARGO_BIN_EXE_affordance"));
         command.arg("run").arg("deployment.json").current_dir(&dir);
+        command.arg("--control").arg(&socket);
         if resume {
             command.arg("--resume");
         }
@@ -940,11 +941,8 @@ fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
         std::thread::sleep(Duration::from_millis(20));
     }
     std::thread::sleep(Duration::from_millis(300));
-    let control = dir.join("agents/control");
-    std::fs::create_dir_all(&control).unwrap();
-    std::fs::write(control.join("pause.json"), "{}").unwrap();
+    crate::controller::Controller::connect(&socket).close(150_000);
     assert!(first.wait().unwrap().success());
-    std::fs::remove_file(control.join("pause.json")).unwrap();
     assert!(
         !home.join("timer-fired").exists(),
         "the timer fired while the pause drained"
@@ -1183,8 +1181,7 @@ fn a_render_rate_limited_is_retried_not_failed() {
             Input::ModelError {
                 task,
                 error: "HTTP 429 too many requests".into(),
-                transient: true,
-                kind: None,
+                kind: affordance::runtime::model::FailureKind::Interrupted,
                 retry_after_ms: None,
                 clock_ms: clock,
             },
@@ -1770,7 +1767,10 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
         .lines()
         .find(|l| l.contains("\"name\":\"message\""))
         .expect("b journaled the message");
-    assert!(msg.contains("\"_msg\":\"a:"), "{msg}");
+    // The message's delivery id is on the journaled event, not in the app's payload.
+    let parsed: J = serde_json::from_str(msg).unwrap();
+    assert!(parsed["id"].as_str().is_some_and(|id| id.starts_with("a:")), "{msg}");
+    assert!(parsed["payload"].get("_msg").is_none(), "{msg}");
     let a_journal = std::fs::read_to_string(dir.join("a/journal.jsonl")).unwrap();
     let ack = a_journal.lines().find(|l| l.contains("\"delivered\":true")).unwrap();
     let clock = |l: &str| serde_json::from_str::<J>(l).unwrap()["clock_ms"].as_i64().unwrap();
@@ -1788,6 +1788,20 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
         .filter(|t| t["t"] == "duplicate_message")
         .count();
     assert_eq!(dups, 1, "the second copy is recognized and dropped");
+    // An event from outside whose payload happens to hold `_msg` is an ordinary event: both
+    // copies are taken.
+    let outside = Input::Event {
+        name: "message".into(),
+        payload: json!({"_msg": "a:1", "text": "hello"}),
+        id: None,
+        clock_ms: 0,
+    };
+    b.handle(&v, &enc, outside.clone()).unwrap();
+    b.handle(&v, &enc, outside).unwrap();
+    assert!(
+        !b.take_trace().iter().any(|t| t["t"] == "duplicate_message"),
+        "a payload's own fields never make an event a duplicate"
+    );
 }
 
 #[test]
@@ -2585,7 +2599,7 @@ fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
         Input::Event {
             name: "message".into(),
             payload: json!({"from": "agent-b", "text": "port is 48213"}),
-            op: None,
+            id: None,
             clock_ms: T0 + 100,
         },
     );
@@ -2666,18 +2680,15 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
     let mut spec = AgentSpec::new("agent-a", json!({"task": "Build it."}));
     spec.max_turns = Some(2);
     rt.add_agent(spec).unwrap();
-    let control = dir.join("control");
-    std::fs::create_dir_all(&control).unwrap();
-    let pause = control.join("pause.json");
-    let p = pause.clone();
-    let pauser = std::thread::spawn(move || {
+    let control = rt.control();
+    let closer = std::thread::spawn(move || {
         while !started.load(std::sync::atomic::Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(10))
         }
-        std::fs::write(&p, json!({"mode": "immediate"}).to_string()).unwrap();
+        control.close(Duration::ZERO);
     });
     let report = rt.run().unwrap();
-    pauser.join().unwrap();
+    closer.join().unwrap();
     assert!(
         !affordance::scenario::log_records(&report.agents[0].state)
             .iter()
@@ -2685,7 +2696,6 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
         "no tool result yet: {:?}",
         affordance::scenario::log_records(&report.agents[0].state)
     );
-    std::fs::remove_file(&pause).unwrap();
     let mut rt = Runtime::resume(config(), enc.clone(), model()).unwrap();
     rt.bind_machine(
         "home",
@@ -2732,24 +2742,20 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
     let mut spec = AgentSpec::new("agent-a", json!({"task": "Build it."}));
     spec.max_turns = Some(1);
     rt.add_agent(spec).unwrap();
-    let control = dir.join("control");
-    std::fs::create_dir_all(&control).unwrap();
-    let pause = control.join("pause.json");
-    let p = pause.clone();
-    let pauser = std::thread::spawn(move || {
+    let control = rt.control();
+    let closer = std::thread::spawn(move || {
         while !started.load(std::sync::atomic::Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(10))
         }
-        std::fs::write(&p, json!({"mode": "immediate"}).to_string()).unwrap();
+        control.close(Duration::ZERO);
     });
     rt.run().unwrap();
-    pauser.join().unwrap();
+    closer.join().unwrap();
     let journal = std::fs::read_to_string(dir.join("agent-a/journal.jsonl")).unwrap();
     assert!(
         !journal.contains("model_error"),
         "a host cancel is not a model error: {journal}"
     );
-    std::fs::remove_file(&pause).unwrap();
     let rt = Runtime::resume(
         config(),
         enc.clone(),
@@ -2766,9 +2772,8 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// Serve mode: an idle instance (nothing in flight, waiting only for events) keeps the run up,
-/// and a control-inbox file with a named event reaches its listener. In batch mode the same run
-/// returns at once.
+/// Kept running: an idle instance (nothing in flight, waiting only for events) keeps the run up,
+/// and a post with a named event reaches its listener. In batch mode the same run returns at once.
 #[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
 fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
@@ -2800,23 +2805,18 @@ fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
     rt.add_agent(spec.clone()).unwrap();
     let report = rt.run().unwrap();
     assert!(!report.complete);
-    // Serve: the run waits; a `ping` event in the inbox stops the instance.
+    // Kept running: the run waits; a posted `ping` stops the instance.
     let _ = std::fs::remove_dir_all(dir.join("run"));
-    let inbox = dir.join("run/control/inbox");
-    std::fs::create_dir_all(&inbox).unwrap();
     let mut rt = Runtime::new(config(true), enc.clone(), model());
     rt.add_agent(spec).unwrap();
     let started = Instant::now();
+    let control = rt.control();
     let writer = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(800));
-        std::fs::write(
-            inbox.join("op1.json"),
-            json!({"operation_id": "op1", "targets": ["a"], "event": "ping", "payload": {"text": "hello"}}).to_string(),
-        )
-        .unwrap();
+        control.post("a", "ping", json!({"text": "hello"}), None).wait()
     });
     let report = rt.run().unwrap();
-    writer.join().unwrap();
+    assert_eq!(writer.join().unwrap(), Ok(()));
     assert!(report.complete, "stopped by the ping");
     assert!(
         started.elapsed() >= Duration::from_millis(700),
@@ -2826,7 +2826,7 @@ fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// A handler error that is not a tool's (an effect, a callback) has no awaiter: the status feed
+/// A handler error that is not a tool's (an effect, a callback) has no awaiter: the run's status
 /// counts it, so a host sees an instance that threw and went idle, and the trace keeps it.
 #[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
@@ -2834,7 +2834,7 @@ fn the_status_feed_counts_handler_errors() {
     use std::time::{Duration, Instant};
     let dir = std::env::temp_dir().join(format!("aff-handler-errors-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("run/control/inbox")).unwrap();
+    std::fs::create_dir_all(&dir).unwrap();
     let app = dir.join("thrower.tsx");
     std::fs::write(
         &app,
@@ -2851,14 +2851,11 @@ fn the_status_feed_counts_handler_errors() {
     let mut spec = AgentSpec::new("a", json!({}));
     spec.model = None;
     rt.add_agent(spec).unwrap();
-    let run = dir.join("run");
+    let control = rt.control();
     let watcher = std::thread::spawn(move || {
         let started = Instant::now();
         let seen = loop {
-            let observed: J = std::fs::read(run.join("observed.json"))
-                .ok()
-                .and_then(|b| serde_json::from_slice(&b).ok())
-                .unwrap_or(J::Null);
+            let observed = control.status();
             let a = observed["agents"]
                 .as_array()
                 .and_then(|a| a.iter().find(|a| a["id"] == "a").cloned());
@@ -2870,18 +2867,11 @@ fn the_status_feed_counts_handler_errors() {
             }
             std::thread::sleep(Duration::from_millis(20));
         };
-        std::fs::write(
-            run.join("control/inbox/op1.json"),
-            json!({"operation_id": "op1", "targets": ["a"], "event": "ping"}).to_string(),
-        )
-        .unwrap();
+        drop(control.post("a", "ping", json!({}), None));
         seen
     });
     let report = rt.run().unwrap();
-    let seen = watcher
-        .join()
-        .unwrap()
-        .expect("observed.json counts the effect's error");
+    let seen = watcher.join().unwrap().expect("the status counts the effect's error");
     assert_eq!(
         (seen["state"].as_str(), seen["healthy"].as_bool()),
         (Some("idle"), Some(true)),

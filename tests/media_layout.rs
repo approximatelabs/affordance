@@ -227,16 +227,17 @@ fn sglang_is_sent_one_placeholder_and_the_resized_picture() {
     });
     let mut model = Sglang::new(&url, 1);
     model.stream = false;
+    let diagnostics = affordance::runtime::model::Diagnostics::default();
     let req = GenRequest {
         images: files.clone(),
         media: media.clone(),
+        diagnostics: diagnostics.clone(),
         ..GenRequest::new("a", ids.clone(), 8, vec![1], None, CancelToken::new())
     };
-    let before = affordance::runtime::model::token_mismatches();
     model.generate(&req).unwrap();
     // This server says it processed 3 prompt tokens, which is not what was laid out: a call
     // whose count differs is counted, for the run's summary (`token_mismatches`).
-    assert_eq!(affordance::runtime::model::token_mismatches(), before + 1);
+    assert_eq!(diagnostics.token_mismatches(), 1);
     let body = peer.join().unwrap();
     let sent: Vec<u64> = body["input_ids"]
         .as_array()

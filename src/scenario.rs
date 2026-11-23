@@ -276,7 +276,7 @@ impl<'a> Run<'a> {
             return self.feed(Input::Event {
                 name: name.into(),
                 payload,
-                op: None,
+                id: None,
                 clock_ms: clock,
             });
         }

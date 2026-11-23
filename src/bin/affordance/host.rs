@@ -1,26 +1,25 @@
 //! `affordance host`: a deployment driven by a frontend over stdio, one JSON object a line, as a
 //! browser's DevTools protocol drives a page. Commands come in on stdin; events go out on stdout.
 //!
-//! In:  `{"type":"prompt","text"}` posts the event `user` (`{text}`) to the root instance;
-//!      `{"type":"abort"}` posts the event `abort`; `{"type":"history"}` posts the event `history`
-//!      (the app shows the conversation so far); `{"type":"event","name","payload"}` posts any
-//!      event; `{"type":"answer","request","value"}` answers a question; `{"type":"shutdown"}`
-//!      (or the end of stdin) ends the run, which `--resume` continues.
-//! Out: `ready {agent}`; `delta {agent, task, text, reasoning?}` (a model's reply as it is
-//!      generated); `output {agent, task, text}` (a command's output as it is written);
-//!      `trace {agent, record}` (renders, replies, finished tools, handler errors); `ui {agent,
-//!      value}` and `question {agent, request, ...}` (the app's calls on the machine `ui`); `error
-//!      {message}`; `exit {error?}`.
+//! In:  the control protocol (`control.rs`: `event`, `close`, `status`, `set_model_limit`,
+//!      `subscribe`; an event goes to the first instance unless it names a `target`), and
+//!      `{"type":"answer","request","value"}`, which answers a question. The end of stdin closes
+//!      the run, which `--resume` continues.
+//! Out: `ready {agent}` once the agents are running; `delta {agent, task, text, reasoning?}` (a
+//!      model's reply as it is generated); `output {agent, task, text}` (a command's output as it
+//!      is written); `trace {agent, record}` (renders, replies, finished tools, handler errors);
+//!      `ui {agent, value}` and `question {agent, request, ...}` (the app's calls on the machine
+//!      `ui`); answers (`result`, `error`); `exit {error?}`.
 //!
 //! The machine `ui` is the frontend: a call with `ask` waits for the frontend's `answer` (a
 //! permission, a choice) and returns its value; any other call is shown and returns null at once.
 //! What to ask, and when, is the app's (`views/lib/frontend.tsx`).
 use affordance::emit::Encoder;
-use affordance::runtime::{CallContext, Executor, Inbox, Observed, Observer, Runtime};
+use affordance::runtime::{CallContext, Control, Executor, Observed, Observer, Runtime};
 use serde_json::{Value as J, json};
 use std::collections::HashMap;
 use std::io::{BufRead, Write};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -77,16 +76,23 @@ impl Executor for Ui {
     }
 }
 
-/// A model's native ids as text, whole characters only: ids that end inside a character wait for
-/// the rest.
+/// A model's native ids as text, with the tokenizer of the binding each agent runs on, whole
+/// characters only: ids that end inside a character wait for the rest.
 struct Decoder {
-    enc: Option<Arc<Encoder>>,
+    /// Each root agent's tokenizer; a child decodes with its root's binding unless it names its own.
+    by_agent: HashMap<String, Arc<Encoder>>,
+    default: Option<Arc<Encoder>>,
     pending: HashMap<(String, u64), Vec<u32>>,
 }
 
 impl Decoder {
     fn text(&mut self, agent: &str, task: u64, ids: &[u32]) -> Option<String> {
-        let enc = self.enc.as_ref()?;
+        let root = agent.split('/').next().unwrap_or(agent);
+        let enc = self
+            .by_agent
+            .get(agent)
+            .or_else(|| self.by_agent.get(root))
+            .or(self.default.as_ref())?;
         let key = (agent.to_string(), task);
         let mut pending = self.pending.remove(&key).unwrap_or_default();
         pending.extend_from_slice(ids);
@@ -113,8 +119,14 @@ pub fn start(rt: &mut Runtime, out: Out, target: String) -> Result<(), String> {
             next: AtomicU64::new(1),
         }),
     );
+    let by_agent = rt
+        .specs()
+        .iter()
+        .filter_map(|s| Some((s.id.clone(), rt.encoder(s.model.as_deref().unwrap_or("default"))?)))
+        .collect();
     let decoder = Mutex::new(Decoder {
-        enc: rt.encoder("default"),
+        by_agent,
+        default: rt.encoder("default"),
         pending: HashMap::new(),
     });
     let watcher = out.clone();
@@ -150,13 +162,30 @@ pub fn start(rt: &mut Runtime, out: Out, target: String) -> Result<(), String> {
         };
         watcher.send(event);
     })));
-    let inbox = rt.inbox();
-    out.send(json!({"type": "ready", "agent": target}));
-    std::thread::spawn(move || read_commands(inbox, out, questions, target));
+    let control = rt.control();
+    // `ready` once the agents are running (a restore has finished), or never if the run ends first.
+    {
+        let (control, out, target) = (control.clone(), out.clone(), target.clone());
+        std::thread::spawn(move || {
+            loop {
+                match control.status()["state"].as_str() {
+                    Some("running") => break out.send(json!({"type": "ready", "agent": target})),
+                    Some("closing" | "closed") => break,
+                    _ => std::thread::sleep(Duration::from_millis(10)),
+                }
+            }
+        });
+    }
+    std::thread::spawn(move || read_commands(control, out, questions, target));
     Ok(())
 }
 
-fn read_commands(inbox: Inbox, out: Out, questions: Questions, target: String) {
+fn read_commands(control: Control, out: Out, questions: Questions, target: String) {
+    let sink: crate::control::Sink = {
+        let out = out.clone();
+        Arc::new(move |line: J| out.send(line))
+    };
+    let done = Arc::new(AtomicBool::new(false));
     // Lines as bytes: one that is not UTF-8 is a bad command (reported below, as bad JSON is),
     // not the end of the input.
     for line in std::io::stdin().lock().split(b'\n') {
@@ -172,35 +201,33 @@ fn read_commands(inbox: Inbox, out: Out, questions: Questions, target: String) {
                 continue;
             }
         };
-        let posted = match command["type"].as_str() {
-            Some("prompt") => match command["text"].as_str() {
-                Some(text) => inbox.post(&target, "user", json!({"text": text})),
-                None => Err("prompt needs text".into()),
-            },
-            Some("abort") => inbox.post(&target, "abort", json!({})),
-            Some("history") => inbox.post(&target, "history", json!({})),
-            Some("event") => match command["name"].as_str() {
-                Some(name) => inbox.post(&target, name, command.get("payload").cloned().unwrap_or(json!({}))),
-                None => Err("event needs a name".into()),
-            },
+        if crate::control::handle(&control, &command, &target, &sink, &done).is_some() {
+            continue;
+        }
+        let error = match command["type"].as_str() {
             Some("answer") => {
                 let request = command["request"].as_u64().unwrap_or(0);
                 match questions.lock().unwrap().remove(&request) {
                     Some(tx) => {
                         let _ = tx.send(command.get("value").cloned().unwrap_or(J::Null));
-                        Ok(())
+                        None
                     }
-                    None => Err(format!("no question {request} is waiting")),
+                    None => Some(format!("no question {request} is waiting")),
                 }
             }
-            Some("shutdown") => break,
-            other => Err(format!(
-                "unknown command type {other:?} (prompt, abort, history, event, answer, shutdown)"
+            other => Some(format!(
+                "unknown command type {other:?} ({}, answer)",
+                crate::control::TYPES
             )),
         };
-        if let Err(message) = posted {
-            out.send(json!({"type": "error", "message": message}));
+        if let Some(message) = error {
+            out.send(match command.get("id") {
+                Some(id) => json!({"type": "error", "id": id, "message": message}),
+                None => json!({"type": "error", "message": message}),
+            });
         }
     }
-    inbox.close();
+    // The frontend has gone: the run closes, its work kept for `--resume`.
+    done.store(true, Ordering::SeqCst);
+    control.close(Duration::ZERO);
 }

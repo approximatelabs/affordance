@@ -1,10 +1,11 @@
-//! The run's status file, and a journal's last clock read from its tail.
+//! The run's clock record, and a journal's last clock read from its tail.
 use super::*;
 
-/// Writes the periodic status files (`clock.json`, `observed.json`) on its own thread, the latest
-/// snapshot winning: a writer slowed by its disk skips snapshots instead of queueing them, and
-/// neither the control loop nor the workers wait for it. `clock.json` is synced (a resume reads
-/// it); `observed.json` is a display. Neither syncs the directory: the shutdown's own writes do.
+/// Writes the run's clock (`clock.json`, private recovery state: where the clock stood, so a crash
+/// during a long quiet wait does not give the wait its time again) on its own thread, the latest
+/// value winning: a writer slowed by its disk skips values instead of queueing them, and neither
+/// the control loop nor the workers wait for it. It is synced; the directory is synced by the
+/// shutdown's own writes.
 pub(super) struct StatusWriter {
     slot: Arc<Pending>,
     thread: Option<std::thread::JoinHandle<()>>,
@@ -13,7 +14,7 @@ pub(super) struct StatusWriter {
 /// The snapshot not yet written, and (under `open`'s lock) whether renames may still land.
 #[derive(Default)]
 pub(super) struct Pending {
-    next: Mutex<(Option<(J, J)>, bool)>,
+    next: Mutex<(Option<J>, bool)>,
     wake: std::sync::Condvar,
     open: Mutex<bool>,
 }
@@ -33,30 +34,25 @@ impl StatusWriter {
     /// line written before it.
     pub(super) fn start(dir: Option<PathBuf>, durable: Arc<Durable>) -> StatusWriter {
         StatusWriter::start_with(dir.map(|dir| {
-            move |clock: J, observed: J, p: &Pending| {
+            move |clock: J, p: &Pending| {
                 if durable.wait(durable.written()).is_err() {
                     return;
                 }
-                for (name, value, sync) in [("clock", clock, true), ("observed", observed, false)] {
-                    // Its own temporary name: the shutdown writes `clock.tmp` while this may still run.
-                    let temp = dir.join(format!(".{name}.status"));
-                    let written = std::fs::File::create(&temp).and_then(|mut f| {
-                        f.write_all(value.to_string().as_bytes())?;
-                        if sync {
-                            f.sync_all()?;
-                        }
-                        Ok(())
+                // Its own temporary name: the shutdown writes `clock.tmp` while this may still run.
+                let temp = dir.join(".clock.status");
+                let written = std::fs::File::create(&temp).and_then(|mut f| {
+                    f.write_all(clock.to_string().as_bytes())?;
+                    f.sync_all()
+                });
+                if written.is_ok() {
+                    p.commit(|| {
+                        let _ = std::fs::rename(&temp, dir.join("clock.json"));
                     });
-                    if written.is_ok() {
-                        p.commit(|| {
-                            let _ = std::fs::rename(&temp, dir.join(format!("{name}.json")));
-                        });
-                    }
                 }
             }
         }))
     }
-    pub(super) fn start_with(write: Option<impl Fn(J, J, &Pending) + Send + 'static>) -> StatusWriter {
+    pub(super) fn start_with(write: Option<impl Fn(J, &Pending) + Send + 'static>) -> StatusWriter {
         let slot = Arc::new(Pending {
             open: Mutex::new(true),
             ..Default::default()
@@ -77,15 +73,15 @@ impl StatusWriter {
                             }
                             g.0.take().unwrap()
                         };
-                        write(next.0, next.1, &slot);
+                        write(next, &slot);
                     }
                 })
                 .expect("spawn status thread")
         });
         StatusWriter { slot, thread }
     }
-    pub(super) fn put(&self, clock: J, observed: J) {
-        self.slot.next.lock().unwrap().0 = Some((clock, observed));
+    pub(super) fn put(&self, clock: J) {
+        self.slot.next.lock().unwrap().0 = Some(clock);
         self.slot.wake.notify_one();
     }
     /// Stop: no rename lands after this returns. A write in progress is not waited for (its
@@ -231,7 +227,7 @@ mod status_writer_tests {
     pub(super) fn a_slow_disk_delays_no_put_and_the_latest_snapshot_wins() {
         let written: Arc<Mutex<Vec<J>>> = Default::default();
         let w = written.clone();
-        let writer = StatusWriter::start_with(Some(move |clock: J, _: J, p: &Pending| {
+        let writer = StatusWriter::start_with(Some(move |clock: J, p: &Pending| {
             std::thread::sleep(Duration::from_millis(500));
             p.commit(|| w.lock().unwrap().push(clock));
         }));
@@ -239,7 +235,7 @@ mod status_writer_tests {
         let mut putting = Duration::ZERO;
         for i in 0..20 {
             let started = Instant::now();
-            writer.put(json!(i), json!({}));
+            writer.put(json!(i));
             putting += started.elapsed();
             std::thread::sleep(Duration::from_millis(5));
         }
@@ -259,7 +255,7 @@ mod status_writer_tests {
             "the latest snapshot is written"
         );
         assert!(written.lock().unwrap().len() <= 3, "{:?}", written.lock().unwrap());
-        writer.put(json!("late"), json!({}));
+        writer.put(json!("late"));
         std::thread::sleep(Duration::from_millis(50));
         let finishing = Instant::now();
         writer.finish();

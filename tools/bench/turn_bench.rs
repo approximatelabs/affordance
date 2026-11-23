@@ -229,7 +229,7 @@ fn main() {
                             Input::Event {
                                 name: "message".into(),
                                 payload: json!({"from": "agent-0002", "text": format!("status {turn}?")}),
-                                op: None,
+                                id: None,
                                 clock_ms: clock,
                             },
                         )

@@ -8,6 +8,7 @@
 //!   affordance lint [PATH]...
 //!   affordance check | render-case | bench   (development, in a source checkout)
 mod cache_watch;
+mod control;
 mod deploy;
 mod dev;
 mod flags;
@@ -135,6 +136,7 @@ struct Selection {
     overrides: deploy::Overrides,
     flags: Vec<String>,
     listen: Option<String>,
+    control: Option<PathBuf>,
     /// `--flag name=value` overrides of this machine's flags (`flags.rs`).
     machine_flags: Vec<String>,
 }
@@ -145,6 +147,7 @@ fn select(args: &[String], allowed_flags: &[&str]) -> Result<Selection, String> 
         overrides: deploy::Overrides::default(),
         flags: vec![],
         listen: None,
+        control: None,
         machine_flags: vec![],
     };
     let mut it = args.iter();
@@ -157,6 +160,7 @@ fn select(args: &[String], allowed_flags: &[&str]) -> Result<Selection, String> 
             "--app" => s.overrides.app = Some(value(a)?.into()),
             "--flag" => s.machine_flags.push(value(a)?),
             "--listen" if allowed_flags.contains(&"--listen") => s.listen = Some(value(a)?),
+            "--control" if allowed_flags.contains(&"--control") => s.control = Some(value(a)?.into()),
             f if allowed_flags.contains(&f) => s.flags.push(f.to_string()),
             f if f.starts_with('-') => return Err(format!("unknown option {f} (affordance --help)")),
             p if s.path.is_none() => s.path = Some(p.into()),
@@ -167,14 +171,21 @@ fn select(args: &[String], allowed_flags: &[&str]) -> Result<Selection, String> 
 }
 
 fn cmd_run(args: &[String]) -> Result<(), String> {
-    let (s, d) = prepare_run(args, &["--resume", "--fresh", "--keep-running"])?;
+    let (s, d) = prepare_run(args, &["--resume", "--fresh", "--keep-running", "--control"])?;
     let has = |f: &str| s.flags.iter().any(|x| x == f);
     let warn = flags::Flags::load(&s.machine_flags)?.cache_warn()?;
     run::with_profile(|| {
-        run::run(d.config, has("--resume"), has("--keep-running"), true, |rt| {
-            rt.observe_traces(cache_watch::observer(warn));
-            Ok(())
-        })
+        run::run(
+            d.config,
+            has("--resume"),
+            has("--keep-running"),
+            true,
+            s.control.as_deref(),
+            |rt| {
+                rt.observe_traces(cache_watch::observer(warn));
+                Ok(())
+            },
+        )
     })
 }
 
@@ -188,7 +199,7 @@ fn cmd_serve(_args: &[String]) -> Result<(), String> {
 /// `serve` (see above).
 #[cfg(feature = "http")]
 fn cmd_serve(args: &[String]) -> Result<(), String> {
-    let (s, d) = prepare_run(args, &["--resume", "--fresh", "--listen"])?;
+    let (s, d) = prepare_run(args, &["--resume", "--fresh", "--listen", "--control"])?;
     let mut settings = serve::Settings::from_config(&d.config["serve"])?;
     if let Some(listen) = &s.listen {
         settings.listen = listen.clone();
@@ -196,7 +207,7 @@ fn cmd_serve(args: &[String]) -> Result<(), String> {
     let resume = s.flags.iter().any(|x| x == "--resume");
     let warn = flags::Flags::load(&s.machine_flags)?.cache_warn()?;
     run::with_profile(|| {
-        run::run(d.config, resume, true, true, |rt| {
+        run::run(d.config, resume, true, true, s.control.as_deref(), |rt| {
             rt.observe_traces(cache_watch::observer(warn));
             let target = rt
                 .specs()
@@ -210,11 +221,11 @@ fn cmd_serve(args: &[String]) -> Result<(), String> {
 
 /// `host`: `run`, kept running, driven by a frontend over stdio (JSONL; see `host.rs`).
 fn cmd_host(args: &[String]) -> Result<(), String> {
-    let (s, d) = prepare_run(args, &["--resume", "--fresh"])?;
+    let (s, d) = prepare_run(args, &["--resume", "--fresh", "--control"])?;
     let resume = s.flags.iter().any(|x| x == "--resume");
     let out = host::Out::new();
     let result = run::with_profile(|| {
-        run::run(d.config, resume, true, false, |rt| {
+        run::run(d.config, resume, true, false, s.control.as_deref(), |rt| {
             let target = rt
                 .specs()
                 .first()

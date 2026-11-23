@@ -10,6 +10,8 @@ struct Group {
     failed: Mutex<HashSet<String>>,
 }
 enum Reply {
+    /// An embedder's post (`Control::post`), answered once the event's journal line is committed.
+    Posted(Sender<Result<(), String>>),
     Single {
         sender: String,
         incarnation: u64,
@@ -27,8 +29,17 @@ pub(super) struct Ack {
 impl Ack {
     fn complete(&mut self, delivered: bool) {
         let Some(reply) = self.reply.take() else { return };
+        if let Reply::Posted(tx) = reply {
+            let _ = tx.send(if delivered {
+                Ok(())
+            } else {
+                Err(format!("{} did not take it (it failed, or stopped)", self.target))
+            });
+            return;
+        }
         let Some(shared) = self.shared.upgrade() else { return };
         match reply {
+            Reply::Posted(_) => unreachable!(),
             Reply::Single {
                 sender,
                 incarnation,
@@ -61,14 +72,30 @@ impl Ack {
     pub(super) fn finish(mut self, delivered: bool) {
         self.complete(delivered);
     }
+    /// An embedder's post is answered only once its line is committed: what it was told is durable.
+    pub(super) fn waits_for_commit(&self) -> bool {
+        matches!(self.reply, Some(Reply::Posted(_)))
+    }
     /// Settle nothing: the sender gets no answer, so its call stays outstanding in its journal and
-    /// journal recovery issues it again (a pause's queued deliveries end this way, not as failures).
+    /// journal recovery issues it again (a closing run's queued deliveries end this way, not as
+    /// failures). An embedder's post is told the run is closing, to post it again after restore.
     pub(super) fn abandon(mut self) {
-        self.reply = None;
+        if let Some(Reply::Posted(tx)) = self.reply.take() {
+            let _ = tx.send(Err(CLOSING.into()));
+        }
     }
 }
 impl Drop for Ack {
+    /// A delivery dropped unsettled (its target gone, or the run ending with it still queued) was
+    /// not delivered. An embedder's post is told so, to post it again.
     fn drop(&mut self) {
+        if let Some(Reply::Posted(tx)) = &self.reply {
+            let _ = tx.send(Err(format!(
+                "not delivered: the run ended or {} is gone (with the same key, a post is taken once)",
+                self.target
+            )));
+            self.reply = None;
+        }
         self.complete(false);
     }
 }
@@ -135,14 +162,14 @@ pub(super) fn send(shared: &Arc<Shared>, sender: &str, incarnation: u64, task: u
         other => json!({"value":other}),
     };
     payload["from"] = sender.into();
-    // A name may hold `:`. The short form is used only where it cannot be read as another
-    // sender's long form (`a:1` task 5 against `a`, incarnation 1, task 5).
-    payload["_msg"] = if incarnation == 0 && !sender.contains(':') {
+    // The message's delivery id, on the event and not in its payload. A name may hold `:`. The
+    // short form is used only where it cannot be read as another sender's long form (`a:1` task 5
+    // against `a`, incarnation 1, task 5).
+    let id = if incarnation == 0 && !sender.contains(':') {
         format!("{sender}:{task}")
     } else {
         format!("{sender}:{incarnation}:{task}")
-    }
-    .into();
+    };
     for target in targets {
         let reply = match &group {
             Some(group) => Reply::Group(group.clone()),
@@ -166,10 +193,51 @@ pub(super) fn send(shared: &Arc<Shared>, sender: &str, incarnation: u64, task: u
                     name: event.into(),
                     payload: payload.clone(),
                     ack: Some(ack),
-                    op: None,
+                    id: Some(id.clone()),
                 },
             );
         }
     }
     Ok(())
+}
+
+/// What a post is told when the run is closing, or closed, before its event is journaled.
+pub(super) const CLOSING: &str =
+    "the run is closing: post it again once the run is restored (with the same key, it is taken once)";
+
+/// An embedder's post: delivered to `target` as the event `event`, answered on `reply` once its
+/// journal line is committed, or with why it was not.
+pub(super) fn post(
+    shared: &Arc<Shared>,
+    target: &str,
+    event: String,
+    payload: J,
+    key: Option<String>,
+    reply: Sender<Result<(), String>>,
+) {
+    if event.starts_with("mount:") {
+        let _ = reply.send(Err(format!(
+            "event {event:?} is reserved (mount:* are a <Mount>'s callbacks)"
+        )));
+        return;
+    }
+    if !shared.route.read().unwrap().contains_key(target) {
+        let _ = reply.send(Err(format!("no instance {target}")));
+        return;
+    }
+    let ack = Ack {
+        shared: Arc::downgrade(shared),
+        target: target.into(),
+        reply: Some(Reply::Posted(reply)),
+    };
+    // An instance unmounted just now drops it, and its acknowledgement says it was not taken.
+    shared.post_to(
+        target,
+        InputKind::Event {
+            name: event,
+            payload,
+            ack: Some(ack),
+            id: key,
+        },
+    );
 }

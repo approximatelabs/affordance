@@ -1,7 +1,6 @@
-//! A pause is answered promptly while the runtime publishes its status (`observed.json`,
-//! `clock.json` every 100 ms) and its agents keep working: those files are written off the
-//! control loop, so a slow disk delays neither pause handling nor the workers (the slow-disk case
-//! itself is `host.rs`'s `status_writer_tests`).
+//! A close is answered promptly while the runtime publishes its status (every 100 ms) and its
+//! agents keep working: the clock record is written off the control loop, so a slow disk delays
+//! neither closing nor the workers (the slow-disk case itself is `host.rs`'s `status_writer_tests`).
 use crate::shared;
 use affordance::runtime::{AgentSpec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
 use serde_json::json;
@@ -11,11 +10,11 @@ use std::time::{Duration, Instant};
 
 #[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
-fn a_pause_is_answered_while_status_is_published() {
+fn a_close_is_answered_while_status_is_published() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let dir = std::env::temp_dir().join(format!("aff-pause-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("aff-close-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("run/control")).unwrap();
+    std::fs::create_dir_all(&dir).unwrap();
     // Agents that keep working (a send to themselves every few ms), so workers take the status lock.
     std::fs::write(dir.join("app.tsx"), r#"export default function Main() {
   const [n, setN] = useState(0, "n");
@@ -34,44 +33,47 @@ fn a_pause_is_answered_while_status_is_published() {
         s.model = None;
         rt.add_agent(s).unwrap();
     }
-    let pause = dir.join("run/control/pause.json");
+    let control = rt.control();
     let asked = Arc::new(std::sync::Mutex::new(None));
-    let asked2 = asked.clone();
-    let pauser = std::thread::spawn(move || {
+    let (asked2, closer_control) = (asked.clone(), control.clone());
+    let closer = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(1500));
+        let status = closer_control.status();
         *asked2.lock().unwrap() = Some(Instant::now());
-        std::fs::write(pause, json!({"mode": "immediate"}).to_string()).unwrap();
+        closer_control.close(Duration::ZERO);
+        status
     });
     let report = rt.run().unwrap();
-    let answered = asked.lock().unwrap().expect("paused").elapsed();
-    pauser.join().unwrap();
-    eprintln!("pause answered in {} ms", answered.as_millis());
+    let answered = asked.lock().unwrap().expect("closed").elapsed();
+    let status = closer.join().unwrap();
+    eprintln!("close answered in {} ms", answered.as_millis());
     assert!(!report.complete);
-    assert!(dir.join("run/observed.json").exists(), "the status was published");
-    assert!(answered < Duration::from_millis(1000), "pause took {answered:?}");
+    assert_eq!(status["state"], "running", "the status was published: {status}");
+    assert_eq!(control.status()["state"], "closed");
+    assert!(answered < Duration::from_millis(1000), "closing took {answered:?}");
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// A pause does not wait behind a backlog of queued `send`s: a queued delivery the sender will
-/// issue again is not applied while the runtime quiesces. Its sender gets no answer (not a
-/// `delivered: false`), so the send stays outstanding in its journal and the resume delivers it,
+/// Closing does not wait behind a backlog of queued `send`s: a queued delivery the sender will
+/// issue again is not applied while the run closes. Its sender gets no answer (not a
+/// `delivered: false`), so the send stays outstanding in its journal and the restore delivers it,
 /// once, to the receiver that had not journaled it.
 #[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
-fn a_pause_skips_queued_sends_and_the_resume_delivers_them_once() {
+fn closing_skips_queued_sends_and_the_restore_delivers_them_once() {
     for batch in [1, 16] {
-        pause_behind_a_backlog(batch);
+        close_behind_a_backlog(batch);
     }
 }
 
-fn pause_behind_a_backlog(batch: usize) {
+fn close_behind_a_backlog(batch: usize) {
     const SENDERS: usize = 8;
     const EACH: usize = 64;
     let total = SENDERS * EACH;
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let dir = std::env::temp_dir().join(format!("aff-pause-backlog-{}-{batch}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("aff-close-backlog-{}-{batch}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("run/control")).unwrap();
+    std::fs::create_dir_all(&dir).unwrap();
     // Each sender sends EACH messages at once; the receiver spends a while on each.
     std::fs::write(
         dir.join("app.tsx"),
@@ -115,39 +117,39 @@ fn pause_behind_a_backlog(batch: usize) {
     let received = || {
         let text = journal("r");
         let mut ids: Vec<String> = text
-            .match_indices("\"_msg\":\"")
+            .match_indices("\"id\":\"s")
             .map(|(at, m)| {
-                let rest = &text[at + m.len()..];
+                let rest = &text[at + m.len() - 1..];
                 rest[..rest.find('"').unwrap()].to_string()
             })
             .collect();
         ids.sort();
         ids
     };
-    // Pause once the receiver has started on the backlog.
+    // Close once the receiver has started on the backlog.
     let mut rt = Runtime::new(config(), enc.clone(), model());
     add(&mut rt);
-    let pause = dir.join("run/control/pause.json");
+    let control = rt.control();
     let asked = Arc::new(std::sync::Mutex::new(None));
-    let (asked2, r_journal, p) = (asked.clone(), dir.join("run/r/journal.jsonl"), pause.clone());
-    let pauser = std::thread::spawn(move || {
-        while !std::fs::read_to_string(&r_journal).is_ok_and(|t| t.contains("\"_msg\"")) {
+    let (asked2, r_journal) = (asked.clone(), dir.join("run/r/journal.jsonl"));
+    let closer = std::thread::spawn(move || {
+        while !std::fs::read_to_string(&r_journal).is_ok_and(|t| t.contains("\"id\":\"s")) {
             std::thread::sleep(Duration::from_millis(2))
         }
         *asked2.lock().unwrap() = Some(Instant::now());
-        std::fs::write(p, json!({"mode": "graceful"}).to_string()).unwrap();
+        control.close(Duration::from_secs(150));
     });
     let report = rt.run().unwrap();
-    let answered = asked.lock().unwrap().expect("paused").elapsed();
-    pauser.join().unwrap();
+    let answered = asked.lock().unwrap().expect("closed").elapsed();
+    closer.join().unwrap();
     let before = received();
     eprintln!(
-        "batch {batch}: pause answered in {} ms with {} of {total} messages journaled",
+        "batch {batch}: close answered in {} ms with {} of {total} messages journaled",
         answered.as_millis(),
         before.len()
     );
     assert!(!report.complete);
-    assert!(answered < Duration::from_millis(1500), "pause took {answered:?}");
+    assert!(answered < Duration::from_millis(1500), "closing took {answered:?}");
     assert!(
         before.len() < total / 2,
         "the queued sends were applied: {} of {total}",
@@ -159,8 +161,7 @@ fn pause_behind_a_backlog(batch: usize) {
             "s{i} journaled a failed delivery"
         );
     }
-    // Resume: every send the receiver had not journaled is still outstanding and is issued again.
-    std::fs::remove_file(&pause).unwrap();
+    // Restore: every send the receiver had not journaled is still outstanding and is issued again.
     let rt = Runtime::resume(config(), enc.clone(), model()).unwrap();
     let report = rt.run().unwrap();
     assert!(report.complete, "every agent finished");

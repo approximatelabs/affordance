@@ -486,7 +486,7 @@ export default function Panel(){{return helper();}}
         Input::Event {
             name: "install".into(),
             payload: json!({"source":module("old")}),
-            op: None,
+            id: None,
             clock_ms: 1,
         },
     );
@@ -495,7 +495,7 @@ export default function Panel(){{return helper();}}
         Input::Event {
             name: "start".into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: 2,
         },
     );
@@ -517,7 +517,7 @@ export default function Panel(){{return helper();}}
         Input::Event {
             name: "install".into(),
             payload: json!({"source":module("new")}),
-            op: None,
+            id: None,
             clock_ms: 3,
         },
     );

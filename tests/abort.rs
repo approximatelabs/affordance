@@ -120,7 +120,7 @@ impl Rig {
         self.input(Input::Event {
             name: name.into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: self.clock,
         })
     }
@@ -241,8 +241,7 @@ fn an_aborted_model_call_that_fails_ends_as_stopped_not_retried() {
     let commands = rig.input(Input::ModelError {
         task,
         error: "HTTP 503".into(),
-        transient: true,
-        kind: None,
+        kind: affordance::runtime::model::FailureKind::Interrupted,
         retry_after_ms: None,
         clock_ms: rig.clock,
     });
@@ -308,7 +307,7 @@ fn an_already_aborted_signal_rejects_at_once_and_issues_nothing() {
 struct Streaming {
     opener: Vec<u32>,
     word: u32,
-    inbox: std::sync::Mutex<Option<affordance::runtime::Inbox>>,
+    control: std::sync::Mutex<Option<affordance::runtime::Control>>,
 }
 impl affordance::runtime::Model for Streaming {
     fn generate(
@@ -331,8 +330,8 @@ impl affordance::runtime::Model for Streaming {
                 break;
             }
             if n == 4 {
-                let inbox = self.inbox.lock().unwrap();
-                inbox.as_ref().unwrap().post(&req.agent, "stop", json!({})).unwrap();
+                let control = self.control.lock().unwrap();
+                drop(control.as_ref().unwrap().post(&req.agent, "stop", json!({}), None));
             }
         }
         Ok(affordance::runtime::GenReply {
@@ -356,16 +355,16 @@ fn escape_stops_a_streaming_reply_and_the_journal_keeps_it() {
     let model = Arc::new(Streaming {
         opener: enc.tok.encode("</think>", false).unwrap().get_ids().to_vec(),
         word,
-        inbox: Default::default(),
+        control: Default::default(),
     });
     let mut cfg = RuntimeConfig::new(app.clone());
     cfg.dir = Some(dir.join("run"));
     cfg.library = Some(std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/views")));
     cfg.max_wall = Some(std::time::Duration::from_secs(30));
     let mut rt = Runtime::new(cfg, enc, model.clone());
-    let inbox = rt.inbox();
-    *model.inbox.lock().unwrap() = Some(inbox.clone());
-    inbox.post("a", "ask", json!({})).unwrap();
+    let control = rt.control();
+    *model.control.lock().unwrap() = Some(control.clone());
+    drop(control.post("a", "ask", json!({}), None));
     let mut spec = AgentSpec::new("a", json!({}));
     spec.machines = Some(vec![]);
     rt.add_agent(spec).unwrap();

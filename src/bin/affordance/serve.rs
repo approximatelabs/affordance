@@ -2,14 +2,14 @@
 //! request reaches the root instance as the event `request` (`{id, method, path, query, headers,
 //! body}`); the app answers with calls on the machine `client`: `{respond: id, status, headers,
 //! body}`, or `{respond: id, status, headers, stream: true}`, then `{respond: id, chunk}`..., then
-//! `{respond: id, end: true}`. Design: the inbox primitive is `Runtime::inbox`; the rest is this
+//! `{respond: id, end: true}`. Design: the posting primitive is `Control::post`; the rest is this
 //! file and TSX.
 //!
 //! HTTP itself is hyper's server, as a browser's network stack parses what a Service Worker sees:
 //! request lines, headers, chunked and length-delimited bodies, keep-alive, and the limits on all
 //! of them. Requests from the network are the riskiest input there is to parse by hand. HTTP/1.1,
 //! no TLS (put a proxy in front).
-use affordance::runtime::{CallContext, Executor, Inbox, Runtime};
+use affordance::runtime::{CallContext, Control, Executor, Runtime};
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full, Limited, combinators::BoxBody};
 use hyper::{Request, Response, StatusCode, body::Incoming};
@@ -284,7 +284,7 @@ pub fn start(rt: &mut Runtime, settings: Settings, target: String) -> Result<(),
         }),
     );
     let shared = Arc::new(Shared {
-        inbox: rt.inbox(),
+        control: rt.control(),
         target,
         settings,
         waiting,
@@ -321,7 +321,7 @@ pub fn start(rt: &mut Runtime, settings: Settings, target: String) -> Result<(),
 }
 
 struct Shared {
-    inbox: Inbox,
+    control: Control,
     target: String,
     settings: Settings,
     waiting: Waiting,
@@ -365,10 +365,9 @@ impl Shared {
         );
         let request = json!({"id": id, "method": parts.method.as_str(), "path": parts.uri.path(),
             "query": parts.uri.query().unwrap_or(""), "headers": headers, "body": body});
-        if let Err(e) = self.inbox.post(&self.target, "request", request) {
-            self.waiting.lock().unwrap().remove(&id);
-            return error(503, e);
-        }
+        // Not delivered (the run is closing): 503, and the client may try again.
+        let delivery = self.control.post(&self.target, "request", request, None);
+        let mut delivered = Some(tokio::task::spawn_blocking(move || delivery.wait()));
         // A client that disconnects drops this future: its request then stops waiting too.
         struct Unlist(Waiting, String, bool);
         impl Drop for Unlist {
@@ -380,12 +379,23 @@ impl Shared {
         }
         let mut unlist = Unlist(self.waiting.clone(), id.clone(), true);
         // Answered, or unlisted with no answer: its time was up (`reap`).
-        match answered.await {
-            Ok(response) => {
-                unlist.2 = false;
-                response
+        tokio::pin!(answered);
+        loop {
+            tokio::select! {
+                response = &mut answered => break match response {
+                    Ok(response) => {
+                        unlist.2 = false;
+                        response
+                    }
+                    Err(_) => error(504, "the app did not answer in time"),
+                },
+                posted = async { delivered.as_mut().unwrap().await }, if delivered.is_some() => {
+                    delivered = None;
+                    if let Ok(Err(e)) = posted {
+                        return error(503, e);
+                    }
+                }
             }
-            Err(_) => error(504, "the app did not answer in time"),
         }
     }
 }

@@ -588,19 +588,17 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
     let mut spec = AgentSpec::new("agent-0000", json!({"id":"agent-0000","task":"generic fixture"}));
     spec.max_turns = Some(3);
     rt.add_agent(spec).unwrap();
-    std::fs::create_dir_all(dir.join("control")).unwrap();
-    let pause = dir.join("control/pause.json");
-    let p = pause.clone();
-    let pauser = std::thread::spawn(move || {
+    let control = rt.control();
+    let closer = std::thread::spawn(move || {
         let until = Instant::now() + Duration::from_secs(8);
         while !started.load(Ordering::SeqCst) {
             assert!(Instant::now() < until, "executor never started");
             std::thread::sleep(Duration::from_millis(5));
         }
-        std::fs::write(p, "{\"mode\":\"immediate\"}").unwrap();
+        control.close(Duration::ZERO);
     });
     rt.run().unwrap();
-    pauser.join().unwrap();
+    closer.join().unwrap();
     let read = || {
         std::fs::read_to_string(dir.join("agent-0000/trace.jsonl"))
             .unwrap()
@@ -612,7 +610,6 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
         read().iter().all(|e| e["t"] != "tool"),
         "controller cancellation has not completed the tool"
     );
-    std::fs::remove_file(pause).unwrap();
     let mut rt = Runtime::resume(config(), e.clone(), model()).unwrap();
     rt.bind_machine(
         "home",

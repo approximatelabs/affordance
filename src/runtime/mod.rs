@@ -21,7 +21,7 @@ pub mod store;
 
 pub use cancel::CancelToken;
 pub use exec::{CallContext, CommandMachine, Exec, Executor, Output, Target};
-pub use host::{AgentReport, AgentSpec, Inbox, Observed, Observer, Report, Runtime, RuntimeConfig};
+pub use host::{AgentReport, AgentSpec, Control, Delivery, Ended, Observed, Observer, Report, Runtime, RuntimeConfig};
 pub use model::{
     Api, Chat, Completions, Credentials, Delta, FnModel, GenReply, GenRequest, Model, Sessions, Sglang, Window,
 };

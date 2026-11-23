@@ -593,8 +593,8 @@ mod tests {
     fn event(name: &str, msg: &str, clock_ms: i64) -> Input {
         Input::Event {
             name: name.into(),
-            payload: json!({"_msg":msg}),
-            op: None,
+            payload: json!({}),
+            id: Some(msg.into()),
             clock_ms,
         }
     }
@@ -744,7 +744,7 @@ export default function Main(){const log=useLog();useConversation(log);
         let input = Input::Event {
             name: "message".into(),
             payload: json!({"text":"hello"}),
-            op: None,
+            id: None,
             clock_ms: 101,
         };
         let commands = a.handle(&view, &enc, input.clone()).unwrap();
@@ -759,7 +759,7 @@ export default function Main(){const log=useLog();useConversation(log);
         let next = Input::Event {
             name: "message".into(),
             payload: json!({"text":"again"}),
-            op: None,
+            id: None,
             clock_ms: 103,
         };
         assert_eq!(
@@ -920,7 +920,7 @@ export default function Main(){const log=useLog();useConversation(log);
             let input = Input::Event {
                 name: "bump".into(),
                 payload: json!({}),
-                op: None,
+                id: None,
                 clock_ms: 100 + n,
             };
             let line = format!("{}\n", serde_json::to_string(&input).unwrap());
@@ -1105,7 +1105,7 @@ export default function Main(){
             let bump = |clock_ms| Input::Event {
                 name: "bump".into(),
                 payload: json!({}),
-                op: None,
+                id: None,
                 clock_ms,
             };
             a.handle(&view, &enc, bump(101)).unwrap();

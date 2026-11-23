@@ -101,7 +101,7 @@ pub(super) fn submit_model(
 /// Start queued model calls in every lane that has room under its share of the limit.
 pub(super) fn pump_model(shared: &Arc<Shared>) {
     loop {
-        if shared.quiescing.load(Ordering::SeqCst) {
+        if shared.closing.load(Ordering::SeqCst) {
             return;
         }
         let Some((lane, job)) = shared.model_gate.take_next() else {
@@ -294,10 +294,10 @@ mod model_gate_tests {
             model_pool: Pool::new(1, "gate-test"),
             exec_pool: Pool::new(1, "gate-test-exec"),
             model_gate: ModelGate::new(8, 0),
-            quiescing: AtomicBool::new(false),
-            clock_base: 0,
-            clock_started: Instant::now(),
-            clock_frozen: AtomicI64::new(i64::MIN),
+            closing: AtomicBool::new(false),
+            started: Instant::now(),
+            clock: Clock::new(0),
+            diagnostics: Default::default(),
             retired: Default::default(),
             booting: Default::default(),
             durable: Default::default(),

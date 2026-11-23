@@ -209,23 +209,17 @@ fn main() {
     let samples = Arc::new(std::sync::Mutex::new(vec![]));
     let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let sampler = {
-        let (samples, done, dir) = (samples.clone(), done.clone(), dir.clone());
+        let (samples, done, control) = (samples.clone(), done.clone(), rt.control());
         std::thread::spawn(move || {
             let mut peak = (0, 0);
             while !done.load(Ordering::Relaxed) {
-                // Turns so far: the runtime's observed.json (written every 100 ms).
-                let turns: u64 = std::fs::read(dir.join("observed.json"))
-                    .ok()
-                    .and_then(|b| serde_json::from_slice::<J>(&b).ok())
-                    .map(|o| {
-                        o["agents"]
-                            .as_array()
-                            .into_iter()
-                            .flatten()
-                            .filter_map(|a| a["turns"].as_u64())
-                            .sum()
-                    })
-                    .unwrap_or(0);
+                // Turns so far: the run's status (refreshed every 100 ms).
+                let turns: u64 = control.status()["agents"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|a| a["turns"].as_u64())
+                    .sum();
                 samples
                     .lock()
                     .unwrap()

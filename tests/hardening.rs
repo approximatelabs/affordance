@@ -575,7 +575,7 @@ fn native_functions_are_state_updaters_and_private_methods_survive_snapshots() {
         affordance::runtime::Input::Event {
             name: "update".into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: 1,
         },
     )

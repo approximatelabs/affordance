@@ -93,7 +93,7 @@ The contract:
 | The model | The app calls it: `model(view?, opts)` sends the page's own view (or an element) and resolves with the output; `dispatch(output)` runs its calls on the view the model saw. `log.step()` does both and writes the records. `views/lib/loop.tsx` has the common loops: `useLoop(log, {before?})` (ask, act, repeat: an autonomous agent) and `useConversation(log)` (answer whatever is unanswered: a chat). The runtime never calls the model on its own. |
 | Effects | In a task: `await harness.machine.call(args)`, `harness.store.*`, `harness.send`, `harness.wait`, `model`, `dispatch`, ... (below); `Promise.all([...])` runs several concurrently. `harness.now()`, `harness.random()` and `harness.stop(value)` are also available. `useEffect(setup, deps)` runs `setup` after a render whose deps changed (by `Object.is`, as in React). |
 | Events | `useEvent("message", listener)` (or `<aff event="message" onCallback={...}/>`, zero tokens). A listener runs when its event arrives, even while tools wait. |
-| Context window | Layout's: the binding's `context` (the model's context length, which a native binding's server reports when the runtime validates it; configured, it may only lower that; `"none"` opts out; logged per binding and in `observed.json` `models`) less `max_new` is every prompt's window; sheets cap boxes in it (`history { max-tokens: 75win; overflow: drop-start; drop-step: 25% }`, `result { ... clip-middle }`), and a prompt that does not fit is never sent (`ContextError`). An app that summarizes reacts to `useEvent("layout")`. `max_prompt` stays as a hard ceiling. |
+| Context window | Layout's: the binding's `context` (the model's context length, which a native binding's server reports when the runtime validates it; configured, it may only lower that; `"none"` opts out; logged per binding and in the run status's `models`) less `max_new` is every prompt's window; sheets cap boxes in it (`history { max-tokens: 75win; overflow: drop-start; drop-step: 25% }`, `result { ... clip-middle }`), and a prompt that does not fit is never sent (`ContextError`). An app that summarizes reacts to `useEvent("layout")`. `max_prompt` stays as a hard ceiling. |
 | Reading replies | The template adapter's `protocol` span: the syntax, the stop tokens, and whether the prompt ends inside thinking. Every stock template app declares it: GLM53App (`glm`), Qwen3App and Qwen3BaseApp (`hermes`), Qwen36App, MiMo25App and Nemotron3App (`xml`), Llama31App (`llama31`). Parsers exist for every rendered family (`docs/REPLY_PARSING.md`). |
 | Language | TypeScript/JSX with JavaScript semantics (`spec/LANGUAGE.md` §7), in apps and template adapters alike. |
 
@@ -308,7 +308,7 @@ to run it.
   length to `commit.jsonl`. It commits as soon as something waits on a commit or a worker has
   nothing queued, and otherwise at most 2 ms after the first line it covers. Whatever leaves the
   process waits for the commit of the input that caused it: model requests, machine calls,
-  control receipts, and `observed.json`. A `harness.send` to another instance, timers, the
+  and the answer to an embedder's post. A `harness.send` to another instance, timers, the
   instance tree and `store.*` operations do not wait. Store records and blob files are written
   without a sync too. A commit syncs them with the journals, before the record that commits
   any line referring to them, and the commit records each store's length beside its journal's. A model-free round trip between two instances costs a fraction of a millisecond instead
@@ -412,7 +412,7 @@ placeholder); `views/lib/openai_server.tsx` builds an OpenAI-compatible
 call, so the reply streams as it is generated) and `/v1/models` on it. `views/demo/memory_server` is a
 chat model with a memory longer than its context behind that endpoint, and `views/demo/serve` the
 smallest served app. An embedding program posts its own events into a running runtime with
-`Runtime::inbox()`.
+`Control::post` (see "Controlling a run").
 
 ## Driving an app from a frontend
 
@@ -420,25 +420,26 @@ smallest served app. An embedding program posts its own events into a running ru
 one JSON object a line, as a browser's DevTools protocol drives a page. It takes `run`'s options
 and keeps running; stdout carries only the protocol (the summary goes to stderr).
 
-- **In** (stdin): `{"type": "prompt", "text"}` posts the event `user` (`{text}`) to the first
-  instance; `{"type": "abort"}` posts the event `abort`; `{"type": "history"}` posts the event `history`;
-  `{"type": "event", "name", "payload"}` posts any event; `{"type": "answer", "request", "value"}` answers a question;
-  `{"type": "shutdown"}`, or the end of stdin, ends the run (`--resume` continues it).
-- **Out** (stdout): `ready {agent}`; `delta {agent, task, text, reasoning?}` (or `delta {agent, task, call: {index, id?, name?, arguments}}`,
+- **In** (stdin): the control protocol (see "Controlling a run"): `{"type": "event", "name",
+  "payload"}` posts an event to the first instance (or to `target`), and `close`, `status`,
+  `set_model_limit` and `subscribe` work as there; `{"type": "answer", "request", "value"}`
+  answers a question. The end of stdin closes the run (`--resume` continues it).
+- **Out** (stdout): `ready {agent}` once the agents are running; `delta {agent, task, text, reasoning?}` (or `delta {agent, task, call: {index, id?, name?, arguments}}`,
   more of a hosted reply's tool call: its place in the reply, its id and name when they arrive, and more of
   its arguments' JSON text), a model's reply as it
   is generated; `output {agent, task, text}`, a command's output as it is written;
   `trace {agent, record}`, the trace records (renders, replies, each model call's `generate`
   statistics such as `first_token_ms` and `tokens_per_s`, finished tools, handler errors, the
   app's `console` lines);
-  `ui {agent, value}` and `question {agent, request, ...}`; `error {message}`; `exit {error?}`.
+  `ui {agent, value}` and `question {agent, request, ...}`; answers to requests that had an `id`
+  (`result {id, value}`, `error {id, message}`), and `error {message}` for a failed one without;
+  `exit {error?}`.
 - **The machine `ui` is the frontend.** A call with `ask` (`{ask: {kind: "permission", ...}}`)
   becomes a `question`, and waits for the frontend's `answer`, whose value it returns; any other
   call is shown as `ui` and returns null at once. What to ask, and when, is the app's.
 
 The deltas and output are what the observer sees (`RuntimeConfig.observer`); they are never
-journaled. Prompts, aborts and answers are: a prompt and an abort are events, an answer is the
-`ui` call's result.
+journaled. Events and answers are: an event is an input, an answer is the `ui` call's result.
 
 `views/lib/frontend.tsx` is the chat loop: `useFrontend(log)` answers each `user` message, runs
 the model's calls until it replies without one, and aborts the turn in progress on `abort`.
@@ -453,10 +454,10 @@ Through `turn.signal`, a tool's command stops with it. `ask(question)` asks the 
 
 ```sh
 cd views/demo/host && affordance host --set model.url=http://127.0.0.1:8080/v1
-{"type":"prompt","text":"What is in this directory?"}
+{"type":"event","name":"user","payload":{"text":"What is in this directory?"}}
 ```
 
-An embedding program does the same with `Runtime::inbox()` (`post`, and `close` to end the run),
+An embedding program does the same with `Runtime::control()` (`post`, and `close` to end the run),
 `Runtime::observe`, and a machine of its own.
 
 **As another harness's model layer.** A harness that keeps its own loop, tools and sessions can use
@@ -467,23 +468,44 @@ the conversation through the bound model's template, calls the model and answers
 as `delta` events, and the event `abort` (`{id}`) stops a call. The tools are declared for the model
 and never run here: the caller runs them. Nothing of the app's own is added to the conversation.
 
-## Staying up and draining
+## Controlling a run
 
-`affordance run --keep-running` (or `keep_running: true`; `RuntimeConfig.serve` in Rust) keeps the run up while
-instances are idle, a chat waiting for its user for example, and keeps reading the control
-inbox. The run then ends when every instance stops, at `max_wall`, or on a pause. Without it (the
-default, for batches) the run returns once nothing is in flight and no instance waits on
-anything. `observed.json` reports an instance with nothing outstanding as `idle`. A control-inbox
-file may name its event (`"event": "ping"`, default `message`), and so may a send:
+A program outside the run controls it the way a browser's embedder controls a page: through one
+handle, over whichever channel it has. It never writes files into the run directory.
+
+| Operation | What it does |
+|---|---|
+| `event {target?, name, payload?, key?}` | Posts an event, as `postMessage` does. The answer comes once the target's journal line is committed, or says why the event was not delivered (no such instance, the run is closing). With a `key`, a second post of the same key is journaled but not taken again, so a controller can post again after a lost answer or a restore. |
+| `close {timeout_ms?}` | Closes the run. The clock stops and no new model or machine call starts. Calls still running get `timeout_ms` to finish (default 0), then are cancelled. The journals are committed and the run can be restored with `--resume`. |
+| `status` | The run's `state` (`starting`, `running`, `closing`, `closed`), its `clock_ms`, each agent's state, the model bindings' windows, and the model queue. |
+| `set_model_limit {limit}` | How many model calls may run at once. 0 holds every model call while the rest of the run goes on. |
+| `subscribe {streams: ["status"]}` | Pushes `{type: "status", value}` each time the status changes. |
+
+The same operations are available four ways:
+
+- **In Rust:** `Runtime::control()` returns a `Control` before the run starts. It has `post` (whose `Delivery` you can `wait` on), `close`, `set_model_limit` and `status`. `Runtime::run` returns a `Report` whose `ended` says how the run ended: `stopped`, `idle`, `closed`, `max_wall` or `worker_lost`.
+- **Over stdio:** through `affordance host` (above).
+- **Over a Unix socket:** for a run started on its own, with `affordance run|serve|host --control PATH`. The protocol is the same JSON lines. A request with an `id` is answered `{type: "result", id, value}` or `{type: "error", id, message}`. Several controllers may connect, and one that disconnects leaves the run as it is. The socket is the user's alone, and it is removed when the run ends, after telling each client `{type: "exit", ended}`.
+- **With signals:** SIGINT (Ctrl-C) and SIGTERM close the run with 30 seconds for running calls. A second signal closes it at once.
+
+`affordance run --keep-running` (or `keep_running: true`; `RuntimeConfig.serve` in Rust) keeps the
+run up while instances are idle, a chat waiting for its user for example. It then ends when every
+instance stops, at `max_wall`, or when it is closed. Without it (the default, for batches) the run
+returns once nothing is in flight and no instance waits on anything. The status reports an
+instance with nothing outstanding as `idle`. A send may name its event too:
 `harness.send(to, payload, {event: "ping"})`.
 
-Workers give local completions, due timers and incoming/control messages a turn between
-atomic inputs. During draining, newly requested model and host calls remain outstanding
-instead of starting more work. A resumed run reissues them from the journal. Calls already
-running retain the selected pause mode's completion/cancellation behavior. A model or machine
-call that the host cancels (an immediate or fast pause, the run ending) is not recorded as a
-failure: nothing is journaled for it, it stays outstanding, and a resumed run issues it again.
-A call the app cancels, or one whose instance is unmounted, is recorded as before.
+Every end goes through closing:
+- every instance stopped,
+- a batch with nothing left,
+- `max_wall` (no time for running calls),
+- a lost render worker,
+- `close`.
+
+While the run closes:
+- **New calls do not start.** Model and machine calls that instances ask for stay outstanding in their journals, and a restored run issues them.
+- **Calls that the host cancels are not failures.** Calls still running when the timeout passes are cancelled by the host. Nothing is journaled for them, and a restored run issues them again. A call the app cancels, or one whose instance is unmounted, is recorded as before.
+- **The clock stands still.** It stays at the moment closing began, so a timer neither fires nor loses time while running calls finish, and a restore continues each timer with what it had left. The clock also stands still while a run's agents restore, so a slow restore takes no time from them.
 
 Errors never name a model server's address: transport failures say the binding and endpoint
 (`sglang /generate: the server closed the connection without a response`), and a hosted
@@ -494,18 +516,14 @@ An instance's failure is its own, as a crashed tab's is. An error or a panic in 
 (loading its app, starting, replaying its journal, handling an input) fails that instance alone:
 it is reported with the error, never run or imaged again, and its worker serves the others. A
 resume replays the same journal and fails it the same way. A render worker that dies outside
-its instances' code ends the run at once: its instances are reported failed, the others paused
-for a resume.
+its instances' code ends the run at once: its instances are reported failed, the others can be
+restored.
 
-A drain does not wait behind queued inputs that will be issued again on resume. A queued
-`harness.send` delivery is not applied: the receiver does not journal it and the sender gets no
-answer (not `delivered: false`), so the send stays outstanding in the sender's journal and the
-resumed run delivers it. A queued control-inbox message is not applied either: with no receipt,
-it is posted again on resume. Everything else still queued (model and machine completions,
-timers, mounts, props, callbacks) is applied as before. A multicast send whose delivery reached
-some targets before the pause stays pending and is resent to all of them on resume; a target
-that already journaled it journals the copy but does not take it twice (its `_msg` id), the same
-at-least-once delivery as after a crash. This is a page being unloaded: its queued messages are
+Closing does not wait behind queued deliveries that will be issued again on restore.
+- **A queued `harness.send` is not applied.** The receiver does not journal it and the sender gets no answer (not `delivered: false`), so the send stays outstanding in the sender's journal and the restored run delivers it.
+- **A queued post is answered that the run is closing,** so the controller posts it again after the restore.
+- **Everything else still queued is applied as before:** model and machine completions, timers, mounts, props, callbacks.
+- **A multicast send that reached some targets before closing stays pending.** It is resent to all of them on restore. A target that already journaled it journals the copy but does not take it twice (its delivery id), the same at-least-once delivery as after a crash. This is a page being unloaded: its queued messages are
 not delivered, and the sender's request stays pending and is retried.
 
 ## Cancellation and streaming

@@ -48,7 +48,7 @@ use pipe::Pipe;
 use status::*;
 
 /// The harness contract version a journal is written against (`spec/HARNESS.md`).
-pub const CONTRACT_VERSION: u32 = 8;
+pub const CONTRACT_VERSION: u32 = 9;
 static NEXT_INCARNATION: AtomicU64 = AtomicU64::new(1);
 
 fn fresh_incarnation() -> u64 {
@@ -85,8 +85,32 @@ pub struct Report {
     pub agents: Vec<AgentReport>,
     /// Wall-clock seconds the run took.
     pub wall_s: f64,
-    /// Every agent stopped (otherwise the run went idle or hit `max_wall`).
+    /// Every agent stopped.
     pub complete: bool,
+    /// How the run ended.
+    pub ended: Ended,
+    /// Model calls whose prompt the server counted differently from the tokens laid out (should
+    /// be zero; `model::Diagnostics::token_mismatches`).
+    pub token_mismatches: u64,
+    /// Model captures that could not be written.
+    pub capture_errors: u64,
+}
+
+/// How a run ended. Every way but `Stopped` leaves outstanding work in the journals, which a
+/// restore continues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Ended {
+    /// Every agent stopped.
+    Stopped,
+    /// A batch run (not kept running) had nothing left to do.
+    Idle,
+    /// The embedder closed it (`Control::close`).
+    Closed,
+    /// It ran for `max_wall`.
+    MaxWall,
+    /// A render worker died outside its instances' own code; its instances are reported failed.
+    WorkerLost,
 }
 
 enum Msg {
@@ -214,13 +238,12 @@ enum InputKind {
         task: u64,
         outcome: Outcome,
     },
-    /// An event; `ack` (sender, task): a `send` the sender is waiting on until this is journaled;
-    /// `op`: an operator's control-inbox operation id.
+    /// An event; `ack`: a `send` or a post waiting until this is journaled; `id`: its delivery id.
     Event {
         name: String,
         payload: J,
         ack: Option<delivery::Ack>,
-        op: Option<String>,
+        id: Option<String>,
     },
     /// Start a child instance. Only recovery of its parent may restore the current incarnation.
     Mount {
@@ -244,20 +267,6 @@ struct Pool {
     tx: Mutex<Sender<Box<dyn FnOnce() + Send>>>,
     /// Jobs running now.
     running: Arc<AtomicUsize>,
-}
-
-struct ControlWatcher {
-    stop: Sender<()>,
-    thread: Option<std::thread::JoinHandle<()>>,
-}
-
-impl Drop for ControlWatcher {
-    fn drop(&mut self) {
-        let _ = self.stop.send(());
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
-    }
 }
 
 impl Pool {
@@ -341,14 +350,15 @@ struct Shared {
     model_pool: Pool,
     exec_pool: Pool,
     model_gate: ModelGate,
-    quiescing: AtomicBool,
-    clock_base: i64,
-    clock_started: Instant,
-    /// The clock's value from the moment a pause (or the end of the run) began, or `i64::MIN`
-    /// while it runs. Work still finishing during the pause sees that moment and no later, so a
-    /// timer neither fires nor loses time while the pause drains: a resume continues every
-    /// timer with what it had left, as a frozen browser tab's timers do.
-    clock_frozen: AtomicI64,
+    /// The run is closing: no new model or machine call starts, and queued deliveries are left
+    /// for a restore (`batching::unless_reissued`).
+    closing: AtomicBool,
+    /// When the runtime started (the boot's own time is reported from it).
+    started: Instant,
+    /// The journals' clock: logical time, which passes only while the run is running.
+    clock: Clock,
+    /// What this run notes about its model calls, and where it captures them.
+    diagnostics: super::model::Diagnostics,
     /// Instances no worker holds: unmounted ones as they were when they left, and lost ones
     /// (`lost`). The run's report includes them.
     retired: Mutex<BTreeMap<String, AgentReport>>,
@@ -388,6 +398,45 @@ impl Drop for Permit<'_> {
     }
 }
 
+/// The journals' clock. It stands still while the agents restore (it starts when the last worker
+/// has booted) and from the moment the run begins closing: work finishing then sees that moment
+/// and no later, so a timer neither fires nor loses time while the run boots or drains, and a
+/// restore continues every timer with what it had left.
+struct Clock(Mutex<ClockState>);
+struct ClockState {
+    at: i64,
+    since: Option<Instant>,
+    stopped: bool,
+}
+impl Clock {
+    fn new(at: i64) -> Clock {
+        Clock(Mutex::new(ClockState {
+            at,
+            since: None,
+            stopped: false,
+        }))
+    }
+    fn now(&self) -> i64 {
+        let c = self.0.lock().unwrap();
+        c.at + c.since.map_or(0, |t| t.elapsed().as_millis() as i64)
+    }
+    /// Let time pass (once the agents are running), unless the run is already closing.
+    fn start(&self) {
+        let mut c = self.0.lock().unwrap();
+        if !c.stopped && c.since.is_none() {
+            c.since = Some(Instant::now());
+        }
+    }
+    /// Stop it for good at this moment.
+    fn stop(&self) {
+        let mut c = self.0.lock().unwrap();
+        if let Some(t) = c.since.take() {
+            c.at += t.elapsed().as_millis() as i64;
+        }
+        c.stopped = true;
+    }
+}
+
 impl Shared {
     /// `j` with blob references replaced by their text (reports and snapshots leave the runtime).
     fn expand(&self, j: &J) -> J {
@@ -405,17 +454,14 @@ impl Shared {
         )
     }
     fn clock_ms(&self) -> i64 {
-        match self.clock_frozen.load(Ordering::SeqCst) {
-            i64::MIN => self.clock_base + self.clock_started.elapsed().as_millis() as i64,
-            frozen => frozen,
-        }
+        self.clock.now()
     }
-    /// Stop the clock at this moment (the first call wins).
-    fn freeze_clock(&self) {
-        let now = self.clock_base + self.clock_started.elapsed().as_millis() as i64;
-        let _ = self
-            .clock_frozen
-            .compare_exchange(i64::MIN, now, Ordering::SeqCst, Ordering::SeqCst);
+    /// Begin closing: the clock stops at this moment, no new call starts, and calls still queued
+    /// for a model are left outstanding for a restore.
+    fn begin_closing(&self) {
+        self.clock.stop();
+        self.closing.store(true, Ordering::SeqCst);
+        suspend_queued_models(self);
     }
     /// List a machine call as live; cancelling its token stops it.
     fn token(&self, agent: &str, incarnation: u64, task: u64) -> CancelToken {
@@ -497,42 +543,82 @@ pub struct Runtime {
     cut: Option<durable::Cut>,
     /// The lock on the run directory, taken by `resume` (`run` takes it otherwise).
     owner: Option<durable::Owner>,
-    /// Events posted from outside while running (`inbox`); `run` drains the receiver.
-    inbox: Option<(Sender<Posted>, Receiver<Posted>)>,
+    /// The embedder's handle and the operations it sends (`control`); `run` drains the receiver.
+    control: Option<(Control, Receiver<Op>)>,
 }
 
-/// Events posted into a running runtime from outside it (an HTTP listener, a UI, a test): the
-/// embedder's `postMessage`. Each is delivered to its instance as an event (`useEvent(name)`),
-/// journaled by the instance that takes it, as a control-inbox event is.
+/// An embedder's handle on a run, as a browser's embedder holds a page: post events into it,
+/// read its status, set its model limit, close it. Take it with `Runtime::control` before `run`;
+/// it is cheap to clone and usable from any thread, before the run starts and while it runs.
 #[derive(Clone)]
-pub struct Inbox(Sender<Posted>);
+pub struct Control {
+    ops: Sender<Op>,
+    status: Arc<Mutex<J>>,
+}
 
-enum Posted {
-    Event {
+enum Op {
+    Post {
         target: String,
         event: String,
         payload: J,
+        key: Option<String>,
+        reply: Sender<Result<(), String>>,
     },
-    /// End the run (`Inbox::close`).
-    Close,
+    Close(Duration),
+    ModelLimit(usize),
 }
 
-impl Inbox {
-    /// Deliver `payload` to instance `target` as the event `event`. Fails once the run has ended.
-    pub fn post(&self, target: &str, event: &str, payload: J) -> Result<(), String> {
+/// A post's answer: `wait` returns once the event's journal line is committed (`Ok`), or with why
+/// it was not delivered. Dropping it does not withdraw the post.
+pub struct Delivery(Receiver<Result<(), String>>);
+
+impl Delivery {
+    /// Wait for the answer.
+    pub fn wait(self) -> Result<(), String> {
         self.0
-            .send(Posted::Event {
-                target: target.into(),
-                event: event.into(),
-                payload,
-            })
-            .map_err(|_| "the run has ended".to_string())
+            .recv()
+            .unwrap_or_else(|_| Err("the run ended before the post was delivered".into()))
+    }
+}
+
+impl Control {
+    /// Deliver `payload` to instance `target` as the event `event` (`useEvent(event)`), as
+    /// `postMessage` does. With a `key`, a post the instance has already taken (posted again after
+    /// a lost answer, or after a restore) is journaled but not taken a second time.
+    pub fn post(&self, target: &str, event: &str, payload: J, key: Option<&str>) -> Delivery {
+        let (reply, answer) = channel();
+        let op = Op::Post {
+            target: target.into(),
+            event: event.into(),
+            payload,
+            key: key.map(str::to_owned),
+            reply: reply.clone(),
+        };
+        if self.ops.send(op).is_err() {
+            let _ = reply.send(Err("the run has ended".into()));
+        }
+        Delivery(answer)
     }
 
-    /// End the run, as closing a page does: what is running is stopped as at `max_wall` (nothing
-    /// lost: the journals hold it, and a resume continues), and `run` returns.
-    pub fn close(&self) {
-        let _ = self.0.send(Posted::Close);
+    /// Close the run: the clock stops and no new call starts; calls still running get `timeout`
+    /// to finish, then are cancelled (nothing is lost: they stay outstanding in the journals, and a
+    /// restore issues them again). `run` returns once everything is committed. A second close may
+    /// shorten the time left; it never lengthens it.
+    pub fn close(&self, timeout: Duration) {
+        let _ = self.ops.send(Op::Close(timeout));
+    }
+
+    /// How many model calls may run at once (0 holds every model call while the rest of the run
+    /// goes on).
+    pub fn set_model_limit(&self, limit: usize) {
+        let _ = self.ops.send(Op::ModelLimit(limit));
+    }
+
+    /// The run's status: `state` (`starting`, `running`, `closing`, `closed`), `clock_ms`, each
+    /// agent's state, the model bindings' windows and the model queue. Refreshed about every
+    /// 100 ms while the run runs.
+    pub fn status(&self) -> J {
+        self.status.lock().unwrap().clone()
     }
 }
 
@@ -557,7 +643,7 @@ impl Runtime {
             journals: HashMap::new(),
             cut: None,
             owner: None,
-            inbox: None,
+            control: None,
         }
     }
 
@@ -582,9 +668,16 @@ impl Runtime {
         self
     }
 
-    /// A handle that posts events into this runtime while it runs (`Inbox::post`).
-    pub fn inbox(&mut self) -> Inbox {
-        Inbox(self.inbox.get_or_insert_with(channel).0.clone())
+    /// The embedder's handle on this run (`Control`). Every call returns a handle on the same run.
+    pub fn control(&mut self) -> Control {
+        self.control
+            .get_or_insert_with(|| {
+                let (ops, rx) = channel();
+                let status = Arc::new(Mutex::new(json!({"state": "starting"})));
+                (Control { ops, status }, rx)
+            })
+            .0
+            .clone()
     }
 
     /// Bind another model by name: an instance (`AgentSpec.model`, `<Mount model>`) or a render
@@ -796,10 +889,10 @@ impl Runtime {
                 self.models.values().map(|(_, m)| m.ranks().max(1)).sum(),
                 self.cfg.model_inflight.unwrap_or(self.cfg.model_threads),
             ),
-            quiescing: AtomicBool::new(false),
-            clock_base,
-            clock_started: Instant::now(),
-            clock_frozen: AtomicI64::new(i64::MIN),
+            closing: AtomicBool::new(false),
+            started,
+            clock: Clock::new(clock_base),
+            diagnostics: super::model::Diagnostics::new(self.cfg.capture_dir.clone()),
             retired: Default::default(),
             booting: Default::default(),
             durable: durable.clone(),
@@ -820,45 +913,6 @@ impl Runtime {
             }
         }
         let mut committing = Committing(durable.clone(), false);
-        let _control_watcher = if let Some(path) = self.cfg.dir.as_ref().map(|d| d.join("model_inflight")) {
-            // Apply a persisted controller allocation before workers submit the
-            // first wave, rather than overshooting it until the first poll.
-            if let Some(n) = std::fs::read_to_string(&path)
-                .ok()
-                .and_then(|s| s.trim().parse::<usize>().ok())
-            {
-                shared.model_gate.set_limit(n);
-            }
-            let shared = Arc::downgrade(&shared);
-            let (stop, wake) = channel();
-            let thread = std::thread::Builder::new()
-                .name("model-inflight".into())
-                .spawn(move || {
-                    while let Err(std::sync::mpsc::RecvTimeoutError::Timeout) =
-                        wake.recv_timeout(Duration::from_secs(2))
-                    {
-                        let Some(shared) = shared.upgrade() else { break };
-                        let Some(n) = std::fs::read_to_string(&path)
-                            .ok()
-                            .and_then(|s| s.trim().parse::<usize>().ok())
-                        else {
-                            continue;
-                        };
-                        if shared.model_gate.set_limit(n) {
-                            let (inflight, queued) = shared.model_gate.counts();
-                            eprintln!("model_inflight: {n} (in flight {inflight}, queued {queued})");
-                            pump_model(&shared);
-                        }
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Some(ControlWatcher {
-                stop,
-                thread: Some(thread),
-            })
-        } else {
-            None
-        };
         shared.booting.store(n_workers, Ordering::SeqCst);
         let mut handles = vec![];
         for (w, (rx, specs)) in rxs.into_iter().zip(per_worker).enumerate() {
@@ -888,32 +942,44 @@ impl Runtime {
                     .map_err(|e| e.to_string())?,
             );
         }
-        // Wait until every agent stopped, or nothing is in flight and no agent waits on anything.
-        let mut last_control = Instant::now() - Duration::from_secs(2);
-        let mut pause_started: Option<Instant> = None;
-        let mut queued_messages: BTreeSet<(PathBuf, String)> = BTreeSet::new();
-        let mut refused_messages: BTreeSet<PathBuf> = BTreeSet::new();
+        // Run until every agent stopped, a batch has nothing left to do, `max_wall` passes, a
+        // worker is lost, or the embedder closes the run. Every end goes through closing: the
+        // clock stops, no new call starts, and calls still running get the close's time to finish.
+        let (control, ops) = match self.control.take() {
+            Some((control, ops)) => (Some(control), Some(ops)),
+            None => (None, None),
+        };
+        let mut last_status = Instant::now() - Duration::from_secs(1);
         let mut last_trim = Instant::now();
         let status_writer = StatusWriter::start(self.cfg.dir.clone(), durable.clone());
-        let posted = self.inbox.take().map(|(_, rx)| rx);
-        let mut closed = false;
-        let complete = loop {
+        // Closing: when it began, how long running calls may take, and why the run ends.
+        let mut closing: Option<(Instant, Duration, Ended)> = None;
+        let close = |closing: &mut Option<(Instant, Duration, Ended)>, timeout: Duration, why: Ended| match closing {
+            Some((_, left, _)) => *left = (*left).min(timeout),
+            None => {
+                shared.begin_closing();
+                *closing = Some((Instant::now(), timeout, why));
+            }
+        };
+        let ended = loop {
             std::thread::sleep(Duration::from_millis(5));
-            if let Some(rx) = &posted {
-                while let Ok(p) = rx.try_recv() {
-                    match p {
-                        Posted::Event { target, event, payload } => {
-                            let _ = shared.post_to(
-                                &target,
-                                InputKind::Event {
-                                    name: event,
-                                    payload,
-                                    ack: None,
-                                    op: None,
-                                },
-                            );
+            while let Some(op) = ops.as_ref().and_then(|rx| rx.try_recv().ok()) {
+                match op {
+                    Op::Post { reply, .. } if closing.is_some() => {
+                        let _ = reply.send(Err(delivery::CLOSING.into()));
+                    }
+                    Op::Post {
+                        target,
+                        event,
+                        payload,
+                        key,
+                        reply,
+                    } => delivery::post(&shared, &target, event, payload, key, reply),
+                    Op::Close(timeout) => close(&mut closing, timeout, Ended::Closed),
+                    Op::ModelLimit(limit) => {
+                        if shared.model_gate.set_limit(limit) {
+                            pump_model(&shared);
                         }
-                        Posted::Close => closed = true,
                     }
                 }
             }
@@ -921,149 +987,66 @@ impl Runtime {
                 last_trim = Instant::now();
                 trim_heap();
             }
-            if last_control.elapsed() >= Duration::from_millis(100) {
-                last_control = Instant::now();
-                if let Some(dir) = &self.cfg.dir {
-                    let control = dir.join("control");
-                    // A pause, once begun, is carried through: commands issued since were dropped
-                    // for the resume to issue again, so it cannot be taken back by removing the
-                    // file. `pause_started` is the state; the file only starts it.
-                    if pause_started.is_some() || control.join("pause.json").exists() {
-                        shared.freeze_clock();
-                        shared.quiescing.store(true, Ordering::SeqCst);
-                        suspend_queued_models(&shared);
-                        let pause_at = pause_started.get_or_insert_with(Instant::now);
-                        let command: J = std::fs::read(control.join("pause.json"))
-                            .ok()
-                            .and_then(|b| serde_json::from_slice(&b).ok())
-                            .unwrap_or(json!({}));
-                        let mode = command["mode"].as_str().unwrap_or("graceful");
-                        if mode == "fast" {
-                            for live in shared.cancels.lock().unwrap().values().filter(|l| l.abort.is_some()) {
-                                live.token.cancel_by_host("controller fast pause");
-                            }
-                        }
-                        if mode == "immediate" || pause_at.elapsed() > Duration::from_secs(150) {
-                            for live in shared.cancels.lock().unwrap().values() {
-                                live.token.cancel_by_host("controller pause");
-                            }
-                        }
-                        if shared.inflight.load(Ordering::SeqCst) == 0 && shared.cancels.lock().unwrap().is_empty() {
-                            break false;
-                        }
-                    }
-                    if pause_started.is_none()
-                        && let Ok(entries) = std::fs::read_dir(control.join("inbox"))
-                    {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            if path.extension().and_then(|s| s.to_str()) != Some("json")
-                                || refused_messages.contains(&path)
-                            {
-                                continue;
-                            }
-                            let Ok(bytes) = std::fs::read(&path) else { continue };
-                            let Ok(message) = serde_json::from_slice::<J>(&bytes) else {
-                                continue;
-                            };
-                            let Some(targets) = message["targets"].as_array() else {
-                                continue;
-                            };
-                            // A message is known by its operation id (its receipt's name): without a
-                            // valid one it could not be told from a new message after a restart, so
-                            // it is refused, once, and never delivered.
-                            let op = message["operation_id"].as_str().unwrap_or("");
-                            if !valid_op(op) {
-                                eprintln!(
-                                    "{}: not delivered: operation_id must be 1 to 128 letters, digits, `-` or `_` (it names the receipt file)",
-                                    path.display()
-                                );
-                                refused_messages.insert(path);
-                                continue;
-                            }
-                            for target in targets.iter().filter_map(J::as_str) {
-                                // A target not started yet (a child, while its parent restores) gets
-                                // the message at a later scan; each target gets it once.
-                                if queued_messages.contains(&(path.clone(), target.to_string()))
-                                    || !shared.route.read().unwrap().contains_key(target)
-                                {
-                                    continue;
-                                }
-                                queued_messages.insert((path.clone(), target.to_string()));
-                                if control
-                                    .join("receipts")
-                                    .join(target)
-                                    .join(format!("{op}.json"))
-                                    .exists()
-                                {
-                                    continue;
-                                }
-                                shared.post_to(
-                                    target,
-                                    InputKind::Event {
-                                        name: message["event"].as_str().unwrap_or("message").into(),
-                                        payload: message["payload"].clone(),
-                                        ack: None,
-                                        op: Some(op.to_string()),
-                                    },
-                                );
-                            }
-                        }
-                    }
-                    // The status is copied under the lock and written by the status thread: a slow
-                    // disk delays neither the workers (they take this lock after every input) nor
-                    // this loop's pause handling.
-                    // A model call retrying a failure is shown as such; the agent is still healthy
-                    // (an outage is retried for as long as it lasts).
-                    // Copied out under the lock (every worker takes it after every input); the
-                    // JSON is built after it is released.
-                    let statuses: Vec<(String, Status)> = shared
-                        .status
-                        .lock()
-                        .unwrap()
-                        .iter()
-                        .map(|(id, s)| (id.clone(), *s))
-                        .collect();
-                    let agents: Vec<J> = statuses.iter().map(|(id,s)| json!({"id":id,"state":if s.failed {"failed"} else if s.stopped {"stopped"} else if s.last_activity_ms == 0 {"starting"} else if s.retrying.is_some() {"retrying"} else {s.phase}, "healthy":!s.failed && !s.stopped && s.last_activity_ms > 0,
-                        "retrying":s.retrying.map(|(failures, error)| json!({"failures":failures,"error":error})),"turns":s.turns,"generated_tokens":s.generated_tokens,"handler_errors":s.handler_errors,"last_activity_ms":s.last_activity_ms,"outstanding":s.outstanding})).collect();
-                    let (model_active, model_queued) = shared.model_gate.counts();
-                    status_writer.put(json!({"clock_ms": shared.clock_ms(), "wall_ms": now_ms()}),
-                        json!({"at":now_ms() as f64/1000.0,"agents":agents,"models":windows,"model_active":model_active,"model_queued":model_queued,"capture_errors":super::model::capture_errors(),"quiescing":shared.quiescing.load(Ordering::SeqCst)}));
+            let booted = shared.booting.load(Ordering::SeqCst) == 0;
+            if last_status.elapsed() >= Duration::from_millis(100) {
+                last_status = Instant::now();
+                let state = match (&closing, booted) {
+                    (Some(_), _) => "closing",
+                    (None, false) => "starting",
+                    (None, true) => "running",
+                };
+                let value = status_value(&shared, state, &windows);
+                status_writer.put(json!({"clock_ms": value["clock_ms"]}));
+                if let Some(control) = &control {
+                    *control.status.lock().unwrap() = value;
                 }
+            }
+            if let Some((began, timeout, why)) = closing {
+                if began.elapsed() >= timeout {
+                    for live in shared.cancels.lock().unwrap().values() {
+                        live.token.cancel_by_host("the run is closing");
+                    }
+                }
+                // A lost worker's messages are never consumed: the drain cannot finish, and need not.
+                if (shared.inflight.load(Ordering::SeqCst) == 0 && shared.cancels.lock().unwrap().is_empty())
+                    || handles.iter().any(|h| h.is_finished())
+                {
+                    break if handles.iter().any(|h| h.is_finished()) {
+                        Ended::WorkerLost
+                    } else {
+                        why
+                    };
+                }
+                continue;
             }
             let status = shared.status.lock().unwrap();
             let all_stopped = status.values().all(|s| s.stopped);
             // Idle only after every worker has started its agents (before that the status is partial).
-            let idle = shared.booting.load(Ordering::SeqCst) == 0
+            let idle = booted
                 && shared.inflight.load(Ordering::SeqCst) == 0
                 && status.values().all(|s| s.stopped || s.outstanding == 0);
+            drop(status);
             if all_stopped {
-                break true;
+                break Ended::Stopped;
             }
             if idle && !self.cfg.serve {
-                break false;
+                break Ended::Idle;
             }
             // A worker only ends when told to: one that ended died outside its instances' own
-            // code, and the work it owed is lost with it. The run stops now, not at `max_wall`:
-            // its agents are reported failed and the rest paused, to be resumed.
+            // code, and the work it owed is lost with it. Its agents are reported failed, the rest
+            // can be restored.
             if handles.iter().any(|h| h.is_finished()) {
-                break false;
-            }
-            if self.cfg.max_wall.is_some_and(|m| started.elapsed() > m) {
-                break false;
-            }
-            if closed {
-                break false;
+                close(&mut closing, Duration::ZERO, Ended::WorkerLost);
+            } else if self.cfg.max_wall.is_some_and(|m| started.elapsed() > m) {
+                close(&mut closing, Duration::ZERO, Ended::MaxWall);
             }
         };
-        // Abort everything still running (commands are killed, requests closed).
-        // No periodic status lands after this (the final clock below must be the last).
+        // Whatever is still running is stopped (commands are killed, requests closed). No periodic
+        // clock lands after this (the final one below must be the last).
         status_writer.finish();
-        shared.freeze_clock();
-        shared.quiescing.store(true, Ordering::SeqCst);
-        suspend_queued_models(&shared);
+        shared.begin_closing();
         for (_, live) in shared.cancels.lock().unwrap().drain() {
-            live.token.cancel_by_host("runtime shutdown");
+            live.token.cancel_by_host("the run is closing");
         }
         // The commands just cancelled are being stopped on the machine threads (SIGTERM, then
         // SIGKILL after five seconds). The run does not return, and the process does not exit,
@@ -1105,22 +1088,43 @@ impl Runtime {
             return Err(error);
         }
         if let Some(dir) = &self.cfg.dir {
-            atomic_value(
-                &dir.join("clock.json"),
-                &json!({"clock_ms": shared.clock_ms(), "wall_ms": now_ms(), "paused": true}),
-            )?;
-            atomic_value(
-                &dir.join("checkpoint.json"),
-                &json!({"at": now_ms(), "agents": agents.len(), "complete": complete}),
-            )?;
+            atomic_value(&dir.join("clock.json"), &json!({"clock_ms": shared.clock_ms()}))?;
+        }
+        if let Some(control) = &control {
+            let mut status = status_value(&shared, "closed", &windows);
+            status["ended"] = json!(ended);
+            *control.status.lock().unwrap() = status;
         }
         agents.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(Report {
             agents,
             wall_s: started.elapsed().as_secs_f64(),
-            complete,
+            complete: ended == Ended::Stopped,
+            ended,
+            token_mismatches: shared.diagnostics.token_mismatches(),
+            capture_errors: shared.diagnostics.capture_errors(),
         })
     }
+}
+
+/// The run's status for `Control::status`: its state, its clock, each agent, the model bindings'
+/// windows and the model queue.
+fn status_value(shared: &Shared, state: &str, windows: &serde_json::Map<String, J>) -> J {
+    // Copied out under the lock (every worker takes it after every input); the JSON is built after
+    // it is released. A model call retrying a failure is shown as such; the agent is still healthy
+    // (an outage is retried for as long as it lasts).
+    let statuses: Vec<(String, Status)> = shared
+        .status
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(id, s)| (id.clone(), *s))
+        .collect();
+    let agents: Vec<J> = statuses.iter().map(|(id,s)| json!({"id":id,"state":if s.failed {"failed"} else if s.stopped {"stopped"} else if s.last_activity_ms == 0 {"starting"} else if s.retrying.is_some() {"retrying"} else {s.phase}, "healthy":!s.failed && !s.stopped && s.last_activity_ms > 0,
+        "retrying":s.retrying.map(|(failures, error)| json!({"failures":failures,"error":error})),"turns":s.turns,"generated_tokens":s.generated_tokens,"handler_errors":s.handler_errors,"last_activity_ms":s.last_activity_ms,"outstanding":s.outstanding})).collect();
+    let (model_active, model_queued) = shared.model_gate.counts();
+    json!({"state": state, "clock_ms": shared.clock_ms(), "wall_ms": now_ms(), "agents": agents, "models": windows,
+        "model_active": model_active, "model_queued": model_queued, "capture_errors": shared.diagnostics.capture_errors()})
 }
 
 pub(super) fn atomic_value(path: &std::path::Path, value: &J) -> Result<(), String> {
@@ -1202,7 +1206,8 @@ struct Slot {
 #[allow(clippy::large_enum_variant)]
 enum Held {
     Command(Command),
-    Receipt(String),
+    /// An embedder's post, answered once its event is committed.
+    Answer(delivery::Ack),
 }
 
 /// A worker's loaded apps, by (file, entry, model binding): a view is bound to its model's tokenizer.
@@ -1407,7 +1412,7 @@ fn restore_instance(
     let journal = super::jsonl::JsonLines::<Input>::open_at(&path, "journal", offset)?
         .into_iter()
         .flatten();
-    if let Some((mut agent, offset, from, mut seen)) = cached {
+    if let Some((mut agent, _, from, mut seen)) = cached {
         let mut boundary = None;
         let replay = (|| -> Result<(), String> {
             // An image taken at a step boundary: the rest of its input's effects pass first.
@@ -1441,7 +1446,6 @@ fn restore_instance(
                 saved: Some(from),
                 bytes,
                 boundary,
-                offset,
                 refs: seen,
             },
         ))
@@ -1481,7 +1485,6 @@ fn restore_instance(
                 saved: None,
                 bytes,
                 boundary,
-                offset: 0,
                 refs,
             },
         ))
@@ -1490,14 +1493,6 @@ fn restore_instance(
 
 fn save_checkpoint(shared: &Shared, slot: &mut Slot, view: &View, force: bool) {
     if slot.error.is_some() {
-        return;
-    }
-    // An operator message's receipt is written once its input is committed, and a resume looks
-    // for unwritten receipts only in the journal after the image. So no image is written while a
-    // receipt is still held: one that covered the message's input would hide it from that search,
-    // and a crash just then would deliver the message a second time. (A forced image, at
-    // shutdown, is written after everything held has been released.)
-    if !force && slot.held.iter().any(|(_, held)| matches!(held, Held::Receipt(_))) {
         return;
     }
     if let Some(cache) = &mut slot.checkpoint {
@@ -1722,16 +1717,8 @@ fn start_instance(
         // policy. Either one read from today's deployment could send the replay down a branch
         // the journal did not take.
         if resumed && let Some(old) = &before {
-            let was: super::model::RetryPolicy = match old.get("retry") {
-                Some(policy) => serde_json::from_value(policy.clone()).map_err(|e| format!("agent.json retry: {e}"))?,
-                // A run started before there was one policy: its limit, and the four further
-                // tries a refused page call was given then.
-                None => super::model::RetryPolicy {
-                    for_ms: old.get("retry_for_ms").and_then(J::as_u64),
-                    refused: 4,
-                    ..Default::default()
-                },
-            };
+            let was: super::model::RetryPolicy =
+                serde_json::from_value(old["retry"].clone()).map_err(|e| format!("agent.json retry: {e}"))?;
             if was != cfg.retry {
                 eprintln!(
                     "{}: model calls keep the retry policy this run was started with; a fresh run takes the new one",
@@ -1816,7 +1803,6 @@ fn start_instance(
             }
         }
     };
-    let receipts_from = restored_from.as_ref().map_or(0, |seed| seed.offset);
     let checkpoint = shared
         .cfg
         .dir
@@ -1883,20 +1869,6 @@ fn start_instance(
         slot,
         json!({"t": "clock", "at_ms": shared.clock_ms(), "wall_ms": now_ms()}),
     );
-    // Control operations already journaled get their receipts (again). Those before a recovery
-    // image got theirs when they were journaled, before the image's input: only the suffix is read.
-    if let Some(d) = &dir {
-        let from = receipts_from;
-        if let Some(reader) =
-            super::jsonl::JsonLines::<Input>::open_at(&d.join(&id).join("journal.jsonl"), "journal", from)?
-        {
-            for row in reader.map_while(Result::ok) {
-                if let Some(op) = receipt_op(&row.value) {
-                    write_receipt(shared, &id, &op)?;
-                }
-            }
-        }
-    }
     for c in commands {
         dispatch(shared, w, slot, c, timers, local);
     }
@@ -1956,14 +1928,19 @@ fn worker(
     impl Drop for Booting<'_> {
         fn drop(&mut self) {
             let shared = self.0;
-            if shared.booting.fetch_sub(1, Ordering::SeqCst) != 1 || std::thread::panicking() {
+            if shared.booting.fetch_sub(1, Ordering::SeqCst) != 1 {
+                return;
+            }
+            // Every agent is running: time passes from now (a restore takes none from timers).
+            shared.clock.start();
+            if std::thread::panicking() {
                 return;
             }
             eprintln!(
                 "affordance: started {} agents on {} workers in {} ms{}",
                 shared.route.read().unwrap().len(),
                 shared.workers.len(),
-                shared.clock_started.elapsed().as_millis(),
+                shared.started.elapsed().as_millis(),
                 if std::env::var("AFFORDANCE_RESTORE_TIMING").is_ok() {
                     format!(" [{}]", restore_timing())
                 } else {
@@ -2171,17 +2148,6 @@ fn feed(
         }
         kind => kind,
     };
-    if let InputKind::Event { op: Some(op), .. } = &kind
-        && let Some(dir) = &shared.cfg.dir
-        && valid_op(op)
-        && dir
-            .join("control/receipts")
-            .join(id)
-            .join(format!("{op}.json"))
-            .exists()
-    {
-        return;
-    }
     match kind {
         InputKind::Mount {
             app,
@@ -2302,12 +2268,12 @@ fn feed(
     // A message the sender waits on: acknowledged once journaled here, refused if this instance
     // is gone or failed.
     let (ack, kind) = match kind {
-        InputKind::Event { name, payload, op, ack } => (
+        InputKind::Event { name, payload, id, ack } => (
             ack,
             InputKind::Event {
                 name,
                 payload,
-                op,
+                id,
                 ack: None,
             },
         ),
@@ -2356,8 +2322,7 @@ fn feed(
         } => Input::ModelError {
             task,
             error,
-            transient: kind.may_pass(),
-            kind: Some(kind),
+            kind,
             retry_after_ms,
             clock_ms,
         },
@@ -2366,10 +2331,10 @@ fn feed(
             outcome,
             clock_ms,
         },
-        InputKind::Event { name, payload, op, .. } => Input::Event {
+        InputKind::Event { name, payload, id, .. } => Input::Event {
             name,
             payload,
-            op,
+            id,
             clock_ms,
         },
         InputKind::Props { props } => Input::Props { props, clock_ms },
@@ -2385,7 +2350,24 @@ fn feed(
         }
     };
     let journaled = apply(shared, w, &view, &enc, slot, input, timers, local);
-    if let Some(ack) = ack {
+    settle(shared, w, slot, ack, journaled, timers, local);
+}
+
+/// Answer a delivery's sender once its event is journaled here: a `send` at once (its answer is
+/// itself an input, committed after this one), an embedder's post once the line is committed.
+fn settle(
+    shared: &Arc<Shared>,
+    w: usize,
+    slot: &mut Slot,
+    ack: Option<delivery::Ack>,
+    journaled: bool,
+    timers: &mut Timers,
+    local: &mut VecDeque<Msg>,
+) {
+    let Some(ack) = ack else { return };
+    if journaled && ack.waits_for_commit() && slot.journal.is_some() {
+        hold(shared, w, slot, Held::Answer(ack), timers, local);
+    } else {
         ack.finish(journaled);
     }
 }
@@ -2408,7 +2390,6 @@ fn apply(
         flush(shared, slot, timers);
         return false;
     }
-    let op = receipt_op(&input);
     // Journal first. The line is durable at its epoch's commit, before any effect it causes
     // leaves the process (`hold`).
     if let Some(journal) = slot.journal.as_mut() {
@@ -2443,14 +2424,10 @@ fn apply(
     if let Some(cache) = &mut slot.checkpoint {
         cache.handled(&slot.agent);
     }
-    if let Some(op) = op.filter(|_| shared.cfg.dir.is_some()) {
-        hold(shared, w, slot, Held::Receipt(op), timers, local);
-    }
     save_checkpoint(shared, slot, view, !was_stopped && slot.agent.stopped().is_some());
     true
 }
 
-/// The control operation an input carries, which gets a receipt once it is committed.
 /// One live call of an instance: what cancels it (a pause, the run ending, the agent no longer
 /// needing it), and for a model call the flag its app's abort signal sets.
 struct Live {
@@ -2508,27 +2485,6 @@ impl Timers {
     }
 }
 
-/// An operator message's id, which names its receipt file: the one rule, for the coordinator
-/// that delivers it, the worker that journals it and the receipt written for it.
-fn valid_op(op: &str) -> bool {
-    (1..=128).contains(&op.len()) && op.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
-}
-
-fn receipt_op(input: &Input) -> Option<String> {
-    match input {
-        Input::Event { op: Some(op), .. } if valid_op(op) => Some(op.clone()),
-        _ => None,
-    }
-}
-
-fn write_receipt(shared: &Shared, id: &str, op: &str) -> Result<(), String> {
-    let Some(dir) = &shared.cfg.dir else { return Ok(()) };
-    atomic_value(
-        &dir.join("control/receipts").join(id).join(format!("{op}.json")),
-        &json!({"journaled":true,"agent":id,"operation_id":op}),
-    )
-}
-
 /// Run `item` once the input that caused it is committed: now if it is, otherwise after the
 /// effects held before it.
 fn hold(shared: &Arc<Shared>, w: usize, slot: &mut Slot, item: Held, timers: &mut Timers, local: &mut VecDeque<Msg>) {
@@ -2578,12 +2534,7 @@ fn run_held(
 ) {
     match item {
         Held::Command(cmd) => dispatch_now(shared, w, slot, cmd, timers, local),
-        Held::Receipt(op) => {
-            if let Err(error) = write_receipt(shared, &slot.spec.id, &op) {
-                slot.error = Some(error);
-                flush(shared, slot, timers);
-            }
-        }
+        Held::Answer(ack) => ack.finish(true),
     }
 }
 
@@ -2751,7 +2702,7 @@ fn dispatch_now(
                             name: format!("mount:{key}:{name}"),
                             payload: json!({"$args": args}),
                             ack: None,
-                            op: None,
+                            id: None,
                         },
                     ),
                 );
@@ -2785,7 +2736,7 @@ fn dispatch_now(
             images,
             media,
         } => {
-            if shared.quiescing.load(Ordering::SeqCst) {
+            if shared.closing.load(Ordering::SeqCst) {
                 return;
             }
             let Some((_, model)) = slot
@@ -2813,6 +2764,12 @@ fn dispatch_now(
             };
             // The call is live from here: one record, with its token and its abort flag.
             let (cancel, abort) = shared.model_token(&id, incarnation, task);
+            // Listed, then checked: the run's close either sees this call or this call sees the
+            // close (and stays outstanding for a restore), never neither.
+            if shared.closing.load(Ordering::SeqCst) {
+                shared.done(&id, incarnation, task);
+                return;
+            }
             let ranks = model.ranks();
             let rank = slot
                 .spec
@@ -2823,6 +2780,7 @@ fn dispatch_now(
                 tag: opts.tag,
                 images,
                 media,
+                diagnostics: shared.diagnostics.clone(),
                 ..GenRequest::new(&id, ids, max_new, stop, rank, cancel)
             };
             // A pipe: the machine its pieces are written to, which the agent must be bound to (the
@@ -2968,7 +2926,7 @@ fn dispatch_now(
         }
         Command::Call { task, name, args } => {
             // Held requests remain outstanding and are reissued by journal recovery.
-            if shared.quiescing.load(Ordering::SeqCst) {
+            if shared.closing.load(Ordering::SeqCst) {
                 return;
             }
             let reply = |local: &mut VecDeque<Msg>, outcome: Outcome| {
@@ -3101,6 +3059,11 @@ fn dispatch_now(
                                 }))
                             }),
                         };
+                        // Listed (above), then checked, as a model call is.
+                        if shared.closing.load(Ordering::SeqCst) {
+                            shared.done(&id, incarnation, task);
+                            return;
+                        }
                         let limit = shared.cfg.call_timeout;
                         shared.inflight.fetch_add(1, Ordering::SeqCst);
                         let job_shared = shared.clone();

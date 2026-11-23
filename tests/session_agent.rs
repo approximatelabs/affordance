@@ -453,7 +453,7 @@ fn long_session_agent_is_one_view_file_on_the_generic_runtime() {
                 sc.pending_q = 3;
                 Input::Event {
                     name: "message".into(),
-                    op: None,
+                    id: None,
                     payload: json!({"from": "agent-0042", "text": "Quick question: which port does your kv service listen on, and what was the error code of the checksum failure you hit early on?"}),
                     clock_ms: clock,
                 }

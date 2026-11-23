@@ -97,7 +97,7 @@ if echo "$reply" | grep -qi '"content":"[^"]*ready'; then ok "serve answers an O
 
 # "affordance host answers a frontend's prompt."
 cp -r views/demo/host "$WORK/host"
-out=$( (echo '{"type":"prompt","text":"Reply with the single word: ready"}'; sleep 20; echo '{"type":"shutdown"}') \
+out=$( (echo '{"type":"event","name":"user","payload":{"text":"Reply with the single word: ready"}}'; sleep 20; echo '{"type":"close"}') \
   | (cd "$WORK/host" && timeout 60 "$A" host --set model.url=$V/v1 2>/dev/null) )
 if echo "$out" | grep -qi '"reply":{"text":"[^"]*ready'; then ok "host answers a frontend's prompt"; else bad "host answers a frontend's prompt"; echo "$out" | tail -3 | cut -c1-300; fi
 
