@@ -2772,7 +2772,7 @@ fn dispatch_now(
             if shared.closing.load(Ordering::SeqCst) {
                 return;
             }
-            let Some((_, model)) = slot
+            let Some((binding_enc, model)) = slot
                 .agent
                 .cfg
                 .model
@@ -2850,7 +2850,7 @@ fn dispatch_now(
                     blobs: None,
                     output: None,
                 };
-                Some(Pipe::new(exec, ctx, options))
+                Some(Pipe::new(exec, ctx, options, Some(binding_enc.clone())))
             } else {
                 None
             };
@@ -2944,16 +2944,30 @@ fn dispatch_now(
                         },
                     };
                     job_shared.done(&req.agent, incarnation, task);
-                    job_shared.answer(
-                        w,
-                        Msg::Input(
-                            req.agent,
-                            InputKind::Completion {
-                                incarnation,
-                                input: Box::new(kind),
-                            },
-                        ),
-                    );
+                    let post = move || {
+                        job_shared.answer(
+                            w,
+                            Msg::Input(
+                                req.agent,
+                                InputKind::Completion {
+                                    incarnation,
+                                    input: Box::new(kind),
+                                },
+                            ),
+                        )
+                    };
+                    // The reply reaches the app after every piece piped before it reached its sink
+                    // (what the app writes next comes after them), on the pipe's own time: this
+                    // model thread is free for the next call.
+                    match pipe {
+                        Some(pipe) => {
+                            std::thread::spawn(move || {
+                                pipe.finish();
+                                post();
+                            });
+                        }
+                        None => post(),
+                    }
                 }),
             );
         }

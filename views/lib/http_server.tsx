@@ -20,8 +20,9 @@
 // inside of a JSON string). Kinds: `text`, `reasoning`, and `tool_call` (which also takes
 // PIECE_INDEX, PIECE_ID and PIECE_NAME; its PIECE is more of the call's arguments). A kind with no
 // frame is not written. The platform writes the chunks; the app's code does not run for a piece,
-// and `reply` is the same whole reply as without a pipe. Pieces come from a hosted binding's
-// stream; a native binding's reply is not piped yet.
+// and `reply` is the same whole reply as without a pipe. A hosted binding's pieces are its
+// stream's; a native binding's are its new ids as text. A sink that stops reading is let go: the
+// reply goes on without it.
 
 /** Where a piece goes in a frame (see above). */
 export const PIECE = "";

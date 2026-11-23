@@ -39,6 +39,11 @@ export default function Main(){
     try{await harness.machine.get('http').call({path:'/slow'},{signal:c.signal});setOut('answered');}
     catch(e){setOut([e.name,c.signal.aborted]);}
   });
+  useEvent('piped',async()=>{
+    const o=await model(<Ask/>,{pipe:{machine:'sink',call:{},text:'[\uE000]'}});
+    await harness.machine.get('sink').call({after:true});
+    setOut({text:o.text});
+  });
   useEvent('stop',()=>{turn().abort();});
   useEvent('early',async()=>{
     const c=new AbortController();
@@ -379,5 +384,102 @@ fn escape_stops_a_streaming_reply_and_the_journal_keeps_it() {
     assert!((5..50).contains(&words), "stopped soon after the Escape: {text:?}");
     let journal = std::fs::read_to_string(dir.join("run/a/journal.jsonl")).unwrap();
     assert!(journal.contains(r#""aborted":true"#), "{journal}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A native model that streams its reply's ids in five quick pieces.
+struct QuickIds {
+    pieces: Vec<Vec<u32>>,
+    took: std::sync::Mutex<Option<std::time::Duration>>,
+}
+impl affordance::runtime::Model for QuickIds {
+    fn generate(
+        &self,
+        _: &affordance::runtime::GenRequest,
+    ) -> Result<affordance::runtime::GenReply, affordance::runtime::model::ModelError> {
+        panic!("a piped call streams")
+    }
+    fn generate_stream(
+        &self,
+        _: &affordance::runtime::GenRequest,
+        on_tokens: &mut dyn FnMut(affordance::runtime::Delta<'_>) -> bool,
+    ) -> Result<affordance::runtime::GenReply, affordance::runtime::model::ModelError> {
+        let started = std::time::Instant::now();
+        let mut ids = vec![];
+        for piece in &self.pieces {
+            ids.extend_from_slice(piece);
+            on_tokens(affordance::runtime::Delta::Ids(piece));
+        }
+        *self.took.lock().unwrap() = Some(started.elapsed());
+        Ok(affordance::runtime::GenReply {
+            ids,
+            ..Default::default()
+        })
+    }
+}
+
+/// "A native model's reply is piped as text, a slow sink never holds the model call, and what the
+/// app writes after the reply comes after it." The sink takes 150 ms a piece; the model streams
+/// five pieces at once and is done long before the sink; the app's own write after `model()`
+/// resolves reaches the sink after every piece.
+#[test]
+fn a_native_reply_is_piped_without_waiting_on_a_slow_sink() {
+    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use std::sync::{Arc, Mutex};
+    let dir = std::env::temp_dir().join(format!("aff-pipe-native-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let app = dir.join("app.tsx");
+    std::fs::write(&app, APP.replace("@ROOT@", env!("CARGO_MANIFEST_DIR"))).unwrap();
+    let enc = Arc::new(tokenizer::encoder());
+    let mut pieces: Vec<Vec<u32>> = ["</think>", "one ", "two ", "three ", "four"]
+        .iter()
+        .map(|t| enc.tok.encode(*t, false).unwrap().get_ids().to_vec())
+        .collect();
+    pieces.push(enc.tok.encode("<|user|>", false).unwrap().get_ids().to_vec());
+    let model = Arc::new(QuickIds {
+        pieces,
+        took: Mutex::new(None),
+    });
+    let written: Arc<Mutex<Vec<J>>> = Arc::default();
+    let log = written.clone();
+    let mut cfg = RuntimeConfig::new(app.clone());
+    cfg.dir = Some(dir.join("run"));
+    cfg.library = Some(std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/views")));
+    cfg.max_wall = Some(std::time::Duration::from_secs(30));
+    let mut rt = Runtime::new(cfg, enc, model.clone());
+    rt.bind_machine(
+        "sink",
+        Arc::new(move |_: &affordance::runtime::CallContext, args: &J| {
+            if args.get("chunk").is_some() {
+                std::thread::sleep(std::time::Duration::from_millis(150));
+            }
+            log.lock().unwrap().push(args.clone());
+            Ok(json!({}))
+        }),
+    );
+    drop(rt.control().post("a", "piped", json!({}), None));
+    let mut spec = AgentSpec::new("a", json!({}));
+    spec.machines = Some(vec!["sink".into()]);
+    rt.add_agent(spec).unwrap();
+    let report = rt.run().unwrap();
+    assert_eq!(report.agents[0].error, None);
+    let took = model.took.lock().unwrap().unwrap();
+    assert!(
+        took < std::time::Duration::from_millis(300),
+        "the model call waited on the sink: {took:?}"
+    );
+    let written = written.lock().unwrap();
+    let chunks: Vec<&str> = written.iter().filter_map(|a| a["chunk"].as_str()).collect();
+    let text: String = chunks
+        .iter()
+        .map(|c| c.trim_start_matches('[').trim_end_matches(']'))
+        .collect();
+    assert!(text.contains("one two three four"), "{chunks:?}");
+    assert_eq!(
+        written.last().unwrap()["after"],
+        true,
+        "the app's own write came after every piece: {written:?}"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

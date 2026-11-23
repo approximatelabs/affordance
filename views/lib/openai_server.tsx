@@ -48,11 +48,9 @@ export function useOpenAIServer({ name = "affordance", reply }) {
       const chunk = (delta, finish) => `data: ${JSON.stringify({id, object: "chat.completion.chunk", created, model,
         choices: [{index: 0, delta, finish_reason: finish}]})}\n\n`;
       await out.write(chunk({role: "assistant", content: ""}, null));
-      // The frames of a piped reply: one chunk a piece, in the same shape. Only a hosted binding
-      // (the `messages` template) streams text; a token-id binding's reply is sent whole below, so
-      // it gets no pipe and the app's `piped` is false.
-      const hosted = harness.model != null && harness.model.template === "messages";
-      const pipe = hosted ? out.pipe({text: chunk({content: PIECE}, null), reasoning: chunk({reasoning_content: PIECE}, null)}) : undefined;
+      // The frames of a piped reply: one chunk a piece, in the same shape. A reply the app does
+      // not pipe (its `piped` is false) is sent whole below.
+      const pipe = out.pipe({text: chunk({content: PIECE}, null), reasoning: chunk({reasoning_content: PIECE}, null)});
       try {
         const answer = await reply({...ask, pipe});
         if (!(answer && answer.piped)) await out.write(chunk({content: typeof answer === "string" ? answer : answer.text}, null));

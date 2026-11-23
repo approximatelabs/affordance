@@ -401,9 +401,11 @@ timeout_s}` in the deployment), and keeps running.
   piece substituted (escaped as the inside of a JSON string) for the placeholder; a kind with
   no frame is not written. The platform writes the chunks: no app code runs for a piece, nothing
   of a piece is journaled, and the call resolves with the same whole reply as without a pipe. On
-  a replay nothing is written. A sink that fails (the client went away) closes the pipe; the
-  model call goes on unless its `signal` stops it. Pieces come from a hosted binding's stream;
-  a native binding's reply is not piped yet.
+  a replay nothing is written. A sink that fails (the client went away), or falls more than 1024
+  pieces behind, closes the pipe; the model call goes on unless its `signal` stops it, and no
+  model call ever waits on a sink. The call resolves after every piece written has reached the
+  sink, so what the app writes next comes after them. A hosted binding's pieces are its stream's;
+  a native binding's are its new token ids, decoded with its tokenizer.
 
 `views/lib/http_server.tsx` gives an app `useRequests(async (req, res) => ...)` with `res.json`,
 `res.text` and `res.stream` (whose `out.pipe(frames)` makes the `pipe` option, with `PIECE` as the
