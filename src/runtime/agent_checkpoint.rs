@@ -845,7 +845,7 @@ export default function Main(){const log=useLog();useConversation(log);
         let first = *a.kept.keys().next().unwrap();
         for restored in [&mut cached, &mut replayed] {
             assert_eq!(restored.state(), a.state());
-            let (answer, commands) = restored.dispatch(&view, &enc, (999, 0), Some(first)).unwrap();
+            let (answer, commands) = restored.dispatch(&view, &enc, (999, 0), Some(first), None).unwrap();
             assert_eq!(answer, Some(Outcome::Ok(seen[0].clone())));
             assert!(commands.is_empty());
         }

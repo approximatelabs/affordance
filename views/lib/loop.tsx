@@ -8,7 +8,8 @@ import { unanswered } from "./log.tsx";
 // layout's, not the loop's: the window (the binding's `context`) and the sheet's history cap
 // keep every prompt in it, and an app that summarizes reacts to the layout event
 // (useEvent("layout")). A step that fails for good stops the instance with that error
-// (`loop_error`), not leaving it idle.
+// (`loop_error`), not leaving it idle. A reply's calls run one after another (`dispatch`:
+// `{order: "parallel"}` runs them at once, `{stop_on_error: true}` skips the rest after one fails).
 //
 // A reply with no tool call ends the loop: asking again would send the same page and get the same
 // reply until the turn limit. The instance stops with the reply as its answer (`{answer: text}`,
@@ -24,7 +25,7 @@ export function useLoop(log, options) {
       try {
         if (before) await before();
         const out = await log.call();
-        await log.dispatch(out);
+        await log.dispatch(out, options && options.dispatch);
         if (out.calls.length === 0 && !(idle && await idle(out))) {
           harness.stop(out.cut_off ? {reason: "cut_off", text: out.text} : {answer: out.text});
           return;

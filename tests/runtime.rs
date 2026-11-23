@@ -3037,3 +3037,94 @@ fn secrets_with_newlines_and_quotes_are_redacted() {
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// "A reply's calls run one after another by default, and an app can ask for them all at once."
+/// One reply asks for two steps; each step's machine call takes 200 ms. In order (the library's
+/// default) the second starts after the first has answered; with `{order: "parallel"}` both start
+/// before either answers. Every call runs once either way.
+#[test]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
+fn a_replys_calls_run_in_order_by_default_and_at_once_when_asked() {
+    use std::time::{Duration, Instant};
+    let dir = std::env::temp_dir().join(format!("aff-dispatch-order-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let app = dir.join("app.tsx");
+    std::fs::write(
+        &app,
+        r#"import { useLog } from "@ROOT@/views/lib/log.tsx";
+import { useLoop } from "@ROOT@/views/lib/loop.tsx";
+import { TurnStrategy } from "@ROOT@/views/strategies/turn_strategy.tsx";
+import { GLM53App } from "@ROOT@/views/template_apps/glm53.tsx";
+export default function Main({ order }) {
+  const log = useLog();
+  useLoop(log, {dispatch: order ? {order} : undefined});
+  const step = <aff label="step" tool_name="step" description="Take a step."
+      args_schema={{type: "object", properties: {n: {type: "integer"}}, required: ["n"]}}
+      onStep={async ({ n }) => { await harness.machine.call({n}); return "step " + String(n); }}>{"[step]"}</aff>;
+  return <GLM53App keep_replies={true}>
+    <TurnStrategy strategy="unrolled" log={[{kind: "input", content: "Take two steps."}, ...log.records]}>{step}</TurnStrategy>
+  </GLM53App>;
+}"#
+        .replace("@ROOT@", env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let enc = encoder();
+    let run = |order: Option<&str>| -> Vec<(i64, Instant, Instant)> {
+        let mut cfg = RuntimeConfig::new(&app);
+        cfg.max_wall = Some(Duration::from_secs(30));
+        cfg.library = Some(root().join("views"));
+        let model = scripted(enc.clone(), 0, |_, n| {
+            match n {
+            1 => "Two steps.</think><tool_call>step<arg_key>n</arg_key><arg_value>1</arg_value></tool_call><tool_call>step<arg_key>n</arg_key><arg_value>2</arg_value></tool_call>".into(),
+            _ => "Done.</think>Both steps are taken.".into(),
+        }
+        });
+        let mut rt = Runtime::new(cfg, enc.clone(), model);
+        let seen: Arc<Mutex<Vec<(i64, Instant, Instant)>>> = Arc::default();
+        let log = seen.clone();
+        rt.bind_machine(
+            "home",
+            Arc::new(move |_: &affordance::runtime::CallContext, args: &J| {
+                let started = Instant::now();
+                std::thread::sleep(Duration::from_millis(200));
+                log.lock()
+                    .unwrap()
+                    .push((args["n"].as_i64().unwrap(), started, Instant::now()));
+                Ok(json!({}))
+            }),
+        );
+        let props = match order {
+            Some(o) => json!({"order": o}),
+            None => json!({}),
+        };
+        rt.add_agent(AgentSpec::new("a", props)).unwrap();
+        let report = rt.run().unwrap();
+        assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
+        if std::env::var_os("DBG").is_some() {
+            eprintln!("stopped {:?}", report.agents[0].stopped);
+            for r in affordance::scenario::log_records(&report.agents[0].state) {
+                let mut r = r.clone();
+                r.as_object_mut().unwrap().remove("ids");
+                eprintln!("R {r}");
+            }
+        }
+        let mut seen = seen.lock().unwrap().clone();
+        seen.sort_by_key(|(_, started, _)| *started);
+        seen
+    };
+    let in_order = run(None);
+    assert_eq!(
+        in_order.iter().map(|(n, ..)| *n).collect::<Vec<_>>(),
+        [1, 2],
+        "each call once, in order"
+    );
+    assert!(
+        in_order[1].1 >= in_order[0].2,
+        "the second call started after the first answered"
+    );
+    let at_once = run(Some("parallel"));
+    assert_eq!(at_once.len(), 2, "each call once");
+    assert!(at_once[1].1 < at_once[0].2, "both calls started before either answered");
+    std::fs::remove_dir_all(&dir).unwrap();
+}

@@ -384,27 +384,29 @@ struct ModelCall {
     usage: J,
 }
 
-/// The view a page call laid out, kept for `dispatch(output)`: its handlers, the state and
-/// context they run with, where it was issued (`view`, dropped once dispatched), the reply's calls
-/// `(name, args, id, problem)`, and the dispatch's results once it has run (a second dispatch
-/// returns them).
+/// A page call's output kept for dispatch: the view its calls' handlers run from and the context
+/// they run with, where it was issued (`view`, dropped once every call has been started), the
+/// reply's calls `(name, args, id, problem)`, which have been started, and each call's result once
+/// it has answered (a later dispatch of the same call returns it).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Kept {
     #[serde(skip)]
     view: Option<(Rc<crate::Prepared>, Rc<Map>, Value, i64, u64)>,
     calls: Option<Vec<(String, J, String, Option<String>)>>,
-    dispatch: Option<u64>,
-    results: Option<J>,
+    #[serde(default)]
+    started: BTreeSet<usize>,
+    #[serde(default)]
+    results: Vec<Option<J>>,
 }
 
-/// A running `dispatch(output)`: the slots awaiting it, its tools still running, the results so
-/// far (in call order), and whether its calls are still being started.
+/// A running `dispatch(output, {calls})`: the output it is of, the slots awaiting it, the calls it
+/// answers for (in the order asked), and whether its calls are still being started. It resolves
+/// once each of its calls has a result, whichever dispatch started it.
 #[derive(Debug, Clone)]
 struct Dispatch {
     call: u64,
     waiters: Vec<(u64, usize)>,
-    pending: BTreeSet<u64>,
-    results: Vec<Option<J>>,
+    indices: Vec<usize>,
     starting: bool,
 }
 
@@ -2149,7 +2151,10 @@ impl Agent {
                         }
                         // `dispatch(output)`: run its calls (the result arrives when they have answered).
                         "dispatch" => {
-                            let (outcome, commands) = self.dispatch(view, enc, (id, i), args["call"].as_u64())?;
+                            let only = args["calls"]
+                                .as_array()
+                                .map(|a| a.iter().map(|v| v.as_u64()).collect::<Vec<_>>());
+                            let (outcome, commands) = self.dispatch(view, enc, (id, i), args["call"].as_u64(), only)?;
                             out.extend(commands);
                             if let Some(outcome) = outcome {
                                 self.resolve(id, i, outcome);
@@ -2321,7 +2326,7 @@ impl Agent {
 
     /// A tool's answer: its return value (or error), as its result in its dispatch:
     /// `{name, id, result, error?, ...meta}`.
-    fn respond(&mut self, id: u64, origin: &Origin, result: &Result<J, String>) {
+    fn respond(&mut self, _handler: u64, origin: &Origin, result: &Result<J, String>) {
         if let Origin::Tool {
             name,
             call_id,
@@ -2350,21 +2355,24 @@ impl Agent {
             // bounded identifiers and scalar metadata: never arguments, results or errors.
             // `at_ms` is its start; `turn` is the page call whose reply asked for it.
             let mut entry = None;
-            if let Some(d) = self.dispatches.get_mut(dispatch) {
-                if d.results[*index].is_none() {
+            let n = self.dispatches.get(dispatch).map(|d| d.call);
+            if let Some(slot) = n
+                .and_then(|n| self.kept.get_mut(&n))
+                .and_then(|k| k.results.get_mut(*index))
+            {
+                if slot.is_none() {
                     let timed_out = record["timed_out"] == true;
                     let error = result.is_err()
                         || record["error"] == true
                         || timed_out
                         || record["exit"].as_i64().is_some_and(|exit| exit != 0);
                     entry = Some(
-                        json!({"t": "tool", "tool": trace_tool_name(name), "at_ms": *started_ms, "turn": d.call,
+                        json!({"t": "tool", "tool": trace_tool_name(name), "at_ms": *started_ms, "turn": n,
                         "dispatch": dispatch, "index": index, "ms": self.clock_ms.saturating_sub(*started_ms).max(0),
                         "status": if error { "error" } else { "ok" }, "timed_out": timed_out}),
                     );
                 }
-                d.results[*index] = Some(record);
-                d.pending.remove(&id);
+                *slot = Some(record);
             }
             if let Some(entry) = entry {
                 self.note(entry);

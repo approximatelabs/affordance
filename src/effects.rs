@@ -394,12 +394,27 @@ impl Interp<'_> {
                     signal,
                 }
             }
-            // `dispatch(output)`: run a model output's calls on the view it answered.
+            // `dispatch(output, {calls?})`: run a model output's calls (all, or those at the
+            // indices in `calls`, in that order) on the view it answered.
             "dispatch" => {
                 let call = crate::interp::get_attr(&a0, "__call")
                     .map(|v| v.to_wire())
                     .map_err(|_| "dispatch(output): pass the output of model()".to_string())?;
-                host("dispatch", serde_json::json!({"call": call}))
+                let mut request = serde_json::json!({"call": call});
+                match args.get(1).map(Value::to_wire) {
+                    None | Some(serde_json::Value::Null) => {}
+                    Some(serde_json::Value::Object(o)) => match o.get("calls") {
+                        None | Some(serde_json::Value::Null) => {}
+                        Some(serde_json::Value::Array(calls)) if calls.iter().all(serde_json::Value::is_u64) => {
+                            request["calls"] = serde_json::Value::Array(calls.clone())
+                        }
+                        Some(_) => {
+                            return Err("dispatch(output, {calls}): calls is a list of call indices (0, 1, ...)".into());
+                        }
+                    },
+                    Some(_) => return Err("dispatch(output, options): options is an object".into()),
+                }
+                host("dispatch", request)
             }
             // `model(<View/>, opts)`: an ad-hoc prompt, laid out once at the call.
             "model" => {

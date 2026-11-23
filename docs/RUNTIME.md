@@ -163,7 +163,7 @@ tool call is never run.
 | `harness.machine.call(args)` | executor-specific JSON | The agent's first machine (below). Shell executors take `{cmd, timeout_s?, env?, stdin?}` and return `{output, exit, seconds, timed_out, truncated}`. `harness.machine.get(role).call(args)` picks a named executor. |
 | `model(opts?)` | an output: `{text, reasoning, calls, problems, cut_off, ids, screen, usage}` | the agent's model: the page's own view, laid out once, at the call. |
 | `model(<App .../>, opts?)` | an output (no `screen`; not dispatchable) | the agent's model, through the harness: the component is laid out to exact ids and run once; its `protocol` span reads the reply. |
-| `dispatch(output)` | `[{name, id, result, error?, ...meta}]` | agent: runs a page output's calls on the view the model saw, concurrently; results in call order. |
+| `dispatch(output, {calls?})` | `[{name, id, result, error?, ...meta}]` | agent: runs a page output's calls (or those at the indices in `calls`) on the view the model saw; each call runs once, and a later dispatch of it gives its result again. `log.dispatch(out, {order, stop_on_error})` runs them one after another by default. |
 | `harness.send(to, payload, {event?})` | `{to, delivered}` | runtime: event `message` (or `event`) to agent `to`, with `payload.from` set by the runtime. |
 | `harness.wait({ms?, events?})` | `{woke: "timeout"}` or `{woke: "event", event, payload}` | agent: parks the handler (no model calls) until `ms` passes or an event in `events` arrives. |
 | `harness.store.put/get/search/list(args)` | `{key}`; `{text, total}`; `{hits}`; `{keys}` | runtime: per-agent storage (persisted with `dir`). |

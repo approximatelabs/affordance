@@ -186,9 +186,13 @@ Native model responses must contain unsigned 32-bit integer token IDs; malformed
 protocol errors, rather than being silently dropped or truncated. Adapters do not retry these
 errors; the instance-level retry policy below still applies.
 
-`dispatch(output)` runs a page output's calls on the handlers of the view the model saw; each
-call's return value is its result, several run concurrently, and it resolves with
-`[{name, id, result, error?, ...meta}]` in call order. A call with a `problem` (an unknown tool, bad
+`dispatch(output, {calls?})` runs a page output's calls on the handlers of the view the model saw:
+all of them, or those at the indices in `calls`, and resolves with their
+`[{name, id, result, error?, ...meta}]` in the order asked. Each call's return value is its result,
+and the calls one dispatch starts run concurrently. A call runs once: dispatched again (alone or
+with others), it is waited for if running and its result given again once answered. So an app
+runs a reply's calls in order, all at once, or stopping at the first error, with plain promises
+(`views/lib/log.tsx` runs them in order by default). A call with a `problem` (an unknown tool, bad
 arguments) is answered with it and not run. Dispatching the same output again returns the same
 results; an output's view is kept until it is dispatched, or until 8 newer page calls have not been
 dispatched either; the output itself (for a repeated dispatch's results) is kept for 64 page calls.
@@ -215,7 +219,7 @@ IDs are overwritten. Held inputs receive IDs only when committed after the turn'
 |---|---|---|
 | `model(opts?)` | an output (see §3) | The page's own view to the instance's model. `{signal}` aborts it (§3). |
 | `model(<App .../>, opts?)` | an output | An ad-hoc prompt: lays out a component to exact ids and runs it once on the instance's model, through the same admission gate, rank pinning, captures and cancellation. The component's `protocol` span reads the reply. A prompt over `max_prompt` is not sent; the call fails with an error the task can catch. |
-| `dispatch(output)` | `[{name, id, result, error?, ...meta}]` | Runs a page output's calls (see §3). |
+| `dispatch(output, {calls?})` | `[{name, id, result, error?, ...meta}]` | Runs a page output's calls, or those at the indices given (see §3). |
 | `fetch(input, init?)` | `Promise<Response>` | Global Fetch over the bound `http` role. Supported options: `method`, `headers`, text `body`, `redirect`, `signal`. Headers, body readers and limitations: `docs/HTTP_AND_MCP.md`. |
 | `harness.machine.call(args, {signal}?)` | executor-specific JSON | The instance's first machine. An aborted `signal` cancels the call, which rejects with `AbortError`. Shell executors take `{cmd, timeout_s?, env?, stdin?}` and return `{output, exit, seconds, timed_out, truncated}`. Large strings cross as blob references (§7). |
 | `harness.machine.get(role).call(args)` | executor-specific JSON | A named one of several. `get` itself only names the machine; `call` issues the effect. |

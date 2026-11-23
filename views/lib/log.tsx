@@ -159,13 +159,38 @@ export function useLog(name) {
     }
   };
 
-  const run = async out => {
+  // Run the output's calls and write their results. `order`: "sequential" (the default, as most
+  // harnesses do: each call starts when the one before it has answered, so a call sees what the
+  // ones before it did) or "parallel" (all at once). `stop_on_error`: in order, the calls after
+  // one that failed are not run (answered `not run`). An app that wants another policy calls
+  // `dispatch(out, {calls: [i]})` itself: each call is its own promise.
+  const run = async (out, options) => {
+    const order = (options && options.order) || "sequential";
+    const stopOnError = !!(options && options.stop_on_error);
+    if (order !== "sequential" && order !== "parallel") throw new TypeError(`dispatch order must be "sequential" or "parallel", not ${JSON.stringify(order)}`);
     const turn = owner(out);
     requireTurn(turn, "ready");
     setBook(x => ({...x, phase: "dispatching"}));
     try {
-      const results = await dispatch(out);
-      finish(turn, results.map(actionRecord));
+      let records;
+      let results;
+      if (order === "parallel") {
+        results = await dispatch(out);
+        records = results.map(actionRecord);
+      } else {
+        results = [];
+        records = [];
+        for (let i = 0; i < out.calls.length; i++) {
+          if (stopOnError && results.some(r => r.error)) {
+            records.push(notRun({calls: [out.calls[i]]}, "an earlier call failed")[0]);
+            continue;
+          }
+          const [r] = await dispatch(out, {calls: [i]});
+          results.push(r);
+          records.push(actionRecord(r));
+        }
+      }
+      finish(turn, records);
       return results;
     } catch (e) {
       finish(turn, notRun(out, e.message));
@@ -184,10 +209,10 @@ export function useLog(name) {
     finish(turn, notRun(out, why || "not dispatched"));
   };
 
-  // One step: call, then dispatch.
-  const step = async (view, opts) => {
+  // One step: call, then dispatch (with `dispatchOptions`, as `dispatch` takes them).
+  const step = async (view, opts, dispatchOptions) => {
     const out = await call(view, opts);
-    const results = await run(out);
+    const results = await run(out, dispatchOptions);
     return {out, results};
   };
 
