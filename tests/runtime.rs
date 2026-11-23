@@ -193,6 +193,39 @@ fn glm_call(think: &str, name: &str, args: &[(&str, &str)]) -> String {
     format!("{think}</think><tool_call>{name}{a}</tool_call>")
 }
 
+/// "A bad call does not stop a good call to the same tool." One reply calls `set_notes` with no
+/// text (outside its schema) and again with text: the first is answered with its problem, the
+/// second runs and the notes are saved.
+#[test]
+#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+fn a_bad_call_does_not_stop_a_good_call_to_the_same_tool() {
+    let enc = encoder();
+    let v = view(&enc);
+    let mut host = Host::new(&enc, &v, |_, turn| {
+        match turn {
+        1 => "Two calls.</think><tool_call>set_notes</tool_call><tool_call>set_notes<arg_key>text</arg_key><arg_value>saved</arg_value></tool_call>".into(),
+        _ => glm_call("Idle.", "wait", &[("seconds", "5")]),
+    }
+    });
+    host.add(config("agent-0001", "Take notes."));
+    host.run();
+    let agent = &host.agents["agent-0001"];
+    let results: Vec<J> = affordance::scenario::log_records(&agent.state())
+        .iter()
+        .filter(|r| r["kind"] == "action")
+        .take(2)
+        .map(|r| r["result"].clone())
+        .collect();
+    assert!(
+        results[0]
+            .as_str()
+            .is_some_and(|s| s.starts_with("error: bad arguments for set_notes")),
+        "{results:?}"
+    );
+    assert_eq!(results[1], "notes saved", "{results:?}");
+    assert_eq!(agent.state()["__ui"]["@notes"], "saved");
+}
+
 #[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
 fn one_agent_session_is_exact_and_replays() {

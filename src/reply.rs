@@ -493,14 +493,7 @@ pub fn parse_reply(text: &str, syntax: Syntax, actions: &ActionSet, in_think: bo
         r.problems.push(Problem::BadSyntax(e));
     }
     for c in &calls {
-        match actions.get(&c.name) {
-            None => r.problems.push(Problem::UnknownAction(c.name.clone())),
-            Some(def) => {
-                if let Err(e) = validate(&def.schema, &c.args) {
-                    r.problems.push(Problem::BadArgs(format!("{}: {}", c.name, e)));
-                }
-            }
-        }
+        r.problems.extend(call_problem(actions, &c.name, &c.args));
     }
     r.calls = calls;
     match r.calls.len() {
@@ -781,6 +774,18 @@ pub fn parse_reply_typed(text: &str, syntax: Syntax, actions: &ActionSet, in_thi
         }
     }
     r
+}
+
+/// What is wrong with one call, if anything: a tool the screen does not offer, or arguments
+/// outside its schema. Each call is judged on its own, so a bad call never makes a good call to
+/// the same tool fail.
+pub fn call_problem(actions: &ActionSet, name: &str, args: &J) -> Option<Problem> {
+    match actions.get(name) {
+        None => Some(Problem::UnknownAction(name.to_string())),
+        Some(def) => validate(&def.schema, args)
+            .err()
+            .map(|e| Problem::BadArgs(format!("{name}: {e}"))),
+    }
 }
 
 #[cfg(test)]

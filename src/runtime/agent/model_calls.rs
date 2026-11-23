@@ -240,15 +240,14 @@ impl Agent {
                 .enumerate()
                 .map(|(i, c)| {
                     let name = c.name.clone();
-                    let problem = reply.problems.iter().find_map(|p| match p {
-                        Problem::UnknownAction(a) if *a == name => {
+                    // This call's own problem (`reply.problems` is the whole reply's, by name).
+                    let problem = match crate::reply::call_problem(&call.actions, &name, &c.args) {
+                        Some(Problem::UnknownAction(_)) => {
                             Some(format!("error: there is no tool named `{name}` on this screen"))
                         }
-                        Problem::BadArgs(e) if e.starts_with(&format!("{name}:")) => {
-                            Some(format!("error: bad arguments for {e}"))
-                        }
+                        Some(Problem::BadArgs(e)) => Some(format!("error: bad arguments for {e}")),
                         _ => None,
-                    });
+                    };
                     (
                         name,
                         c.args.clone(),
