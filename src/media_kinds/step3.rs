@@ -25,12 +25,15 @@ pub fn layout(params: &serde_json::Value, width: u32, height: u32) -> Result<Vec
                 .ok_or_else(|| format!("step3: parameter {key} must be a whole number")),
         }
     };
+    // Every Step3 tokenizer names its markers the same way; a rule may name others.
     let name = |key: &str| -> Result<String, String> {
-        params
-            .get(key)
-            .and_then(|v| v.as_str())
-            .map(str::to_string)
-            .ok_or_else(|| format!("step3: parameter {key} (a token name) is required"))
+        match params.get(key) {
+            None => Ok(format!("<{key}>")),
+            Some(v) => v
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| format!("step3: parameter {key} must be a token name")),
+        }
     };
 
     let global_tokens = count("global_tokens", 169)? as usize;
