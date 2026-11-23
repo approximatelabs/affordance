@@ -556,7 +556,21 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
         .take_while(|line| serde_json::from_str::<J>(line).unwrap()["input"] != "reply")
         .collect::<Vec<_>>()
         .join("\n");
-    std::fs::write(&journal, if prefix.is_empty() { prefix } else { prefix + "\n" }).unwrap();
+    let prefix = if prefix.is_empty() { prefix } else { prefix + "\n" };
+    std::fs::write(&journal, &prefix).unwrap();
+    // The commit log such a crash leaves: the last commit made, with this agent's journal at its
+    // prefix and every other file as it is.
+    let mut journals = serde_json::Map::new();
+    for id in ["one", "two", "three"] {
+        let saved: J = serde_json::from_slice(&std::fs::read(run.join(id).join("agent.json")).unwrap()).unwrap();
+        let len = std::fs::metadata(run.join(id).join("journal.jsonl")).map_or(0, |m| m.len());
+        journals.insert(id.into(), json!([saved["incarnation"], len]));
+    }
+    std::fs::write(
+        run.join("commit.jsonl"),
+        format!("{}\n", json!({"epoch": 1, "journals": journals, "stores": {}})),
+    )
+    .unwrap();
     let outstanding = cli(&config, &path, &capture, true);
     let outstanding: J = serde_json::from_slice(&outstanding.stdout).unwrap();
     assert!(

@@ -1313,3 +1313,23 @@ fn a_hosted_reply_streams_its_text_and_stops_when_told() {
         "the server stopped writing when the client left ({written} events)"
     );
 }
+
+/// "A hosted model server that cannot be reached is `unreachable`, and a cancelled call is
+/// `cancelled`", the same kinds the native bindings report, so `retry: {on: ["unreachable"]}`
+/// means the same on every binding.
+#[test]
+fn a_hosted_server_that_cannot_be_reached_is_unreachable_and_a_cancel_is_cancelled() {
+    let fixture = Fixture::new();
+    // Nothing listens here: the connection is refused before anything is sent.
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", closed.local_addr().unwrap());
+    drop(closed);
+    let client = fixture.client(&url);
+    let error = client.generate(&fixture.request(&session())).unwrap_err();
+    assert_eq!(error.kind, FailureKind::Unreachable, "{error}");
+    assert!(!error.message.contains("fixture-anthropic-secret"), "{error}");
+    let request = fixture.request(&session());
+    request.cancel.cancel("the caller stopped");
+    let error = client.generate(&request).unwrap_err();
+    assert_eq!(error.kind, FailureKind::Cancelled, "{error}");
+}

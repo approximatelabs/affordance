@@ -555,10 +555,6 @@ impl ModelError {
     pub fn cancelled(message: impl Into<String>) -> Self {
         Self::of(FailureKind::Cancelled, message)
     }
-    /// A failure that may pass (a network error, a rate limit, an outage).
-    pub fn transient(message: impl Into<String>) -> Self {
-        Self::of(FailureKind::Interrupted, message)
-    }
     /// An error from the HTTP transport, as the kind its failure is.
     fn transport(e: HttpError) -> Self {
         let kind = match e.failure {
@@ -1196,10 +1192,13 @@ impl Sglang {
         let why = finish["message"]
             .as_str()
             .map_or_else(|| finish.to_string(), str::to_string);
-        ModelError::transient(redact_credentials(
-            format!("sglang /generate: the server aborted the request: {why}"),
-            headers,
-        ))
+        ModelError::of(
+            FailureKind::Interrupted,
+            redact_credentials(
+                format!("sglang /generate: the server aborted the request: {why}"),
+                headers,
+            ),
+        )
         .without_endpoint(&self.url)
     }
 }
@@ -1709,14 +1708,9 @@ impl Model for Completions {
     }
 }
 
-/// Retry a failed attempt with a short backoff while its failure may pass: not after a cancel, a
-/// protocol error or an HTTP status other than 429 or 5xx, and with no wait after the last
-/// attempt. `f` gets the attempt number (0-based) to tag onto its request. `on_fail` runs for a
-/// failed attempt the server may still hold (it was sent and not answered with a status), so its
-/// caller can tell the server to drop it instead of leaving it to the server's own cleanup.
-/// One attempt at `f`. A failure after the request was sent runs `on_fail` (a server may still
-/// hold the request: the client tells it to stop). The failure goes back as it is: whether the
-/// call is made again is the retry policy's, not the client's.
+/// One attempt at `f`. A failure after the request was sent runs `on_fail`: a server may still
+/// hold the request, and the client tells it to drop it. The failure goes back as it is: whether
+/// the call is made again is the retry policy's, not the client's.
 fn attempt<T>(
     cancel: &CancelToken,
     mut on_fail: impl FnMut(usize),
@@ -2114,7 +2108,7 @@ impl Chat {
                 Some(a) if (200..300).contains(&status) => a
                     .finish(stopped)
                     .map(|resp| (status, resp, delay))
-                    .map_err(|e| ModelError::transient(format!("{}: {e}", self.kind()))),
+                    .map_err(|e| ModelError::fatal(format!("{}: {e}", self.kind()))),
                 _ => Ok((status, resp, delay)),
             })
             .map_err(|e| e.without_endpoint(&self.url));
@@ -2211,13 +2205,13 @@ impl Chat {
         stream: Option<(&mut hosted_stream::Assembler, &mut (dyn FnMut(Delta<'_>) -> bool + 'f))>,
     ) -> Result<(u16, J, Option<Duration>, bool), ModelError> {
         use super::http::{ERROR_BODY_MAX, Request, Timing, exchange};
+        // Classified as the native bindings' are (a refused connection is `unreachable`), and
+        // named by the binding, the key never in the message.
         let failed = |e: HttpError| {
             let message = redact_credentials(format!("{}: {e}", self.kind()), headers);
-            if e.transient() {
-                ModelError::transient(message)
-            } else {
-                ModelError::fatal(message)
-            }
+            let mut error = ModelError::transport(e);
+            error.message = message;
+            error
         };
         // `headers` is the whole list the caller built (and the capture records), Content-Type included.
         let mut fields: Vec<(&str, String)> = headers.to_vec();
@@ -2234,7 +2228,7 @@ impl Chat {
         let timing = Timing::deadline(self.timeout).between(self.stall.filter(|_| stream.is_some()));
         let response = exchange(request, timing, &req.cancel).map_err(|e| {
             if req.cancel.is_cancelled() {
-                ModelError::from(format!("cancelled: {}", req.cancel.reason()))
+                ModelError::cancelled(format!("cancelled: {}", req.cancel.reason()))
             } else {
                 failed(e)
             }
@@ -2267,8 +2261,9 @@ impl Chat {
                 }
             });
             req.cancel.check().map_err(ModelError::cancelled)?;
+            // A malformed stream is a malformed reply, as it is without streaming.
             if let Some(e) = problem {
-                return Err(ModelError::transient(redact_credentials(
+                return Err(ModelError::fatal(redact_credentials(
                     format!("{}: {e}", self.kind()),
                     headers,
                 )));
