@@ -1,6 +1,6 @@
 //! `affordance`: run apps (TSX) as agents, and render, test and lint them.
 //!
-//!   affordance run [PATH] [-f FILE]... [--set KEY=VALUE]... [--dir DIR] [--app FILE] [--resume | --fresh] [--keep-running]
+//!   affordance run [PATH] [-f FILE]... [--set KEY=VALUE]... [--dir DIR] [--app FILE] [--restore | --fresh] [--keep-running]
 //!   affordance config [PATH] [-f FILE]... [--set KEY=VALUE]...
 //!   affordance init [DIR]
 //!   affordance render APP.tsx --state FILE|- [--tokenizer FILE] [--entry NAME] [--json]
@@ -30,15 +30,16 @@ Usage:
       --set KEY=VALUE         one value over the files (repeatable; KEY dotted, VALUE YAML)
       --dir DIR               the journal directory (default .affordance beside the file)
       --app FILE              the app (overrides root.app or app.view)
-      --resume                continue the run in the journal directory
+      --restore                continue the run in the journal directory
       --fresh                 start over (the previous run's files are kept under .retired)
       --keep-running          stay up while agents are idle (a chat waiting for its user)
+      --control PATH          a control socket: post, status, close (also on serve and host)
       --flag NAME=VALUE       one of this machine's flags, for this run (repeatable; below)
   affordance serve [PATH]     run it behind HTTP (same options as run; --listen HOST:PORT): each
                               request is the event `request` to the root; the app answers on
                               the machine `client` (docs/RUNTIME.md)
   affordance host [PATH]      run it for a frontend over stdio (same options as run): JSON lines
-                              in (prompt, abort, answer, shutdown) and out (deltas, output,
+                              in (event, answer, close, status) and out (deltas, output,
                               trace, questions on the machine `ui`) (docs/RUNTIME.md)
   affordance config [PATH]    print the resolved deployment (same -f and --set), secrets hidden
   affordance init [DIR]       write a first agent: app.tsx, affordance.yaml and .gitignore
@@ -171,13 +172,13 @@ fn select(args: &[String], allowed_flags: &[&str]) -> Result<Selection, String> 
 }
 
 fn cmd_run(args: &[String]) -> Result<(), String> {
-    let (s, d) = prepare_run(args, &["--resume", "--fresh", "--keep-running", "--control"])?;
+    let (s, d) = prepare_run(args, &["--restore", "--fresh", "--keep-running", "--control"])?;
     let has = |f: &str| s.flags.iter().any(|x| x == f);
     let warn = flags::Flags::load(&s.machine_flags)?.cache_warn()?;
     run::with_profile(|| {
         run::run(
             d.config,
-            has("--resume"),
+            has("--restore"),
             has("--keep-running"),
             true,
             s.control.as_deref(),
@@ -199,15 +200,15 @@ fn cmd_serve(_args: &[String]) -> Result<(), String> {
 /// `serve` (see above).
 #[cfg(feature = "http")]
 fn cmd_serve(args: &[String]) -> Result<(), String> {
-    let (s, d) = prepare_run(args, &["--resume", "--fresh", "--listen", "--control"])?;
+    let (s, d) = prepare_run(args, &["--restore", "--fresh", "--listen", "--control"])?;
     let mut settings = serve::Settings::from_config(&d.config["serve"])?;
     if let Some(listen) = &s.listen {
         settings.listen = listen.clone();
     }
-    let resume = s.flags.iter().any(|x| x == "--resume");
+    let restore = s.flags.iter().any(|x| x == "--restore");
     let warn = flags::Flags::load(&s.machine_flags)?.cache_warn()?;
     run::with_profile(|| {
-        run::run(d.config, resume, true, true, s.control.as_deref(), |rt| {
+        run::run(d.config, restore, true, true, s.control.as_deref(), |rt| {
             rt.observe_traces(cache_watch::observer(warn));
             let target = rt
                 .specs()
@@ -221,11 +222,11 @@ fn cmd_serve(args: &[String]) -> Result<(), String> {
 
 /// `host`: `run`, kept running, driven by a frontend over stdio (JSONL; see `host.rs`).
 fn cmd_host(args: &[String]) -> Result<(), String> {
-    let (s, d) = prepare_run(args, &["--resume", "--fresh", "--control"])?;
-    let resume = s.flags.iter().any(|x| x == "--resume");
+    let (s, d) = prepare_run(args, &["--restore", "--fresh", "--control"])?;
+    let restore = s.flags.iter().any(|x| x == "--restore");
     let out = host::Out::new();
     let result = run::with_profile(|| {
-        run::run(d.config, resume, true, false, s.control.as_deref(), |rt| {
+        run::run(d.config, restore, true, false, s.control.as_deref(), |rt| {
             let target = rt
                 .specs()
                 .first()
@@ -245,15 +246,15 @@ fn cmd_host(args: &[String]) -> Result<(), String> {
 fn prepare_run(args: &[String], flags: &[&str]) -> Result<(Selection, deploy::Deployment), String> {
     let s = select(args, flags)?;
     let has = |f: &str| s.flags.iter().any(|x| x == f);
-    if has("--resume") && has("--fresh") {
-        return Err("--resume and --fresh are opposites; pick one".into());
+    if has("--restore") && has("--fresh") {
+        return Err("--restore and --fresh are opposites; pick one".into());
     }
     let base = deploy::find(s.path.as_deref())?;
     let d = deploy::load(&base, &s.overrides)?;
     let dir = PathBuf::from(d.config["dir"].as_str().unwrap_or(deploy::STATE));
-    if !has("--resume") && !has("--fresh") && holds_a_run(&dir) {
+    if !has("--restore") && !has("--fresh") && holds_a_run(&dir) {
         return Err(format!(
-            "{} holds a run: --resume to continue it, or --fresh to start over (its files are kept under .retired)",
+            "{} holds a run: --restore to continue it, or --fresh to start over (its files are kept under .retired)",
             dir.display()
         ));
     }

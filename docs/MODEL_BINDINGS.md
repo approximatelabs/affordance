@@ -339,7 +339,7 @@ Persisted instances record a digest of their built-in model binding's replay ide
 the existing app/tokenizer pins: which model answers (kind, model, provider options such as a
 LoRA, template, context: the window in effect, the same whether the server reported it or the
 config stated it), not how it is reached (address, credentials, ranks, timeouts,
-cache TTL) or sampled, so moving a server or changing a timeout resumes. `"replay":"strict"`
+cache TTL) or sampled, so moving a server or changing a timeout restores. `"replay":"strict"`
 refuses a changed or missing model identity before inference. Warning replay reports the
 difference and preserves the journal's original pins. Existing journals without this identity
 cannot acquire a strict guarantee retrospectively.
@@ -412,7 +412,7 @@ The endpoint addresses and credential paths are supplied by the deployment opera
 }
 ```
 
-Save it as `affordance.yaml` (JSON is valid YAML) and run `affordance run`; add `--resume` to
+Save it as `affordance.yaml` (JSON is valid YAML) and run `affordance run`; add `--restore` to
 recover that run.
 This example adds no machine bindings or tool execution.
 

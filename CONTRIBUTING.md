@@ -48,7 +48,7 @@ shows the test applied to decisions already made.
    useful beyond the case at hand, deterministic under replay, and consistent with cancellation,
    close and restore.
 4. **The standard cases still read naturally:** a chat bot, an autonomous tool-using agent, a
-   multi-agent fleet, and a resumed journal. If one needs a workaround, the change is wrong.
+   multi-agent fleet, and a restored journal. If one needs a workaround, the change is wrong.
 
 Affordance is licensed under [Apache-2.0](LICENSE); a contribution is offered under the same
 license. No stable Rust ABI, complete JavaScript/npm compatibility, or cross-platform runtime

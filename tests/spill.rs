@@ -174,7 +174,7 @@ fn script(n: usize, prompt: &str) -> String {
     }
 }
 
-fn session(dir: &Path, resume: bool) -> affordance::runtime::Report {
+fn session(dir: &Path, restore: bool) -> affordance::runtime::Report {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/zai-org__GLM-5.3.json"));
     let mut cfg = RuntimeConfig::new(root().join("views/agents/session.tsx"));
     cfg.workers = 1;
@@ -202,13 +202,13 @@ fn session(dir: &Path, resume: bool) -> affordance::runtime::Report {
         affordance::runtime::model::ModelTemplate::new("glm53", json!({})).unwrap(),
     )
     .unwrap();
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
     rt.bind_machine("home", Arc::new(Exec::local()));
-    if !resume {
+    if !restore {
         let mut spec = AgentSpec::new("agent-0", json!({"id": "agent-0", "task": "Migrate the build."}));
         spec.max_turns = Some(4);
         spec.max_new = 256;

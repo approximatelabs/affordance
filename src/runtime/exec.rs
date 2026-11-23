@@ -647,7 +647,7 @@ fn group_members(owner: &Process) -> Vec<Process> {
         .collect()
 }
 
-/// Stop the call's process group on its own thread: a cancel (a fleet pause cancels many calls at
+/// Stop the call's process group on its own thread: a cancel (a fleet closing cancels many calls at
 /// once) must never wait or scan /proc.
 fn terminate(owned: std::sync::Weak<Mutex<Option<Process>>>, grace: Duration) {
     std::thread::spawn(move || {

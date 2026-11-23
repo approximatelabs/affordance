@@ -57,7 +57,7 @@ a conversation, a permission prompt or a file is.
    product, a vendor, a file or a process; it is useful beyond the case that prompted it; a replay
    reproduces it; it behaves under cancellation, close and restore.
 4. **Check the ordinary cases**: a chat bot, an autonomous tool-using agent, a fleet of agents, a
-   resumed journal. If one needs a workaround, the primitive is wrong.
+   restored journal. If one needs a workaround, the primitive is wrong.
 
 ## Decisions, and why they went the way they did
 

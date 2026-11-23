@@ -961,7 +961,7 @@ export default function Main(){
 }
 
 /// A page that fails to render rejects its `model()` call, as `fetch` rejects: the app catches it
-/// and goes on (the agent failed, on every resume too, since replay throws again).
+/// and goes on (the agent failed, on every restore too, since replay throws again).
 #[test]
 fn a_page_that_fails_to_render_rejects_its_model_call() {
     let source = r#"

@@ -5,8 +5,8 @@
 //! `runtime_bench <agents> <turns> [workers] [output_kib]` prints one JSON line:
 //! turns per second, render time per turn (mean and p95, from the traces), prompt size, prefix
 //! reuse, peak and per-agent memory (at the peak, and anonymous memory while running: what a
-//! cgroup cannot reclaim). With `AFFORDANCE_BENCH_REPLAY=1` it then resumes the run's directory (every agent has
-//! stopped, so the resume is a replay of every journal) and reports the replay's time and memory.
+//! cgroup cannot reclaim). With `AFFORDANCE_BENCH_REPLAY=1` it then restores the run's directory (every agent has
+//! stopped, so the restore is a replay of every journal) and reports the replay's time and memory.
 use affordance::emit::Encoder;
 use affordance::runtime::{AgentSpec, CallContext, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
 use serde_json::{Value as J, json};
@@ -154,7 +154,7 @@ fn main() {
         let anon = status_kib("RssAnon:");
         let cfg = config();
         let t0 = Instant::now();
-        let mut rt = Runtime::resume(cfg, enc, model).unwrap();
+        let mut rt = Runtime::restore(cfg, enc, model).unwrap();
         rt.bind_machine("home", Arc::new(machine));
         let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let sampler = {

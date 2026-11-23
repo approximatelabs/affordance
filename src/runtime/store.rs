@@ -128,7 +128,7 @@ impl Store {
         self.dir.as_ref().map(|d| d.join(agent).join("store.jsonl"))
     }
 
-    /// Load an agent's persisted blobs (on resume).
+    /// Load an agent's persisted blobs (on restore).
     pub fn load(&self, agent: &str) -> Result<(), String> {
         let handle = self.space(agent);
         let mut current = handle.lock().unwrap();

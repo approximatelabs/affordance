@@ -60,7 +60,7 @@ pub(super) fn agent_outstanding_summary(agent: &Agent) -> OutstandingSummary {
 
 pub(super) fn agent_outstanding(agent: &Agent) -> Vec<Command> {
     let mut out: Vec<Command> = agent.tasks.values().map(|(_, c)| c.clone()).collect();
-    // A model call told to stop is told again: on resume it answers at once, with what it has.
+    // A model call told to stop is told again: on restore it answers at once, with what it has.
     out.extend(
         agent
             .aborting

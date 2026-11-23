@@ -103,7 +103,7 @@ impl Frontend {
     }
 }
 
-fn start(url: &str, dir: &std::path::Path, resume: bool) -> Frontend {
+fn start(url: &str, dir: &std::path::Path, restore: bool) -> Frontend {
     let mut command = Command::new(env!("CARGO_BIN_EXE_affordance"));
     command
         .arg("host")
@@ -114,8 +114,8 @@ fn start(url: &str, dir: &std::path::Path, resume: bool) -> Frontend {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    if resume {
-        command.arg("--resume");
+    if restore {
+        command.arg("--restore");
     }
     let mut child = command.spawn().unwrap();
     let (tx, events) = channel();

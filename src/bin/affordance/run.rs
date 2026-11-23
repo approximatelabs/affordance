@@ -285,13 +285,13 @@ fn duration(value: &J, name: &str) -> Result<Duration, String> {
     Duration::try_from_secs_f64(seconds).map_err(|_| format!("{name} must be finite and nonnegative"))
 }
 
-/// Run a loaded deployment (`deploy::load`): fresh, or `resume` from its journals. `prepare` sees
+/// Run a loaded deployment (`deploy::load`): fresh, or `restore` from its journals. `prepare` sees
 /// the runtime before it starts (`serve` binds its `client` machine and takes its control there).
 /// The summary at the end goes to stdout, or to stderr when stdout is a protocol's (`host`).
 /// SIGINT and SIGTERM close the run; with `control_socket`, controllers connect there.
 pub fn run(
     cfg: J,
-    resume: bool,
+    restore: bool,
     keep_running: bool,
     summary_on_stdout: bool,
     control_socket: Option<&std::path::Path>,
@@ -378,7 +378,7 @@ pub fn run(
     rc.strict_replay = cfg["replay"].as_str() == Some("strict");
     rc.call_timeout = Duration::from_secs(cfg["call_timeout_s"].as_u64().unwrap_or(3600));
     rc.max_wall = cfg.get("max_wall_s").map(|v| duration(v, "max_wall_s")).transpose()?;
-    // Keep running (stay up while instances are idle, reading the inbox), or run the batch to quiescence.
+    // Keep running (stay up while instances are idle), or run the batch until nothing is left to do.
     // The summary printed at the end reads no state (each agent's snapshot.json has it).
     rc.report_state = false;
     rc.serve = keep_running || cfg["keep_running"].as_bool().unwrap_or(false);
@@ -452,12 +452,12 @@ pub fn run(
             specs.push((n, serde_json::from_value(base).map_err(|e| format!("agent {n}: {e}"))?));
         }
     }
-    let mut rt = if resume {
-        Runtime::resume(rc, enc, model)?
+    let mut rt = if restore {
+        Runtime::restore(rc, enc, model)?
     } else {
         Runtime::new(rc, enc, model)
     };
-    if resume {
+    if restore {
         rt.membership(specs.into_iter().map(|(_, s)| s).collect())?;
     } else {
         for (_, spec) in specs {

@@ -55,7 +55,7 @@ const OVERSEER: &str = r#"export default function Main() {
   return <text>{"overseeing"}</text>;
 }"#;
 
-fn run(dir: &Path, resume: bool) -> affordance::runtime::Report {
+fn run(dir: &Path, restore: bool) -> affordance::runtime::Report {
     std::fs::write(dir.join("target.tsx"), TARGET).unwrap();
     std::fs::write(dir.join("overseer.tsx"), OVERSEER).unwrap();
     let enc = Arc::new(tokenizer::encoder());
@@ -63,12 +63,12 @@ fn run(dir: &Path, resume: bool) -> affordance::runtime::Report {
     cfg.dir = Some(dir.join("run"));
     cfg.workers = 3;
     let model = Arc::new(FnModel(|_: &GenRequest| Ok(GenReply::default())));
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
-    if !resume {
+    if !restore {
         for id in ["agent-0", "agent-1", "agent-quiet", "other"] {
             let mut s = AgentSpec::new(id, json!({"name": id}));
             s.model = None;

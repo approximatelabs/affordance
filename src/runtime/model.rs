@@ -665,7 +665,7 @@ pub trait Model: Send + Sync {
     /// Which model an instance talks to and how its prompts are laid out: the binding's kind,
     /// model and provider options (a LoRA), and its template and context (`Presented`). Not how it
     /// is reached (address, credentials, ranks, timeouts, retry policy, cache TTL) or sampled: a moved
-    /// server or a changed timeout resumes. The resume pin and recovery images use this.
+    /// server or a changed timeout restores. The restore pin and recovery images use this.
     fn replay_identity(&self) -> Option<J> {
         self.binding_identity()
             .map(|b| json!({"kind": b["kind"], "model": b["model"], "provider_options": b["provider_options"]}))

@@ -27,7 +27,7 @@ fn deployment(name: &str, app: &str, home: Option<&Path>) -> PathBuf {
     dir
 }
 
-fn start(dir: &Path, resume: bool) -> Child {
+fn start(dir: &Path, restore: bool) -> Child {
     let mut command = Command::new(env!("CARGO_BIN_EXE_affordance"));
     command
         .arg("run")
@@ -37,8 +37,8 @@ fn start(dir: &Path, resume: bool) -> Child {
         .current_dir(dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    if resume {
-        command.arg("--resume");
+    if restore {
+        command.arg("--restore");
     }
     command.spawn().unwrap()
 }

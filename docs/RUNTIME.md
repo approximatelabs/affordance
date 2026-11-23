@@ -18,7 +18,7 @@ It defines no app-specific tool vocabulary, state schema, template tokens or fol
 
 ```sh
 affordance run              # the deployment in affordance.yaml (here or in a parent directory)
-affordance run --resume     # continue from its journals
+affordance run --restore     # continue from its journals
 affordance config           # print the deployment a run would use
 ```
 
@@ -40,7 +40,7 @@ deployment is valid YAML too); unknown keys are errors.
   `dir`, and local machines' homes. Paths given on the command line are relative to the current
   directory, so a deployment runs the same from anywhere.
 - **The journal directory** is `dir`, by default `.affordance/` beside the file. A run that
-  finds an earlier run there stops and asks for `--resume` (continue it) or `--fresh` (start over;
+  finds an earlier run there stops and asks for `--restore` (continue it) or `--fresh` (start over;
   the earlier run's files move under `.retired/`).
 - **`affordance config`** prints the resolved deployment (same arguments as `run`), with the
   values of `secrets` hidden.
@@ -231,7 +231,7 @@ agent's own `env`. The runtime process's real environment is never visible.
 - An app may read its secrets and use them, the way a page reads its cookies. Showing a secret to
   the model is the app's choice.
 - Values of keys listed in `secrets` are redacted (`[secret:KEY]`) in `trace.jsonl` and
-  `agent.json`, as values (a PEM key with newlines and quotes is found). On resume they come
+  `agent.json`, as values (a PEM key with newlines and quotes is found). On restore they come
   from the config again. A secret under 4 bytes is refused: it cannot be told from text.
 - `journal.jsonl` stores inputs verbatim (replay needs them). Treat it as sensitive.
 - The runtime's own credentials (SSH keys, endpoints, API keys) are machine and model
@@ -292,7 +292,7 @@ to run it.
   - `<dir>/blobs/<sha256>`: large strings (below);
   - `<dir>/commit.jsonl`: the journals' commits (below);
   - `<dir>/runtime.lock`: locked by the one runtime that owns the directory. A second runtime
-    over it (`--resume` or a fresh run) fails before it recovers anything; a crash releases it.
+    over it (`--restore` or a fresh run) fails before it recovers anything; a crash releases it.
 - **Large strings live on disk.** With `dir`, a string of at least `spill_bytes` (default 64 KiB)
   is written once to `<dir>/blobs/<sha256>` and travels through state, journal,
   store and commands as a short reference. The app sees an ordinary string: the language reads
@@ -315,22 +315,22 @@ to run it.
   of four disk syncs. This is the browser's IndexedDB with relaxed durability: a transaction
   completes before it reaches the disk, and the platform flushes in the background. Here,
   though, nothing outside the process sees a result before it is durable.
-- **A crash resumes from the last commit.** Resume first truncates every journal and store to
+- **A crash restores from the last commit.** A restore first truncates every journal and store to
   the last committed length (bytes past it are kept in `uncommitted-journal-<offset>.bin` or
   `uncommitted-store-<offset>.bin`). A file the commit does not name for its instance's
   incarnation is emptied. A blob a committed line refers to was synced by that commit. A blob
   file a crash left without its content is rewritten when its text is next stored: a put checks
   an existing file's content once per process before reusing it. A line is written only after
   every line that caused it, in any journal, so a commit never holds a delivery without the
-  send that caused it, nor a sender's acknowledgement without the delivery. The run resumes in
+  send that caused it, nor a sender's acknowledgement without the delivery. The run restores in
   a state it passed through. The work after the last commit (a few milliseconds of in-process
   work) is computed again, and nothing outside the process saw it. A recovery image taken after
   the last commit is ignored, and that agent replays its journal in full. A clean shutdown
-  commits everything and closes the log, so the next resume truncates nothing. Only the log's
+  commits everything and closes the log, so the next restore truncates nothing. Only the log's
   last line may be torn: a bad line before it is damage, not an older commit, and recovery
   refuses it (naming its byte offset) rather than cut every journal back. Each truncation is
   printed with the instance id and byte counts.
-- **Resume.** `--resume` rebuilds every agent from its journal (same renders, same state) and
+- **Restore.** `--restore` rebuilds every agent from its journal (same renders, same state) and
   resubmits its outstanding work. External work in flight at the crash is submitted again, so
   machine commands with durable side effects should deduplicate by agent and task id.
 
@@ -370,7 +370,7 @@ its engines and most of each prompt is prefilled again.
 
 The Rust API: `Runtime::new(config, Arc<Encoder>, Arc<dyn Model>)` (the `default` model), then
 `.bind_model(name, enc, model)` and `.bind_machine(role, machine)`, then `.add_agent(spec)` or
-`Runtime::resume`, then `.run() -> Report`.
+`Runtime::restore`, then `.run() -> Report`.
 `runtime::Agent` is the single-agent core with no I/O (`start`, `handle(input) -> commands`,
 `restore(journal)`), for custom hosts and tests. Its one exception: with `set_blobs`, it writes
 large strings as content-addressed blob files (idempotent, so replay is unchanged).
@@ -423,7 +423,7 @@ and keeps running; stdout carries only the protocol (the summary goes to stderr)
 - **In** (stdin): the control protocol (see "Controlling a run"): `{"type": "event", "name",
   "payload"}` posts an event to the first instance (or to `target`), and `close`, `status`,
   `set_model_limit` and `subscribe` work as there; `{"type": "answer", "request", "value"}`
-  answers a question. The end of stdin closes the run (`--resume` continues it).
+  answers a question. The end of stdin closes the run (`--restore` continues it).
 - **Out** (stdout): `ready {agent}` once the agents are running; `delta {agent, task, text, reasoning?}` (or `delta {agent, task, call: {index, id?, name?, arguments}}`,
   more of a hosted reply's tool call: its place in the reply, its id and name when they arrive, and more of
   its arguments' JSON text), a model's reply as it
@@ -446,7 +446,7 @@ the model's calls until it replies without one, and aborts the turn in progress 
 It tells the frontend what it is doing as `ui` values: `{state: "working" | "idle"}`,
 `{calls: [{id, name, args}]}` as the model's tool calls start, `{results: [...]}` when they end,
 and, in answer to the event `history`, `{history: [...]}`: the conversation so far, for a frontend
-that connects to a resumed run. These are the app's own messages, not the protocol's: another app
+that connects to a restored run. These are the app's own messages, not the protocol's: another app
 tells its frontend whatever it likes.
 Through `turn.signal`, a tool's command stops with it. `ask(question)` asks the frontend.
 `views/tools/files.tsx` has `read`, `write` and `edit` tools over a machine's shell.
@@ -476,7 +476,7 @@ handle, over whichever channel it has. It never writes files into the run direct
 | Operation | What it does |
 |---|---|
 | `event {target?, name, payload?, key?}` | Posts an event, as `postMessage` does. The answer comes once the target's journal line is committed, or says why the event was not delivered (no such instance, the run is closing). With a `key`, a second post of the same key is journaled but not taken again, so a controller can post again after a lost answer or a restore. |
-| `close {timeout_ms?}` | Closes the run. The clock stops and no new model or machine call starts. Calls still running get `timeout_ms` to finish (default 0), then are cancelled. The journals are committed and the run can be restored with `--resume`. |
+| `close {timeout_ms?}` | Closes the run. The clock stops and no new model or machine call starts. Calls still running get `timeout_ms` to finish (default 0), then are cancelled. The journals are committed and the run can be restored with `--restore`. |
 | `status` | The run's `state` (`starting`, `running`, `closing`, `closed`), its `clock_ms`, each agent's state, the model bindings' windows, and the model queue. |
 | `set_model_limit {limit}` | How many model calls may run at once. 0 holds every model call while the rest of the run goes on. |
 | `subscribe {streams: ["status"]}` | Pushes `{type: "status", value}` each time the status changes. |
@@ -515,7 +515,7 @@ configuration, not in journals, traces, captures or what an app sees.
 An instance's failure is its own, as a crashed tab's is. An error or a panic in its own code
 (loading its app, starting, replaying its journal, handling an input) fails that instance alone:
 it is reported with the error, never run or imaged again, and its worker serves the others. A
-resume replays the same journal and fails it the same way. A render worker that dies outside
+restore replays the same journal and fails it the same way. A render worker that dies outside
 its instances' code ends the run at once: its instances are reported failed, the others can be
 restored.
 

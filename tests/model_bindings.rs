@@ -415,14 +415,14 @@ fn a_failed_attempt_is_aborted_with_the_key_and_the_next_keeps_the_provider_opti
     assert_ne!(generations[0].body["rid"], generations[1].body["rid"]);
 }
 
-fn cli(config: &J, file: &std::path::Path, capture: &std::path::Path, resume: bool) -> std::process::Output {
+fn cli(config: &J, file: &std::path::Path, capture: &std::path::Path, restore: bool) -> std::process::Output {
     // The apps are written to a scratch directory and import the repository's views.
     let mut config = config.clone();
     config["library"] = json!(env!("CARGO_MANIFEST_DIR"));
     std::fs::write(file, config.to_string()).unwrap();
     let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_affordance"));
     command.arg("run").arg(file).env("AFFORDANCE_CAPTURE_DIR", capture);
-    command.arg(if resume { "--resume" } else { "--fresh" });
+    command.arg(if restore { "--restore" } else { "--fresh" });
     command.output().unwrap()
 }
 fn texts(path: &std::path::Path) -> String {
@@ -534,7 +534,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     );
     assert_eq!(native.requests().len(), 2);
     // How a server is reached is not which model answers: other timeouts, retries and sampling
-    // resume strictly (an operational change must not make a fleet unresumable).
+    // restore strictly (an operational change must not make a fleet unrestorable).
     let mut moved = config.clone();
     moved["models"]["A"]["request_timeout_s"] = json!(77);
     moved["models"]["A"]["sampling"]["temperature"] = json!(0.3);
@@ -892,7 +892,7 @@ fn one_retry_policy_is_stated_in_the_deployment_or_on_the_call() {
         assert_eq!(reason.get("reason").unwrap_or(reason), stopped, "{name}: {report}");
         let calls = peer.requests().iter().filter(|w| w.path == "/v1/completions").count();
         assert_eq!(calls, requests, "{name}");
-        // Each failure is in the trace with its kind, and a resumed run makes no new request.
+        // Each failure is in the trace with its kind, and a restored run makes no new request.
         let trace = std::fs::read_to_string(files.0.join(format!("run-{name}/a/trace.jsonl"))).unwrap();
         assert_eq!(
             trace.matches(r#""kind":"busy""#).count(),
@@ -901,7 +901,7 @@ fn one_retry_policy_is_stated_in_the_deployment_or_on_the_call() {
         );
         cli(&config, &path, &files.0.join(format!("capture-{name}")), true);
         let calls = peer.requests().iter().filter(|w| w.path == "/v1/completions").count();
-        assert_eq!(calls, requests, "{name}: a resumed run replays its journaled failures");
+        assert_eq!(calls, requests, "{name}: a restored run replays its journaled failures");
     }
     // A policy that cannot be read is refused when the deployment is loaded.
     let peer = Peer::stock();
@@ -1256,7 +1256,7 @@ export default function Main(){{
     assert!(stored.contains("credential_diagnostic") && stored.contains(r#"["x-api-key","[redacted]"]"#));
     assert!(cli(&config, &path, &capture, true).status.success());
     assert_eq!(peer.requests().len(), 2, "replay must not make provider calls");
-    // How the provider is reached (here its cache TTL) is not the model: a strict resume goes on.
+    // How the provider is reached (here its cache TTL) is not the model: a strict restore goes on.
     config["model"]["cache_ttl"] = json!("1h");
     assert!(cli(&config, &path, &capture, true).status.success());
     // Another model is: refused.
@@ -1801,7 +1801,7 @@ fn the_window_falls_through_to_get_server_info() {
 }
 
 /// The window is part of the binding's identity, as it was when configured: a fleet that drops
-/// its hand-set `context` once the server reports the same one keeps its resume pin.
+/// its hand-set `context` once the server reports the same one keeps its restore pin.
 #[test]
 fn a_window_the_server_reports_keeps_the_pin_of_the_same_window_configured() {
     use affordance::runtime::model::{ModelTemplate, with_context, with_template};

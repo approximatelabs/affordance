@@ -94,7 +94,7 @@ the model) turn on. If the server returns a tool call as plain text, `affordance
 the server is not reachable, `affordance run` says so and keeps trying for five minutes
 (`model.retry.for_s`). Each agent's journal and trace
 are in `.affordance/<agent>/`. The journal records every input the agent received, so
-`affordance run --resume` continues the run exactly; `affordance run --fresh` starts over.
+`affordance run --restore` continues the run exactly; `affordance run --fresh` starts over.
 
 ### Change a setting
 

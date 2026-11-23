@@ -82,6 +82,14 @@ pub(super) fn submit_model(
 ) {
     {
         let mut lanes = shared.model_gate.lanes.lock().unwrap();
+        // Checked under the lanes' lock, which closing's `suspend_queued_models` also takes: a call
+        // queued after the run began closing would sit in a queue nothing drains any more.
+        if shared.closing.load(Ordering::SeqCst) {
+            drop(lanes);
+            shared.done(&agent, incarnation, task);
+            shared.inflight.fetch_sub(1, Ordering::SeqCst);
+            return;
+        }
         let n = lanes.len();
         let queued = QueuedModel {
             agent,
@@ -134,7 +142,7 @@ pub(super) fn suspend_queued_models(shared: &Shared) {
         .collect();
     for job in queued {
         // The journal still contains the outstanding Generate. Resuming submits it
-        // again without inventing an error or starting a new decode during pause.
+        // again without inventing an error or starting a new decode while the run closes.
         shared.done(&job.agent, job.incarnation, job.task);
         shared.inflight.fetch_sub(1, Ordering::SeqCst);
     }

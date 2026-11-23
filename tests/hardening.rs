@@ -724,14 +724,14 @@ fn persisted_auto_keys_survive_reload_and_explicit_collisions() {
     let first = affordance::runtime::store::Store::new(Some(f.0.clone()));
     put(&first, json!({"key":"b1","text":"first"}));
     assert_eq!(put(&first, json!({"text":"second"}))["key"], "b2");
-    let resumed = affordance::runtime::store::Store::new(Some(f.0.clone()));
-    resumed.load("a").unwrap();
-    resumed.load("a").unwrap();
+    let restored = affordance::runtime::store::Store::new(Some(f.0.clone()));
+    restored.load("a").unwrap();
+    restored.load("a").unwrap();
     assert_eq!(
-        resumed.call("a", "store.get", &json!({"key":"b1"})).unwrap()["text"],
+        restored.call("a", "store.get", &json!({"key":"b1"})).unwrap()["text"],
         "first"
     );
-    assert_eq!(put(&resumed, json!({"text":"third"}))["key"], "b3");
+    assert_eq!(put(&restored, json!({"text":"third"}))["key"], "b3");
 }
 
 #[test]

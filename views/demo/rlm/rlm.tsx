@@ -9,7 +9,7 @@ import { useLog } from "@affordance/lib/log.tsx";
 // The REPL (tools/rlm_repl, a daemon per machine home) makes no model calls: `llm_batch` parks the
 // cell, the `python` handler answers every prompt with a model call on `Sub` (model(<Sub/>)) (all at once,
 // Promise.all), and resumes the cell. So sub-LLM calls are this instance's own model calls: in its
-// journal, under its budget, replayed on resume.
+// journal, under its budget, replayed on restore.
 //
 // The default export is a small bench: per task, an `RLM` and (with `direct`) a `Direct` baseline
 // that reads the whole context in its prompt; the root grades both (`@results`).

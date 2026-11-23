@@ -4,7 +4,7 @@
 //! In:  the control protocol (`control.rs`: `event`, `close`, `status`, `set_model_limit`,
 //!      `subscribe`; an event goes to the first instance unless it names a `target`), and
 //!      `{"type":"answer","request","value"}`, which answers a question. The end of stdin closes
-//!      the run, which `--resume` continues.
+//!      the run, which `--restore` continues.
 //! Out: `ready {agent}` once the agents are running; `delta {agent, task, text, reasoning?}` (a
 //!      model's reply as it is generated); `output {agent, task, text}` (a command's output as it
 //!      is written); `trace {agent, record}` (renders, replies, finished tools, handler errors);
@@ -227,7 +227,7 @@ fn read_commands(control: Control, out: Out, questions: Questions, target: Strin
             });
         }
     }
-    // The frontend has gone: the run closes, its work kept for `--resume`.
+    // The frontend has gone: the run closes, its work kept for `--restore`.
     done.store(true, Ordering::SeqCst);
     control.close(Duration::ZERO);
 }

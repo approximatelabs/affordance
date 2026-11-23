@@ -243,9 +243,9 @@ harness.stop({info, listed, results, required, continued});
     let journal = std::fs::read_to_string(dir.0.join("run/a/journal.jsonl")).unwrap();
     assert!(!journal.contains("mcp-test-credential"));
     drop(server);
-    let mut resumed = Runtime::resume(config, encoder(), model()).unwrap();
-    resumed.bind_machine("http", executor);
-    let replay = resumed.run().unwrap();
+    let mut restored = Runtime::restore(config, encoder(), model()).unwrap();
+    restored.bind_machine("http", executor);
+    let replay = restored.run().unwrap();
     assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
     assert_eq!(replay.agents[0].stopped.as_ref(), Some(stopped));
     assert_eq!(

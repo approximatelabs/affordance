@@ -97,7 +97,7 @@ impl StatusWriter {
 /// The clock of a journal's last record (None: no journal, or no record). Read from the tail
 /// when the journal ends in a whole record; otherwise (a torn or unterminated tail) the
 /// recovering reader runs over the journal as before. The prefix is validated by the agent's
-/// own restore (`restore_instance`), on its worker, not here on the one resume thread.
+/// own restore (`restore_instance`), on its worker, not here on the one restore thread.
 pub(super) fn journal_last_clock(file: &std::path::Path) -> Result<Option<i64>, String> {
     if let Some(clock) = tail_clock(file) {
         return Ok(Some(clock));

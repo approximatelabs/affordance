@@ -47,7 +47,7 @@ cargo clippy --offline --all-features --all-targets -- -D warnings
 serving a small model. Each check is something a user does: the first agent runs a shell command
 and answers, on every binding kind (chat completions, OpenAI Responses, Anthropic Messages, and
 token ids on both servers); a server without its tool-call parser and an unreachable server are
-reported; a run resumes; `serve` answers an OpenAI client; `host` answers a prompt. It is a heavy
+reported; a run restores; `serve` answers an OpenAI client; `host` answers a prompt. It is a heavy
 check that no gate or CI job runs: it needs Docker, three GPUs and the model on disk. Run it by
 hand when a change touches model calls or the first-run path (`KEEP=1` leaves the servers up for
 the next run).

@@ -201,7 +201,7 @@ fn multicast_has_one_durable_result_and_recovery_preserves_batched_delivery() {
             .any(|input| matches!(input,Input::Batch {inputs} if inputs.len()>1)),
         "the burst must share a journal frame"
     );
-    let cached = Runtime::resume(cfg.clone(), enc.clone(), model.clone())
+    let cached = Runtime::restore(cfg.clone(), enc.clone(), model.clone())
         .unwrap()
         .run()
         .unwrap();
@@ -214,7 +214,7 @@ fn multicast_has_one_durable_result_and_recovery_preserves_batched_delivery() {
     for id in ["good", "hub"] {
         let _ = std::fs::remove_file(files.0.join("run").join(id).join("checkpoint.json"));
     }
-    let replay = Runtime::resume(cfg, enc, model).unwrap().run().unwrap();
+    let replay = Runtime::restore(cfg, enc, model).unwrap().run().unwrap();
     for id in ["good", "hub"] {
         let before = first.agents.iter().find(|a| a.id == id).unwrap();
         let after = replay.agents.iter().find(|a| a.id == id).unwrap();

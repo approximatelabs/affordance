@@ -45,7 +45,7 @@ fn state(dir: &Path, id: &str) -> J {
 /// The process is killed between two commits. The askers then lose everything after the last
 /// commit (as a power loss would) while the hub keeps all it wrote: the hub's journal holds
 /// messages whose sends the askers no longer have. Recovery cuts every journal back to the last
-/// commit, so on resume each message is taken exactly once, with the clock of the send the
+/// commit, so on restore each message is taken exactly once, with the clock of the send the
 /// asker's journal kept (a message from the lost timeline carries another clock).
 #[test]
 fn a_crash_between_commits_resumes_from_a_consistent_cut() {
@@ -126,7 +126,7 @@ fn a_crash_between_commits_resumes_from_a_consistent_cut() {
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_affordance"))
         .arg("run")
         .arg(&cfg_path)
-        .arg("--resume")
+        .arg("--restore")
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
@@ -212,7 +212,7 @@ fn cut_of(dir: &Path, kind: &str) -> serde_json::Map<String, J> {
 /// Killed between commits, then a power loss simulated: every journal and store loses what
 /// the last commit did not cover, and every blob file no committed line (or synced recovery
 /// image) refers to is left empty, as a file renamed into place before its data reached the
-/// disk can be. On resume, every blob any journal, store or image refers to exists with its
+/// disk can be. On restore, every blob any journal, store or image refers to exists with its
 /// content, every key an asker learned reads back its text, and the hub took each text once.
 #[test]
 fn a_crash_between_commits_keeps_every_blob_and_store_entry_a_committed_line_refers_to() {
@@ -309,7 +309,7 @@ fn a_crash_between_commits_keeps_every_blob_and_store_entry_a_committed_line_ref
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_affordance"))
         .arg("run")
         .arg(&cfg_path)
-        .arg("--resume")
+        .arg("--restore")
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));

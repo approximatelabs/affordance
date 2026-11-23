@@ -40,14 +40,14 @@ pub struct RuntimeConfig {
     /// that does not read it turns this off, so a shutdown does not materialize every log at once
     /// (each agent's `snapshot.json` has it).
     pub report_state: bool,
-    /// On resume, refuse an agent whose journal no longer replays to the same prompts (instead of
+    /// On restore, refuse an agent whose journal no longer replays to the same prompts (instead of
     /// recording `diverged_at` and continuing).
     pub strict_replay: bool,
     /// The deployment layer of every agent's environ.
     pub env: BTreeMap<String, String>,
     /// Environ keys whose values are redacted in traces and in `agent.json`.
     pub secrets: BTreeSet<String>,
-    /// Give up after this long (agents keep their journals; `resume` continues them).
+    /// Give up after this long (agents keep their journals; `restore` continues them).
     pub max_wall: Option<Duration>,
     /// Keep running while instances are idle (a chat waiting for its user, a server waiting for
     /// requests), until every instance stops, `max_wall`, or `Control::close`. Without it (batch),

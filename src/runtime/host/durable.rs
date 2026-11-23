@@ -10,8 +10,8 @@
 //! journal, and so with everything that caused it.
 //!
 //! What waits for a commit is what leaves the process: model requests, machine calls, store
-//! operations, a fresh mount's archiving of an old directory, control receipts and the status
-//! files. A delivery to another instance does not wait. Its line in the receiver's journal is
+//! operations, a fresh mount's archiving of an old directory, the answer to an embedder's post and
+//! the clock record. A delivery to another instance does not wait. Its line in the receiver's journal is
 //! written after the sender's line that caused it, so no cut has the delivery without its cause,
 //! and none has the sender's acknowledgement without the delivery.
 use super::super::blobs::Unsynced;
@@ -21,7 +21,7 @@ use std::path::Path;
 use std::sync::{Condvar, Weak};
 
 /// How long a barrier waits after the first line it will cover for more lines to join, unless
-/// something waits on it (an effect, a receipt, a status write, a drained worker).
+/// something waits on it (an effect, a post's answer, a clock write, a drained worker).
 const GROUP: Duration = Duration::from_millis(2);
 /// The commit log is rewritten as one complete cut when it grows past this.
 const COMPACT_BYTES: u64 = 4 << 20;
@@ -325,7 +325,7 @@ impl Durable {
 
     /// Commit everything written, then stop the barrier thread. With `close` (no line can be
     /// written after this), the log records that the journals are complete as they stand: a
-    /// resume after a clean shutdown truncates nothing, so the journals stay authoritative.
+    /// restore after a clean shutdown truncates nothing, so the journals stay authoritative.
     pub(super) fn finish(&self, close: bool) -> Result<(), String> {
         {
             let mut st = self.state.lock().unwrap();

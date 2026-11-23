@@ -118,7 +118,7 @@ fn run_finds_its_file_and_explains_what_it_will_not_do() {
     std::fs::create_dir_all(dir.join(".affordance/a")).unwrap();
     std::fs::write(dir.join(".affordance/a/agent.json"), "{}").unwrap();
     let rerun = stderr(&affordance(&dir, &["run"]));
-    assert!(rerun.contains("--resume") && rerun.contains("--fresh"), "{rerun}");
+    assert!(rerun.contains("--restore") && rerun.contains("--fresh"), "{rerun}");
     let _ = std::fs::remove_dir_all(&dir);
     let _ = std::fs::remove_dir_all(&misnamed);
 }

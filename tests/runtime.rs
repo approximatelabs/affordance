@@ -353,7 +353,7 @@ fn scripted(
     let counts: Mutex<BTreeMap<String, usize>> = Mutex::new(BTreeMap::new());
     Arc::new(FnModel(move |req: &GenRequest| {
         // The turn number is the count of model turns already in the prompt (stateless, so a
-        // resumed run continues the same script).
+        // restored run continues the same script).
         let asst = enc.token_id("<|assistant|>").unwrap();
         let n = req.ids.iter().filter(|&&t| t == asst).count();
         counts.lock().unwrap().insert(req.agent.clone(), n);
@@ -402,7 +402,7 @@ fn fleet_runtime(
     dir: &std::path::Path,
     delay_ms: u64,
     max_wall: Option<std::time::Duration>,
-    resume: bool,
+    restore: bool,
 ) -> affordance::runtime::Report {
     let enc = encoder();
     let mut cfg = RuntimeConfig::new(root().join("views/demo/runtime/agent.tsx"));
@@ -412,8 +412,8 @@ fn fleet_runtime(
     cfg.env.insert("DEPLOY_TOKEN".into(), "tok-5ecret-value".into());
     cfg.secrets.insert("DEPLOY_TOKEN".into());
     let model = scripted(enc.clone(), delay_ms, fleet_script);
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
@@ -426,7 +426,7 @@ fn fleet_runtime(
             affordance::runtime::Executor::call(&Exec::local(), ctx, &args)
         }),
     );
-    if !resume {
+    if !restore {
         for i in 0..6 {
             let mut spec = AgentSpec::new(&format!("agent-{i}"), json!({"task": "Say hello to your neighbour."}));
             spec.max_turns = Some(5);
@@ -468,7 +468,7 @@ fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
         assert_eq!(a.metrics.turns, 5, "{}", a.id);
         assert_eq!(
             a.metrics.rewrites, 0,
-            "{}: every turn appends exactly, across the resume",
+            "{}: every turn appends exactly, across the restore",
             a.id
         );
         let records = affordance::scenario::log_records(&a.state);
@@ -834,7 +834,7 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
         c
     };
     // Timings leave room for a loaded machine and still catch the regression: the run and the
-    // resume take 0.9 + 0.4 s of logical time, under the 2 s wait; the pause between them makes
+    // restore take 0.9 + 0.4 s of logical time, under the 2 s wait; the pause between them makes
     // 3.0 s of real time, past it (0.9 s, and not less, because the first run's budget also
     // covers starting up and its first turn).
     let make_model = || scripted(enc.clone(), 0, |_, _| glm_call("Waiting.", "wait", &[("seconds", "2")]));
@@ -845,7 +845,7 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
     let report = first.run().unwrap();
     assert_eq!(report.agents[0].metrics.turns, 1);
     std::thread::sleep(Duration::from_millis(1700));
-    let report = Runtime::resume(config(400), enc.clone(), make_model())
+    let report = Runtime::restore(config(400), enc.clone(), make_model())
         .unwrap()
         .run()
         .unwrap();
@@ -856,19 +856,19 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
     // A post with a key is answered once its line is committed; posted again (its answer lost,
     // say), it is journaled but not taken a second time.
     let mail = json!({"from":"operator","text":"Please wake up."});
-    let mut rt = Runtime::resume(config(1500), enc.clone(), make_model()).unwrap();
+    let mut rt = Runtime::restore(config(1500), enc.clone(), make_model()).unwrap();
     let delivered = rt.control().post("agent-a", "message", mail.clone(), Some("abc123"));
     let report = rt.run().unwrap();
     assert_eq!(delivered.wait(), Ok(()));
     assert_eq!(report.agents[0].metrics.turns, 2);
-    let mut rt = Runtime::resume(config(400), enc.clone(), make_model()).unwrap();
+    let mut rt = Runtime::restore(config(400), enc.clone(), make_model()).unwrap();
     let again = rt.control().post("agent-a", "message", mail, Some("abc123"));
     let report = rt.run().unwrap();
     assert_eq!(again.wait(), Ok(()));
     assert_eq!(report.agents[0].metrics.turns, 2, "the same key is taken once");
     let journal = std::fs::read_to_string(dir.join("agent-a/journal.jsonl")).unwrap();
     assert_eq!(
-        journal.matches("\"id\":\"abc123\"").count(),
+        journal.matches("\"id\":\".post:abc123\"").count(),
         2,
         "the key is on the journaled event, not in the app's payload"
     );
@@ -884,8 +884,8 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
 fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
     // A 2.5 s timer in one agent; a 3.5 s command in another. A pause once the command has
     // started waits for it to finish, by when the timer would be due; but the timer's time stops at the pause:
-    // it neither fires during the drain nor after the resume until the ~2.2 s it had left pass. (Found by Multiplet: a 240 s
-    // wait fired a second after its fleet resumed.)
+    // it neither fires during the drain nor after the restore until the ~2.2 s it had left pass. (Found by Multiplet: a 240 s
+    // wait fired a second after its fleet restored.)
     use std::process::Command as Process;
     use std::time::{Duration, Instant};
     let dir = std::env::temp_dir().join(format!("aff-pause-drain-clock-{}", std::process::id()));
@@ -922,12 +922,12 @@ fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
     });
     std::fs::write(dir.join("deployment.json"), deployment.to_string()).unwrap();
     let socket = dir.join("control.sock");
-    let run = |resume: bool| {
+    let run = |restore: bool| {
         let mut command = Process::new(env!("CARGO_BIN_EXE_affordance"));
         command.arg("run").arg("deployment.json").current_dir(&dir);
         command.arg("--control").arg(&socket);
-        if resume {
-            command.arg("--resume");
+        if restore {
+            command.arg("--restore");
         }
         command
             .stdout(std::process::Stdio::null())
@@ -947,19 +947,19 @@ fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
         !home.join("timer-fired").exists(),
         "the timer fired while the pause drained"
     );
-    let resumed = Instant::now();
+    let restored = Instant::now();
     assert!(run(true).status().unwrap().success());
     assert!(home.join("timer-fired").exists());
     let waited = std::fs::metadata(home.join("timer-fired"))
         .unwrap()
         .modified()
         .unwrap()
-        .duration_since(std::time::SystemTime::now() - resumed.elapsed())
+        .duration_since(std::time::SystemTime::now() - restored.elapsed())
         .unwrap_or_default();
-    eprintln!("after the resume the timer fired in {waited:?}");
+    eprintln!("after the restore the timer fired in {waited:?}");
     assert!(
         waited >= Duration::from_millis(2000),
-        "after the resume the timer fired in {waited:?}, not the ~2.2 s it had left"
+        "after the restore the timer fired in {waited:?}, not the ~2.2 s it had left"
     );
     std::fs::remove_dir_all(dir).unwrap();
 }
@@ -1025,7 +1025,7 @@ fn a_failing_overflow_handler_lets_the_turn_proceed() {
 fn pinned_run(
     dir: &std::path::Path,
     view: &std::path::Path,
-    resume: bool,
+    restore: bool,
     strict: bool,
 ) -> affordance::runtime::Report {
     let enc = encoder();
@@ -1036,12 +1036,12 @@ fn pinned_run(
     let model = scripted(enc.clone(), 0, |_, n| {
         glm_call("Note.", "set_notes", &[("text", &format!("n{n}"))])
     });
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
-    if !resume {
+    if !restore {
         let mut spec = AgentSpec::new("agent-0", json!({"task": "Keep notes."}));
         spec.max_turns = Some(3);
         rt.add_agent(spec).unwrap();
@@ -1096,7 +1096,7 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
     std::fs::write(dir.join("agent-0/agent.json"), serde_json::to_string(&old).unwrap()).unwrap();
     let refused = pinned_run(&dir, &original, true, false);
     let err = refused.agents[0].error.clone().unwrap_or_default();
-    assert!(err.contains("resume refused") && err.contains("contract 1"), "{err}");
+    assert!(err.contains("restore refused") && err.contains("contract 1"), "{err}");
     assert_eq!(refused.agents[0].metrics.turns, 0);
 }
 
@@ -1453,7 +1453,7 @@ fn a_bwrap_machine_shows_a_command_the_system_and_its_home_and_no_other_files() 
     let _ = std::fs::remove_dir_all(&base);
 }
 
-fn tree_run(dir: &std::path::Path, resume: bool) -> affordance::runtime::Report {
+fn tree_run(dir: &std::path::Path, restore: bool) -> affordance::runtime::Report {
     let enc = encoder();
     let mut cfg = RuntimeConfig::new(root().join("views/demo/tree/root.tsx"));
     cfg.workers = 1;
@@ -1486,8 +1486,8 @@ fn tree_run(dir: &std::path::Path, resume: bool) -> affordance::runtime::Report 
             ..Default::default()
         })
     }));
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
@@ -1498,7 +1498,7 @@ fn tree_run(dir: &std::path::Path, resume: bool) -> affordance::runtime::Report 
             Arc::new(move |_: &affordance::runtime::CallContext, _: &J| Ok(json!({"output": host, "exit": 0}))),
         );
     }
-    if !resume {
+    if !restore {
         let mut spec = AgentSpec::new("root", json!({"names": ["alice", "bob"]}));
         spec.model = None;
         spec.machines = Some(vec!["m0".into(), "m1".into()]);
@@ -2241,13 +2241,13 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
 }
 
 /// A long run keeps store payloads on disk: outputs over the
-/// inline cap stay in the store file, `read` returns a stored output word for word, and a resume
+/// inline cap stay in the store file, `read` returns a stored output word for word, and a restore
 /// (streamed from the journal) rebuilds the same agent. The app's log is its own state, bounded
 /// by its own policy (`log.release`, views/lib/log.tsx).
 #[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
 fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
-    fn run(dir: &std::path::Path, resume: bool) -> affordance::runtime::Report {
+    fn run(dir: &std::path::Path, restore: bool) -> affordance::runtime::Report {
         let enc = encoder();
         let mut cfg = RuntimeConfig::new(root().join("views/agents/session.tsx"));
         cfg.workers = 1;
@@ -2282,8 +2282,8 @@ fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
             affordance::runtime::model::ModelTemplate::new("glm53", json!({"keep_replies": true})).unwrap(),
         )
         .unwrap();
-        let mut rt = if resume {
-            Runtime::resume(cfg, enc, model).unwrap()
+        let mut rt = if restore {
+            Runtime::restore(cfg, enc, model).unwrap()
         } else {
             Runtime::new(cfg, enc, model)
         };
@@ -2295,7 +2295,7 @@ fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
                 Ok(json!({"output": format!("{cmd}\n").repeat(1200), "exit": 0}))
             }),
         );
-        if !resume {
+        if !restore {
             let mut spec = AgentSpec::new("a", json!({"id": "a", "n_agents": 1, "task": "Keep the build green."}));
             spec.max_turns = Some(40);
             rt.add_agent(spec).unwrap();
@@ -2640,7 +2640,7 @@ fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
 }
 
 /// An immediate pause cancels a machine call in flight. That is the operator's, not the app's:
-/// no error result is journaled, and the resumed fleet runs the call again.
+/// no error result is journaled, and the restored fleet runs the call again.
 #[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
 fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
@@ -2696,7 +2696,7 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
         "no tool result yet: {:?}",
         affordance::scenario::log_records(&report.agents[0].state)
     );
-    let mut rt = Runtime::resume(config(), enc.clone(), model()).unwrap();
+    let mut rt = Runtime::restore(config(), enc.clone(), model()).unwrap();
     rt.bind_machine(
         "home",
         Arc::new(|_: &affordance::runtime::CallContext, _: &J| Ok(json!({"output": "built ok", "exit": 0}))),
@@ -2713,7 +2713,7 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
 }
 
 /// The same for a model call: a pause (or the run ending) cancels it, but that is the host's, not
-/// a model failure. No model error is journaled, and the resumed run issues the call again.
+/// a model failure. No model error is journaled, and the restored run issues the call again.
 #[test]
 #[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
 fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
@@ -2756,7 +2756,7 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
         !journal.contains("model_error"),
         "a host cancel is not a model error: {journal}"
     );
-    let rt = Runtime::resume(
+    let rt = Runtime::restore(
         config(),
         enc.clone(),
         scripted(enc.clone(), 0, |_, _| "Done.</think>Built.".into()),
@@ -2767,7 +2767,7 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
     assert!(a.error.is_none(), "{:?}", a.error);
     assert_eq!(
         a.metrics.turns, 1,
-        "the resumed run issued the call again and the model answered"
+        "the restored run issued the call again and the model answered"
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }

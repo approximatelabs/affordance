@@ -162,7 +162,12 @@ pub fn listen(path: &Path, control: Control, default_target: String) -> Result<S
                     });
                     clients.lock().unwrap().push(sink.clone());
                     let (control, target, done) = (control.clone(), default_target.clone(), done.clone());
-                    std::thread::spawn(move || serve_client(stream, &control, &target, &sink, &done));
+                    let clients = clients.clone();
+                    std::thread::spawn(move || {
+                        serve_client(stream, &control, &target, &sink, &done);
+                        // Gone: it is told nothing more.
+                        clients.lock().unwrap().retain(|c| !Arc::ptr_eq(c, &sink));
+                    });
                 }
             })
             .map_err(|e| e.to_string())?;

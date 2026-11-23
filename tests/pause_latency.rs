@@ -162,7 +162,7 @@ fn close_behind_a_backlog(batch: usize) {
         );
     }
     // Restore: every send the receiver had not journaled is still outstanding and is issued again.
-    let rt = Runtime::resume(config(), enc.clone(), model()).unwrap();
+    let rt = Runtime::restore(config(), enc.clone(), model()).unwrap();
     let report = rt.run().unwrap();
     assert!(report.complete, "every agent finished");
     let after = received();

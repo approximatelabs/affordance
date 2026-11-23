@@ -723,13 +723,13 @@ fn app_session(f: &Fixture, mut client: Chat, system: &str) -> (J, Vec<J>) {
     assert_eq!(report.stopped, Some(json!({"done":true})), "{:?}", report.stopped);
     assert_eq!(report.state["__ui"]["@n"], 3);
     let state = report.state.clone();
-    let restored = Runtime::resume(cfg.clone(), f.enc.clone(), model.clone())
+    let restored = Runtime::restore(cfg.clone(), f.enc.clone(), model.clone())
         .unwrap()
         .run()
         .unwrap();
     assert_eq!(restored.agents[0].state, state);
     std::fs::remove_file(dir.join("run/a/checkpoint.json")).unwrap();
-    let replay = Runtime::resume(cfg, f.enc.clone(), model).unwrap().run().unwrap();
+    let replay = Runtime::restore(cfg, f.enc.clone(), model).unwrap().run().unwrap();
     assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
     assert_eq!(replay.agents[0].state, state);
     std::fs::remove_dir_all(dir).unwrap();
@@ -1061,13 +1061,13 @@ fn summary_renders_disable_hosted_calls_without_changing_descriptions_or_active_
                 stop["violation"].as_str().unwrap().contains("non-callable render"),
                 "{kind}: {stop}"
             );
-            let recovered = Runtime::resume(cfg.clone(), f.enc.clone(), client.clone())
+            let recovered = Runtime::restore(cfg.clone(), f.enc.clone(), client.clone())
                 .unwrap()
                 .run()
                 .unwrap();
             assert_eq!(recovered.agents[0].stopped, report.stopped);
             std::fs::remove_file(dir.join("run/a/checkpoint.json")).unwrap();
-            let replay = Runtime::resume(cfg, f.enc.clone(), client).unwrap().run().unwrap();
+            let replay = Runtime::restore(cfg, f.enc.clone(), client).unwrap().run().unwrap();
             assert_eq!(replay.agents[0].stopped, report.stopped);
             assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
             let seen = peer.join().unwrap();

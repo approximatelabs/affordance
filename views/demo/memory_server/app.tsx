@@ -5,7 +5,7 @@
 // What the model sees for a reply: the system prompt with summaries of older exchanges (a tree:
 // every LEAF exchanges become a leaf summary, every three leaves merge into one), the last KEEP
 // exchanges verbatim, and the new message. Nothing is lost: the journal holds every exchange, and a
-// restart resumes the same memory.
+// restart restores the same memory.
 import { useOpenAIServer } from "@affordance/lib/openai_server.tsx";
 import { ModelContext } from "@affordance/lib/model.tsx";
 

@@ -15,7 +15,7 @@ Contract version: **9** (`CONTRACT_VERSION`, pinned in every journal). Version 9
 event's delivery id on the journaled event (`id`), not in its payload (`_msg`), and every model
 failure has its kind; version 8 pinned a model binding by which model answers (kind, model,
 provider options, template, context), not how it is reached (docs/MODEL_BINDINGS.md).
-A journal of another version requires that version's binary to resume.
+A journal of another version requires that version's binary to restore.
 
 ## 1. Objects
 
@@ -89,7 +89,7 @@ its parent's. Top-level instances are bound to the deployment's machines unless 
 roles. With a model binding, an instance calls its model when its code says so
 (`model()`, §3); without one it only reacts.
 
-Children live on their parent's worker. Each journals under `<dir>/<parent>/<key>/`. On resume, a
+Children live on their parent's worker. Each journals under `<dir>/<parent>/<key>/`. On restore, a
 parent's replay rebuilds its children set, and each child restores from its own journal and first
 props.
 
@@ -172,7 +172,7 @@ that was already complete when the abort reached the model is journaled whole an
 normally (`aborted` absent): the journal decides the race. A machine call (and so `fetch`) is
 cancelled and rejects with `AbortError`. A call given a signal already aborted is never issued; it
 rejects with `AbortError` at once. A model call aborted and not yet answered when the host stops is
-stopped again on resume (it answers at once with what it has) rather than issued whole. Signals are
+stopped again on restore (it answers at once with what it has) rather than issued whole. Signals are
 the instance's: whether one is aborted, and why (`signal.aborted`, `signal.reason`,
 `signal.throwIfAborted()`), is kept with the instance (journal, images), so a controller kept in
 state, which is frozen, still aborts. They are read and aborted in handlers. `AbortSignal.abort()`
@@ -420,7 +420,7 @@ next attempt waits at least that long, up to 300 s.
 Each failure is a journaled input carrying its kind and the server's requested wait, and the
 wait runs on the instance's clock. A replay or a restore therefore retries exactly as the run
 did. The trace has one `model_error` record per failure with `kind`, `failures` and
-`retry_in_ms`. A resumed instance keeps the policy it was started with.
+`retry_in_ms`. A restored instance keeps the policy it was started with.
 
 When the policy gives no further attempt, the awaiting task sees the error as a rejected
 promise, which the app can catch (`useLoop` stops the instance with it: `loop_error`).
@@ -485,12 +485,12 @@ crash left named but empty is rewritten rather than reused. A record is written 
 it, so the truncated journals are a state the run passed through. No receiver keeps a delivery
 whose send was lost, and no sender keeps an acknowledgement for a delivery that was lost. A
 crash loses only the work since the last commit, and nothing outside the process observed that
-work. A clean shutdown commits everything and closes the log; a resume after it (or of a run
+work. A clean shutdown commits everything and closes the log; a restore after it (or of a run
 directory without a commit log) truncates nothing, so the journals stand as they are. Only the
 log's final line may be torn (an interrupted commit); a bad line before it is an error naming
 its byte offset, and recovery truncates nothing. Each truncation is reported on stderr with the
 instance id and byte counts. An instance whose `agent.json` cannot be read is left as it is and
-is not resumed; a journal whose last record cannot be read fails that instance's restore alone.
+is not restored; a journal whose last record cannot be read fails that instance's restore alone.
 
 A runtime owns its run directory: before recovery it takes an exclusive lock on
 `<dir>/runtime.lock` and holds it until the run returns. A second runtime over the same
@@ -545,15 +545,15 @@ from an image reads only the journal after it: validation covers that suffix (th
 already taken are in the image), and the last clock comes from the journal's tail. A full replay still reads and validates the whole
 journal. Cache-write failure leaves the durable journal authoritative. Checkpoints neither
 migrate older formats nor serialize suspended stacks or host resources.
-`snapshot.json` remains diagnostic; the root run's `checkpoint.json` remains its shutdown report.
+`snapshot.json` remains diagnostic.
 
 **Pins.** `agent.json` records `pins: {contract, app, tokenizer}` from the first start. Each
-journaled reply carries the hash of the prompt it answered. On resume, the first turn whose prompt
-the current app no longer renders is reported (`diverged_at`). With `replay: "strict"` the resume
+journaled reply carries the hash of the prompt it answered. On restore, the first turn whose prompt
+the current app no longer renders is reported (`diverged_at`). With `replay: "strict"` the restore
 is refused. A journal pinned to another `contract` is always refused: its inputs mean something
-else under this one, so it resumes only on a binary of its own contract.
+else under this one, so it restores only on a binary of its own contract.
 
-**The clock is logical.** It resumes from the saved clock, so time while stopped does not expire
+**The clock is logical.** It continues from the saved clock, so time while stopped does not expire
 waits.
 
 ## 9. Limits
@@ -577,7 +577,7 @@ waits.
 | `command` reply (`max_reply_bytes`) | 128 MiB | The call fails and the command is stopped (a JSON reply cut short is not a result); stderr is kept to 64 KiB. |
 | `spill_bytes` | 64 KiB | Strings past it live on disk. |
 | `model_inflight` | `model_threads` | Model calls in flight, balanced across ranks. Adjustable while running (`Control::set_model_limit`). |
-| `restore_concurrency` | CPUs available | Instances restoring at once on resume; the rest wait. Bounds the boot peak to the steady heap plus this many restores. |
+| `restore_concurrency` | CPUs available | Instances restoring at once on restore; the rest wait. Bounds the boot peak to the steady heap plus this many restores. |
 
 *Not built:* storage quotas, per-minute call rates.
 
@@ -585,7 +585,7 @@ waits.
 
 Root specs accept `dedicated_worker: true`: allocate an additional render worker for that root
 and its mounted descendants, excluding other roots. `workers` still sizes the shared root
-pool. Placement applies to startup/resume membership; there is no dynamic root-spawn API.
+pool. Placement applies to startup/restore membership; there is no dynamic root-spawn API.
 Reports expose the physical worker index as diagnostics, not app state. Which root to isolate
 is deployment policy; there is no built-in channel hub. Children retain parent-worker placement.
 
@@ -603,7 +603,7 @@ these files):
 |---|---|
 | `<id>/agent.json` | The instance's spec and pins. Secrets are removed. |
 | `<id>/journal.jsonl` | Its inputs. **Sensitive:** tool outputs and messages are stored as they were. |
-| `commit.jsonl` | The journals' commits: each journal's committed length, by instance (§7). Resume truncates journals to the last one. |
+| `commit.jsonl` | The journals' commits: each journal's committed length, by instance (§7). A restore truncates journals to the last one. |
 | `runtime.lock` | Locked by the runtime that owns the directory (§7). |
 | `<id>/trace.jsonl` | Renders, replies, model calls (usage, cost), semantic tool completions, handler errors, stops. Secrets redacted. |
 | `<id>/snapshot.json` | Diagnostic state and metrics at shutdown. |
@@ -632,7 +632,7 @@ fails or resends the call; it is logged, counted in the status's and the run rep
 
 The journal's clock (`clock_ms`) is logical: it stands still while a run's agents restore and
 from the moment the run begins closing, and continues from there, so neither a slow restore nor
-the time a run is closed takes anything from waits and timeouts. Each start and resume writes a trace record
+the time a run is closed takes anything from waits and timeouts. Each start and restore writes a trace record
 `{t:"clock", at_ms, wall_ms}`; until the next one, wall time is `at_ms + (wall_ms - at_ms)`.
 
 Every trace record has `at_ms`, its time in the journal's clock (`clock_ms`): when what it
@@ -668,7 +668,7 @@ excluded. Machine/store/send subcalls, callbacks and pending or rejected
 undispatched calls do not produce semantic completion events. An early answer
 is counted when returned even if background work continues; its later success
 or failure produces no second completion. Restore discards reconstructed
-traces and preserves outstanding work, so resuming completed calls does not
+traces and preserves outstanding work, so restoring completed calls does not
 append duplicates. Traces are best-effort diagnostics, not a transactional
 exactly-once lifetime ledger: a process crash between journal and trace writes
 can lose a completion. Consumers count completions in their bounded trace tail;

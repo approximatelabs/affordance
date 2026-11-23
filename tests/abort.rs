@@ -1,5 +1,5 @@
 //! `AbortController`: a model call stopped by its signal keeps what it generated; a machine call or
-//! `fetch` rejects with `AbortError`; the journal decides a race; replay and resume agree.
+//! `fetch` rejects with `AbortError`; the journal decides a race; replay and restore agree.
 use crate::tokenizer;
 use affordance::{
     View,
@@ -205,7 +205,7 @@ fn a_reply_that_wins_the_race_is_whole() {
 }
 
 #[test]
-fn an_aborted_call_is_stopped_again_on_resume_not_reissued_whole() {
+fn an_aborted_call_is_stopped_again_on_restore_not_reissued_whole() {
     let mut rig = Rig::new();
     let (task, _) = generate(&rig.event("ask"));
     rig.event("stop");

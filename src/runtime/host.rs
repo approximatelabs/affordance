@@ -62,7 +62,7 @@ pub struct AgentReport {
     pub id: String,
     /// The render worker it ran on.
     pub worker: usize,
-    /// The first turn whose journaled prompt this app no longer renders (resume under changed code).
+    /// The first turn whose journaled prompt this app no longer renders (restore under changed code).
     pub diverged_at: Option<u64>,
     /// Its counters (turns, tokens, appends, errors), as replay recomputes them.
     pub metrics: Metrics,
@@ -536,12 +536,12 @@ pub struct Runtime {
     models: BTreeMap<String, ModelBinding>,
     machines: BTreeMap<String, Arc<dyn Executor>>,
     specs: Vec<AgentSpec>,
-    /// The agents `resume` found journals for, with each journal's last clock (journals are
+    /// The agents `restore` found journals for, with each journal's last clock (journals are
     /// streamed from disk when the agents start, never held here).
     journals: HashMap<String, i64>,
-    /// The journals' committed cut, recovered by `resume` (`run` recovers it otherwise).
+    /// The journals' committed cut, recovered by `restore` (`run` recovers it otherwise).
     cut: Option<durable::Cut>,
-    /// The lock on the run directory, taken by `resume` (`run` takes it otherwise).
+    /// The lock on the run directory, taken by `restore` (`run` takes it otherwise).
     owner: Option<durable::Owner>,
     /// The embedder's handle and the operations it sends (`control`); `run` drains the receiver.
     control: Option<(Control, Receiver<Op>)>,
@@ -707,7 +707,7 @@ impl Runtime {
         Ok(self)
     }
 
-    /// The agents to run (after `add_agent`, or as read back by `resume`).
+    /// The agents to run (after `add_agent`, or as read back by `restore`).
     pub fn specs(&self) -> &[AgentSpec] {
         &self.specs
     }
@@ -734,8 +734,8 @@ impl Runtime {
 
     /// Continue the agents journaled under `cfg.dir`: each is rebuilt from its journal and its
     /// outstanding work is submitted again. Secret env values come from `cfg.env` again.
-    pub fn resume(cfg: RuntimeConfig, enc: Arc<Encoder>, model: Arc<dyn Model>) -> Result<Self, String> {
-        let dir = cfg.dir.clone().ok_or("resume needs a runtime dir")?;
+    pub fn restore(cfg: RuntimeConfig, enc: Arc<Encoder>, model: Arc<dyn Model>) -> Result<Self, String> {
+        let dir = cfg.dir.clone().ok_or("restore needs a run directory")?;
         let mut rt = Runtime::new(cfg, enc, model);
         rt.owner = Some(durable::own(&dir)?);
         // A crash leaves the journals as the last commit made them, before anything reads them.
@@ -748,7 +748,7 @@ impl Runtime {
             .collect();
         entries.sort();
         for path in entries {
-            // One agent's damage is its own: an unreadable spec leaves it unresumed (its files as
+            // One agent's damage is its own: an unreadable spec leaves it not restored (its files as
             // they are), and an unreadable journal fails its own restore.
             let spec = std::fs::read(path.join("agent.json"))
                 .map_err(|e| e.to_string())
@@ -756,7 +756,7 @@ impl Runtime {
             let spec = match spec {
                 Ok(spec) => spec,
                 Err(e) => {
-                    eprintln!("{}: not resumed: agent.json: {e}", path.display());
+                    eprintln!("{}: not restored: agent.json: {e}", path.display());
                     continue;
                 }
             };
@@ -917,7 +917,7 @@ impl Runtime {
         let mut handles = vec![];
         for (w, (rx, specs)) in rxs.into_iter().zip(per_worker).enumerate() {
             let shared = shared.clone();
-            let resumed: HashSet<String> = specs
+            let restored: HashSet<String> = specs
                 .iter()
                 .filter(|s| self.journals.contains_key(&s.id))
                 .map(|s| s.id.clone())
@@ -938,7 +938,7 @@ impl Runtime {
             handles.push(
                 std::thread::Builder::new()
                     .name(format!("render-{w}"))
-                    .spawn(move || worker(w, shared, specs, resumed, rx))
+                    .spawn(move || worker(w, shared, specs, restored, rx))
                     .map_err(|e| e.to_string())?,
             );
         }
@@ -952,13 +952,17 @@ impl Runtime {
         let mut last_status = Instant::now() - Duration::from_secs(1);
         let mut last_trim = Instant::now();
         let status_writer = StatusWriter::start(self.cfg.dir.clone(), durable.clone());
-        // Closing: when it began, how long running calls may take, and why the run ends.
-        let mut closing: Option<(Instant, Duration, Ended)> = None;
-        let close = |closing: &mut Option<(Instant, Duration, Ended)>, timeout: Duration, why: Ended| match closing {
-            Some((_, left, _)) => *left = (*left).min(timeout),
-            None => {
-                shared.begin_closing();
-                *closing = Some((Instant::now(), timeout, why));
+        // Closing: when running calls are cancelled, and why the run ends. A later close may bring
+        // that moment forward, never put it back.
+        let mut closing: Option<(Instant, Ended)> = None;
+        let close = |closing: &mut Option<(Instant, Ended)>, timeout: Duration, why: Ended| {
+            let deadline = Instant::now() + timeout;
+            match closing {
+                Some((at, _)) => *at = (*at).min(deadline),
+                None => {
+                    shared.begin_closing();
+                    *closing = Some((deadline, why));
+                }
             }
         };
         let ended = loop {
@@ -1001,10 +1005,19 @@ impl Runtime {
                     *control.status.lock().unwrap() = value;
                 }
             }
-            if let Some((began, timeout, why)) = closing {
-                if began.elapsed() >= timeout {
-                    for live in shared.cancels.lock().unwrap().values() {
-                        live.token.cancel_by_host("the run is closing");
+            if let Some((deadline, why)) = closing {
+                if Instant::now() >= deadline {
+                    // Taken out first: a cancel runs callbacks, which must not run under the lock
+                    // every call takes.
+                    let tokens: Vec<CancelToken> = shared
+                        .cancels
+                        .lock()
+                        .unwrap()
+                        .values()
+                        .map(|l| l.token.clone())
+                        .collect();
+                    for token in tokens {
+                        token.cancel_by_host("the run is closing");
                     }
                 }
                 // A lost worker's messages are never consumed: the drain cannot finish, and need not.
@@ -1060,7 +1073,7 @@ impl Runtime {
         for (w, joined) in joined.into_iter().enumerate() {
             match joined {
                 Ok(reports) => agents.extend(reports?),
-                // Its instances are failed (a resume restores them from their journals).
+                // Its instances are failed (a restore rebuilds them from their journals).
                 Err(panic) => {
                     let error = format!("render worker {w} {}", panicked(panic));
                     let held: Vec<String> = shared
@@ -1258,7 +1271,7 @@ impl Views {
 }
 
 /// Thread-time spent in each phase of restoring agents (printed with the boot line under
-/// `AFFORDANCE_RESTORE_TIMING`): a diagnostic for resume cost.
+/// `AFFORDANCE_RESTORE_TIMING`): a diagnostic for restore cost.
 static PHASES: [std::sync::atomic::AtomicU64; 8] = [const { std::sync::atomic::AtomicU64::new(0) }; 8];
 const PHASE_NAMES: [&str; 8] = [
     "store_load",
@@ -1345,7 +1358,7 @@ fn checkpoint_identity(shared: &Shared, cfg: &AgentConfig, view: &View, enc: &En
     // The app is its files' contents and their paths relative to the root view (`source_hash`),
     // and which of them is the root: its name, not its absolute path. A deploy that installs
     // the same files in a new release directory moved every image's root path, and each agent
-    // of four 256-agent fleets replayed its whole journal on resume (347 s).
+    // of four 256-agent fleets replayed its whole journal on restore (347 s).
     let root = std::path::Path::new(&*view.prog.root)
         .file_name()
         .map(|n| n.to_string_lossy().into_owned());
@@ -1499,7 +1512,7 @@ fn save_checkpoint(shared: &Shared, slot: &mut Slot, view: &View, force: bool) {
         // An image is synced when written, and may refer to blobs no committed line refers to yet.
         match cache.save(&slot.agent, view, force, &|| shared.durable.sync_files()) {
             Ok(None) => {}
-            // Why a resume will replay more of the journal than an interval.
+            // Why a restore will replay more of the journal than an interval.
             Ok(Some(reason)) => {
                 let inputs = slot.agent.journal_len();
                 trace(slot, json!({"t":"checkpoint_refused","inputs":inputs,"reason":reason}));
@@ -1510,7 +1523,7 @@ fn save_checkpoint(shared: &Shared, slot: &mut Slot, view: &View, force: bool) {
 }
 
 /// The image to write for an instance as its worker stops, after everything held for a commit
-/// has been released (so no receipt is still held: see `save_checkpoint`).
+/// has been released.
 fn due_image(slot: &mut Slot, view: &View) -> Option<super::checkpoint::Ready> {
     if slot.error.is_some() {
         return None;
@@ -1563,7 +1576,7 @@ fn start_instance(
     spec: AgentSpec,
     app: PathBuf,
     env: BTreeMap<String, String>,
-    resumed: bool,
+    restored: bool,
     timers: &mut Timers,
     local: &mut VecDeque<Msg>,
 ) -> Result<(), String> {
@@ -1646,12 +1659,12 @@ fn start_instance(
         Err(e) => return fail(slots, cfg, spec, app, e),
     };
     let (mut journal_file, mut trace_file) = (None, None);
-    if !resumed {
+    if !restored {
         shared.store.forget_tree(&spec.id);
     }
     if let Some(dir) = &shared.cfg.dir {
         let d = dir.join(&spec.id);
-        if !resumed && d.exists() {
+        if !restored && d.exists() {
             let archive = dir.join(".retired").join(incarnation.to_string()).join(&spec.id);
             std::fs::create_dir_all(archive.parent().unwrap()).map_err(|e| e.to_string())?;
             std::fs::rename(&d, &archive).map_err(|e| format!("archive {}: {e}", d.display()))?;
@@ -1666,12 +1679,12 @@ fn start_instance(
         for k in &shared.cfg.secrets {
             stored.env.remove(k);
         }
-        let before = resumed
+        let before = restored
             .then(|| std::fs::read(d.join("agent.json")).ok())
             .flatten()
             .and_then(|b| serde_json::from_slice::<J>(&b).ok());
         let start = before.as_ref().and_then(|v| v["start_ms"].as_i64());
-        // What the journal was written against. A resume under other code or tokenizer is
+        // What the journal was written against. A restore under other code or tokenizer is
         // reported, and replay then checks every turn's prompt (`diverged_at`). A journal of
         // another contract is refused: its inputs mean something else (like IndexedDB's
         // `VersionError`), so it needs the binary it was written with.
@@ -1696,13 +1709,13 @@ fn start_instance(
                 spec,
                 app,
                 format!(
-                    "resume refused: the journal was written under harness contract {old}, and this binary runs contract {CONTRACT_VERSION}; resume it with a contract-{old} binary"
+                    "restore refused: the journal was written under harness contract {old}, and this binary runs contract {CONTRACT_VERSION}; restore it with a contract-{old} binary"
                 ),
             );
         }
-        if resumed && pinned.as_ref().and_then(|old| old.get("model")) != pins.get("model") {
+        if restored && pinned.as_ref().and_then(|old| old.get("model")) != pins.get("model") {
             if shared.cfg.strict_replay {
-                return fail(slots,cfg,spec,app,"strict resume refused: model binding identity changed or was not recorded; restore the original binding configuration, or use warning replay explicitly".into());
+                return fail(slots,cfg,spec,app,"strict restore refused: model binding identity changed or was not recorded; restore the original binding configuration, or use warning replay explicitly".into());
             }
             eprintln!(
                 "{}: warning: model binding identity changed or was not recorded",
@@ -1710,13 +1723,13 @@ fn start_instance(
             );
         }
         if let Some(old) = pinned.as_ref().filter(|old| **old != pins) {
-            eprintln!("{}: resuming under changed pins {old} -> {pins}", spec.id);
+            eprintln!("{}: restoring under changed pins {old} -> {pins}", spec.id);
         }
         let mut stored_json = serde_json::to_value(&stored).map_err(|e| e.to_string())?;
-        // A resumed instance replays under what it was started with: its seed and its retry
+        // A restored instance replays under what it was started with: its seed and its retry
         // policy. Either one read from today's deployment could send the replay down a branch
         // the journal did not take.
-        if resumed && let Some(old) = &before {
+        if restored && let Some(old) = &before {
             let was: super::model::RetryPolicy =
                 serde_json::from_value(old["retry"].clone()).map_err(|e| format!("agent.json retry: {e}"))?;
             if was != cfg.retry {
@@ -1736,12 +1749,12 @@ fn start_instance(
         stored_json["pins"] = pinned.unwrap_or_else(|| {
             let mut initial = pins;
             // A warning restore cannot certify the model used by an unpinned old journal.
-            if resumed && initial.get("model").is_some() {
+            if restored && initial.get("model").is_some() {
                 initial["model"] = J::Null;
             }
             initial
         });
-        stored_json["incarnation"] = if resumed {
+        stored_json["incarnation"] = if restored {
             before.as_ref().and_then(|v| v["incarnation"].as_u64()).unwrap_or(0)
         } else {
             incarnation
@@ -1762,7 +1775,7 @@ fn start_instance(
             return fail(slots, cfg, spec, app, format!("store recovery failed: {e}"));
         }
     }
-    let dir = shared.cfg.dir.clone().filter(|_| resumed);
+    let dir = shared.cfg.dir.clone().filter(|_| restored);
     let (agent, commands, error, restored_from) = match &dir {
         Some(d) => {
             let start = std::fs::read(d.join(&spec.id).join("agent.json"))
@@ -1787,8 +1800,8 @@ fn start_instance(
             match restored {
                 Ok((a, cmds, seed)) => (a, cmds, None, Some(seed)),
                 Err(e) => {
-                    eprintln!("{}: resume failed: {e}", spec.id);
-                    (Agent::new(cfg)?, vec![], Some(format!("resume failed: {e}")), None)
+                    eprintln!("{}: restore failed: {e}", spec.id);
+                    (Agent::new(cfg)?, vec![], Some(format!("restore failed: {e}")), None)
                 }
             }
         }
@@ -1824,7 +1837,7 @@ fn start_instance(
     } else {
         vec![]
     };
-    let incarnation = if resumed {
+    let incarnation = if restored {
         shared
             .cfg
             .dir
@@ -1840,7 +1853,7 @@ fn start_instance(
         Some(file) => Some(Journal::new(file, &id, incarnation)?),
         None => None,
     };
-    if let (Some(journal), Some(dir), false) = (&journal, &shared.cfg.dir, resumed) {
+    if let (Some(journal), Some(dir), false) = (&journal, &shared.cfg.dir, restored) {
         shared.durable.register(journal, &dir.join(&id));
     }
     // Its start's effects wait for whatever caused it (a parent's mount) to be committed.
@@ -1862,8 +1875,8 @@ fn start_instance(
         },
     );
     let slot = slots.get_mut(&id).unwrap();
-    // The journal's clock is logical: it stops while the run is paused (a wait does not expire in
-    // the pause). Each start records where it stands against wall time, so a host can map any
+    // The journal's clock is logical: it stands still while the run restores and from when it
+    // begins closing (a wait does not expire while the run is closed). Each start records where it stands against wall time, so a host can map any
     // later `at_ms` or `clock_ms` to wall time: wall = at_ms + (wall_ms - at_ms) of this record.
     trace(
         slot,
@@ -1914,7 +1927,7 @@ fn worker(
     w: usize,
     shared: Arc<Shared>,
     specs: Vec<AgentSpec>,
-    resumed: HashSet<String>,
+    restored: HashSet<String>,
     rx: Receiver<Msg>,
 ) -> Result<Vec<AgentReport>, String> {
     let mut views = Views { loaded: HashMap::new() };
@@ -1958,7 +1971,7 @@ fn worker(
             .as_ref()
             .map(PathBuf::from)
             .unwrap_or_else(|| shared.cfg.view.clone());
-        let (id, journal) = (spec.id.clone(), resumed.contains(&spec.id));
+        let (id, journal) = (spec.id.clone(), restored.contains(&spec.id));
         // An agent that cannot start fails alone; the worker starts the rest.
         if let Err(error) = start_instance(
             &shared,
@@ -2051,8 +2064,8 @@ fn worker(
     }
     // Images and snapshots are of committed journals.
     shared.durable.wait(shared.durable.written())?;
-    // Then what was held for it: receipts are written; held requests are not issued while the
-    // runtime stops, so they stay outstanding for the resume.
+    // Then what was held for it: posts are answered; held requests are not issued while the
+    // runtime stops, so they stay outstanding for the restore.
     for slot in slots.values_mut() {
         release(&shared, w, slot, &mut timers, &mut local);
     }
@@ -2184,16 +2197,16 @@ fn feed(
             spec.capabilities = p.spec.capabilities.clone();
             spec.inspectable = p.spec.inspectable;
             let env = p.agent.cfg.env.clone();
-            let resumed = restore
+            let restored = restore
                 && shared
                     .cfg
                     .dir
                     .as_ref()
                     .is_some_and(|d| d.join(id).join("journal.jsonl").exists());
-            // A resumed child replays from the props it started with; the parent's current props,
+            // A restored child replays from the props it started with; the parent's current props,
             // if different, are then one more input.
             let current = spec.props.clone();
-            if resumed
+            if restored
                 && let Some(first) = shared
                     .cfg
                     .dir
@@ -2204,7 +2217,7 @@ fn feed(
             {
                 spec.props = first;
             }
-            if let Err(e) = start_instance(shared, w, views, slots, spec, base, env, resumed, timers, local) {
+            if let Err(e) = start_instance(shared, w, views, slots, spec, base, env, restored, timers, local) {
                 // As for an instance that fails at boot: it is reported failed, so the run's
                 // report names it and a send to it says why it was not delivered.
                 lost(shared, w, id, e);
@@ -2428,7 +2441,7 @@ fn apply(
     true
 }
 
-/// One live call of an instance: what cancels it (a pause, the run ending, the agent no longer
+/// One live call of an instance: what cancels it (the run closing, the agent no longer
 /// needing it), and for a model call the flag its app's abort signal sets.
 struct Live {
     token: CancelToken,
@@ -2869,8 +2882,8 @@ fn dispatch_now(
                             panicked(panic)
                         )))
                     });
-                    // A call the host cancelled (a pause, the run ending) is not the model's failure:
-                    // nothing is journaled, the call stays outstanding, and a resume issues it again.
+                    // A call the host cancelled (the run closing) is not the model's failure:
+                    // nothing is journaled, the call stays outstanding, and a restore issues it again.
                     if result.is_err() && req.cancel.cancelled_by_host() {
                         job_shared.done(&req.agent, incarnation, task);
                         job_shared.inflight.fetch_sub(1, Ordering::SeqCst);
@@ -3076,9 +3089,9 @@ fn dispatch_now(
                                 Ok(args) => super::exec::with_deadline(move || exec.call(&ctx, &args), limit, &token),
                                 Err(e) => Err(e),
                             };
-                            // A call the host cancelled (a pause, the run ending) is not the app's
+                            // A call the host cancelled (the run closing) is not the app's
                             // failure: no result is journaled, the call stays outstanding, and a
-                            // resume issues it again.
+                            // restore issues it again.
                             if outcome.is_err() && token.cancelled_by_host() {
                                 job_shared.done(&agent, incarnation, task);
                                 job_shared.inflight.fetch_sub(1, Ordering::SeqCst);
@@ -3165,10 +3178,10 @@ export default function Main({panics}) {
     /// A render that panics on a timer's input fails its agent alone: the worker it shares with
     /// a healthy agent goes on, and the run completes at once rather than at `max_wall` (a reply
     /// parser's panic once stalled a whole run until its stop deadline). The
-    /// panicking input is journaled, so a resume replays it and fails the agent again, and
+    /// panicking input is journaled, so a restore replays it and fails the agent again, and
     /// nothing else.
     #[test]
-    fn a_panicking_agent_fails_alone_and_again_on_resume() {
+    fn a_panicking_agent_fails_alone_and_again_on_restore() {
         let scratch = Scratch::new("handle");
         let cfg = scratch.config(1);
         let mut rt = Runtime::new(cfg.clone(), encoder(), model());
@@ -3191,10 +3204,10 @@ export default function Main({panics}) {
             ),
             (None, Some(json!({"n": 1})))
         );
-        let report = Runtime::resume(cfg, encoder(), model()).unwrap().run().unwrap();
+        let report = Runtime::restore(cfg, encoder(), model()).unwrap().run().unwrap();
         assert_eq!(
             agent(&report, "crash").error.as_deref(),
-            Some("resume failed: panicked: render failed")
+            Some("restore failed: panicked: render failed")
         );
         assert_eq!(agent(&report, "healthy").error, None);
     }

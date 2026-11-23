@@ -795,7 +795,7 @@ impl Agent {
                 e[4] += r.layouts - before.layouts;
                 e[5] += r.layout_us - before.layout_us;
             }
-            // Reconstructed diagnostics are never appended on resume. Drain per input so
+            // Reconstructed diagnostics are never appended on restore. Drain per input so
             // a long replay does not retain a second in-memory history of completions.
             agent.trace.clear();
         }
@@ -1012,9 +1012,9 @@ impl Agent {
             // The step that ended has drained and its effects pass has not run: a boundary.
             // Keeping one copies the instance's bookkeeping (its event log, the message ids it has
             // seen, kept outputs, children's props). While that is small every boundary is kept,
-            // so a resume starts from the last one. Once it is large, one is kept every
+            // so a restore starts from the last one. Once it is large, one is kept every
             // BOUNDARY_GAP inputs: a recovery image is written far less often than that, and a
-            // resume replays at most that many inputs more.
+            // restore replays at most that many inputs more.
             let bookkeeping = self.event_log.len()
                 + self.seen_msgs.len()
                 + self.children.len()

@@ -98,13 +98,13 @@ export default function Main({{denied,reverse,name}}){{
     ));
     let mut cfg = config(&app);
     cfg.dir = Some(dir.0.join("run"));
-    let run = |resume| {
-        let mut rt = if resume {
-            Runtime::resume(cfg.clone(), encoder(), model()).unwrap()
+    let run = |restore| {
+        let mut rt = if restore {
+            Runtime::restore(cfg.clone(), encoder(), model()).unwrap()
         } else {
             Runtime::new(cfg.clone(), encoder(), model())
         };
-        if !resume {
+        if !restore {
             for (id, denied, reverse) in [
                 ("saved", false, false),
                 ("reversed", false, true),
@@ -143,8 +143,8 @@ export default function Main({{denied,reverse,name}}){{
         // Exercise complete journal replay as well as the normal cache-based stop path.
         let _ = std::fs::remove_file(dir.0.join("run").join(&agent.id).join("checkpoint.json"));
     }
-    let resumed = run(true);
-    for (before, after) in report.agents.iter().zip(&resumed.agents) {
+    let restored = run(true);
+    for (before, after) in report.agents.iter().zip(&restored.agents) {
         assert!(after.error.is_none(), "{:?}", after.error);
         assert_eq!(after.stopped, before.stopped);
         assert_eq!(after.state, before.state);
@@ -239,7 +239,7 @@ export default function Main(){
             let lines = |p: &std::path::Path| std::fs::read(p).map_or(0, |b| b.iter().filter(|&&c| c == b'\n').count());
             let start = lines(&journal).max(before.journal_len);
             let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
-            let mut rt = Runtime::resume(cfg, encoder(), model()).unwrap();
+            let mut rt = Runtime::restore(cfg, encoder(), model()).unwrap();
             let watch = {
                 let (done, control) = (done.clone(), rt.control());
                 std::thread::spawn(move || {
@@ -256,10 +256,10 @@ export default function Main(){
                 "control",
                 Arc::new(|_: &affordance::runtime::CallContext, _: &J| Ok(json!({}))),
             );
-            let resumed = rt.run().unwrap();
+            let restored = rt.run().unwrap();
             done.store(true, Ordering::SeqCst);
             watch.join().unwrap();
-            let after = resumed.agents.iter().find(|a| a.id == "busy").unwrap();
+            let after = restored.agents.iter().find(|a| a.id == "busy").unwrap();
             assert!(after.error.is_none(), "{:?}", after.error);
             assert!(
                 after.journal_len > before.journal_len,
@@ -304,7 +304,7 @@ export default function Main() { const [phase,setPhase]=useState(0,'phase'); use
     rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
     for report in [
         rt.run().unwrap(),
-        Runtime::resume(cfg, enc, model()).unwrap().run().unwrap(),
+        Runtime::restore(cfg, enc, model()).unwrap().run().unwrap(),
     ] {
         let kid = report.agents.iter().find(|a| a.id == "a/kid").unwrap();
         assert!(kid.error.is_none(), "{:?}", kid.error);
@@ -501,7 +501,7 @@ export default function Main(){
     let clock = read(&run.join("clock.json"))["clock_ms"].as_i64().unwrap() + 10;
     append("a", "advance", json!({"label":"second"}), clock);
     append("a/kid", "bump", json!({}), clock + 1);
-    let second = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let second = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
@@ -528,7 +528,7 @@ export default function Main(){
         .unwrap()
         .write_all(b"{\"input\":\"event\",\"name\":\"bad\",\"payload\":\"\xf0\x9f")
         .unwrap();
-    let third = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let third = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
@@ -562,7 +562,7 @@ export default function Main(){
     assert_ne!(before, edited);
     assert_eq!(before.len(), edited.len());
     std::fs::write(&root_journal, edited).unwrap();
-    let edited = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let edited = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
@@ -570,14 +570,14 @@ export default function Main(){
     assert_eq!(expected["__ui"]["@label"], "other");
     // A broken cache is disposable; recovery still has the entire original journal.
     std::fs::write(&checkpoint, b"{broken checkpoint").unwrap();
-    let restored = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let restored = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
     assert_eq!(restored.agents.iter().find(|a| a.id == "a").unwrap().state, expected);
     // Configuration changes must rerun initialization under the requested environment.
     cfg.env.insert("DEMO".into(), "right".into());
-    let changed = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
+    let changed = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
     assert!(changed.agents.iter().all(|a| a.error.is_none()), "{changed:?}");
     assert_eq!(
         changed.agents.iter().find(|a| a.id == "a").unwrap().state["__ui"]["@initial"],
@@ -628,8 +628,8 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
             .count()
     };
     let mut bumps = 1;
-    // One more input each time, so each resume has a suffix to replay after the image.
-    let mut resume = |cfg: &RuntimeConfig, options: J| {
+    // One more input each time, so each restore has a suffix to replay after the image.
+    let mut restore = |cfg: &RuntimeConfig, options: J| {
         let clock = serde_json::from_slice::<J>(&std::fs::read(run.join("clock.json")).unwrap()).unwrap()["clock_ms"]
             .as_i64()
             .unwrap()
@@ -650,7 +650,7 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
         )
         .unwrap();
         bumps += 1;
-        let report = Runtime::resume(cfg.clone(), enc.clone(), template(options))
+        let report = Runtime::restore(cfg.clone(), enc.clone(), template(options))
             .unwrap()
             .run()
             .unwrap();
@@ -670,7 +670,7 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
     operational.restore_concurrency = Some(1);
     operational.call_timeout = Duration::from_secs(17);
     operational.max_wall = Some(Duration::from_secs(6));
-    resume(&operational, json!({"reasoning_effort":"high"}));
+    restore(&operational, json!({"reasoning_effort":"high"}));
     assert_eq!(
         restores(),
         before + 1,
@@ -684,15 +684,15 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
         format!("{source}\n// changed code\n"),
     )
     .unwrap();
-    resume(&operational, json!({"reasoning_effort":"high"}));
+    restore(&operational, json!({"reasoning_effort":"high"}));
     refused(n);
-    resume(&operational, json!({"reasoning_effort":"high"}));
+    restore(&operational, json!({"reasoning_effort":"high"}));
     assert_eq!(restores(), n + 1);
-    resume(&operational, json!({"reasoning_effort":"low"}));
+    restore(&operational, json!({"reasoning_effort":"low"}));
     refused(n + 1);
     let mut environment = operational.clone();
     environment.env.insert("DEMO".into(), "right".into());
-    assert_eq!(resume(&environment, json!({"reasoning_effort":"low"})), "right");
+    assert_eq!(restore(&environment, json!({"reasoning_effort":"low"})), "right");
     refused(n + 1);
 }
 
@@ -716,7 +716,7 @@ fn recovery_caches_skip_secret_environments_and_live_source_values() {
         let first = rt.run().unwrap();
         assert!(first.agents[0].error.is_none());
         assert!(!run.join("a/checkpoint.json").exists());
-        let second = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
+        let second = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
         assert!(second.agents[0].error.is_none());
         assert_eq!(first.agents[0].state, second.agents[0].state);
     }
@@ -740,12 +740,12 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
     fresh(cfg.clone());
     let path = run.join("a/store.jsonl");
     std::fs::write(&path, b"{broken record}\n").unwrap();
-    let resumed = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let restored = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
     assert!(
-        resumed
+        restored
             .agents
             .iter()
             .find(|a| a.id == "a")
@@ -755,7 +755,7 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
             .unwrap()
             .contains("store recovery failed")
     );
-    let b = resumed.agents.iter().find(|a| a.id == "b").unwrap();
+    let b = restored.agents.iter().find(|a| a.id == "b").unwrap();
     assert!(b.error.is_none());
     assert_eq!(b.state["__ui"]["@n"], 1);
     assert_eq!(std::fs::read(&path).unwrap(), b"{broken record}\n");
@@ -842,7 +842,7 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
             .unwrap();
             f.sync_all().unwrap();
         }
-        let report = Runtime::resume(cfg.clone(), enc.clone(), model())
+        let report = Runtime::restore(cfg.clone(), enc.clone(), model())
             .unwrap()
             .run()
             .unwrap();
@@ -867,10 +867,10 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
     bytes.extend_from_slice(b"{\"input\":\"result\"}");
     std::fs::write(&root, &bytes).unwrap();
     // A bad record is not torn: the agent's own restore refuses it, and its journal is kept.
-    let report = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
+    let report = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
     let a = report.agents.iter().find(|a| a.id == "a").unwrap();
     assert!(
-        a.error.as_deref().is_some_and(|e| e.contains("resume failed")),
+        a.error.as_deref().is_some_and(|e| e.contains("restore failed")),
         "{report:?}"
     );
     assert_eq!(std::fs::read(&root).unwrap(), bytes);
@@ -901,11 +901,11 @@ fn one_unreadable_journal_does_not_stop_the_fleet() {
         .write_all(b"{\"input\":\"unknown-variant\",\"clock_ms\":1}\n")
         .unwrap();
     let bytes = std::fs::read(&journal).unwrap();
-    let report = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
+    let report = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
     for agent in &report.agents {
         if agent.id == "b" {
             assert!(
-                agent.error.as_deref().is_some_and(|e| e.contains("resume failed")),
+                agent.error.as_deref().is_some_and(|e| e.contains("restore failed")),
                 "{report:?}"
             );
         } else {
@@ -916,7 +916,7 @@ fn one_unreadable_journal_does_not_stop_the_fleet() {
     assert_eq!(std::fs::read(&journal).unwrap(), bytes);
 }
 
-/// One runtime owns a run directory: a second one over it (a resume, or a fresh run) is refused
+/// One runtime owns a run directory: a second one over it (a restore, or a fresh run) is refused
 /// before it recovers anything, and the first runs on unaffected. The lock goes with its owner.
 #[test]
 fn a_second_runtime_cannot_take_a_live_run_directory() {
@@ -933,9 +933,9 @@ fn a_second_runtime_cannot_take_a_live_run_directory() {
     while std::fs::metadata(&journal).map_or(true, |m| m.len() == 0) {
         std::thread::sleep(Duration::from_millis(5));
     }
-    let err = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let err = Runtime::restore(cfg.clone(), enc.clone(), model())
         .err()
-        .expect("a resume over a live directory must fail");
+        .expect("a restore over a live directory must fail");
     assert!(
         err.contains("in use by another runtime") && err.contains(&cfg.dir.as_ref().unwrap().display().to_string()),
         "{err}"
@@ -951,10 +951,10 @@ fn a_second_runtime_cannot_take_a_live_run_directory() {
     let report = running.join().unwrap().unwrap();
     assert!(report.agents.iter().all(|a| a.error.is_none()), "{report:?}");
     let n = report.agents[0].state["__ui"]["@n"].as_u64().unwrap();
-    let resumed = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
+    let restored = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
     assert!(
-        resumed.agents[0].error.is_none() && resumed.agents[0].state["__ui"]["@n"].as_u64().unwrap() > n,
-        "{resumed:?}"
+        restored.agents[0].error.is_none() && restored.agents[0].state["__ui"]["@n"].as_u64().unwrap() > n,
+        "{restored:?}"
     );
 }
 
@@ -1027,7 +1027,7 @@ fn resume_rejects_a_saved_identity_that_escapes_its_directory() {
     let mut saved: J = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
     saved["id"] = json!("../outside");
     std::fs::write(&path, saved.to_string()).unwrap();
-    let err = Runtime::resume(cfg, enc, model())
+    let err = Runtime::restore(cfg, enc, model())
         .err()
         .expect("invalid saved identity must fail");
     assert!(err.contains("does not match its directory"), "{err}");

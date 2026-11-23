@@ -915,13 +915,13 @@ mod tests {
         let held = std::thread::spawn(move || {
             let (s, _) = listener.accept().unwrap();
             std::thread::sleep(std::time::Duration::from_millis(100));
-            t.cancel("controller pause");
+            t.cancel("the run is closing");
             std::thread::sleep(std::time::Duration::from_millis(700));
             drop(s)
         });
         let url = format!("http://127.0.0.1:{port}/generate");
         let e = super::post_json(&url, b"{}", &[], std::time::Duration::from_secs(5), &token).unwrap_err();
-        assert_eq!(e.message, "cancelled: controller pause");
+        assert_eq!(e.message, "cancelled: the run is closing");
         held.join().unwrap();
         let closed = std::net::TcpListener::bind("127.0.0.1:0")
             .unwrap()

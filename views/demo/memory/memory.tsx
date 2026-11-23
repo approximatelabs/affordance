@@ -10,7 +10,7 @@
 //   - Who may write memory is structural, not a prompt rule: a session writes through the `onNote`
 //     callback this root passes it. A helper it mounts gets no `onNote`, so it cannot write.
 //   - The memory outlives sessions because the root does: a session's stop (`onStop`) mounts the
-//     next, and a crash resumes the whole tree from its journals.
+//     next, and a crash restores the whole tree from its journals.
 import { TurnStrategy } from "@affordance/strategies/turn_strategy.tsx";
 import { cover, pendingBlocks } from "@affordance/strategies/context.tsx";
 import { MessagesApp } from "@affordance/template_apps/messages.tsx";

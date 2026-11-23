@@ -237,7 +237,9 @@ pub(super) fn post(
             name: event,
             payload,
             ack: Some(ack),
-            id: key,
+            // Its own namespace: a send's id starts with its sender's name, which never starts with
+            // `.`, so a post's key never matches a message from another instance.
+            id: key.map(|key| format!(".post:{key}")),
         },
     );
 }

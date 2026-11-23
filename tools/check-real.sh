@@ -82,9 +82,9 @@ if grep -q "the model call failed" "$WORK/d.err" && grep -q "not tried again" "$
   ok "an unreachable server is reported, and the run stops after its retry time"
 else bad "an unreachable server is reported, and the run stops after its retry time"; tail -3 "$WORK/d.err"; fi
 
-# "A run continues after it is resumed."
+# "A run continues after it is restored."
 agent r --set model.url=$V/v1
-if (cd "$WORK/r" && timeout 60 "$A" run --resume 2>/dev/null | grep -q '"complete": true'); then ok "a finished run resumes from its journal"; else bad "a finished run resumes from its journal"; fi
+if (cd "$WORK/r" && timeout 60 "$A" run --restore 2>/dev/null | grep -q '"complete": true'); then ok "a finished run restores from its journal"; else bad "a finished run restores from its journal"; fi
 
 # "affordance serve answers an OpenAI client."
 # The demo is copied out of the checkout first: it must run with the library the command bundles.

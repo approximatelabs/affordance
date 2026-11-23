@@ -610,7 +610,7 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
         read().iter().all(|e| e["t"] != "tool"),
         "controller cancellation has not completed the tool"
     );
-    let mut rt = Runtime::resume(config(), e.clone(), model()).unwrap();
+    let mut rt = Runtime::restore(config(), e.clone(), model()).unwrap();
     rt.bind_machine(
         "home",
         Arc::new(|_: &CallContext, _: &J| {
@@ -630,18 +630,18 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
     );
     assert!(completed.iter().all(|e| e["status"] == "ok" && e["timed_out"] == false));
     let before = std::fs::read(dir.join("agent-0000/trace.jsonl")).unwrap();
-    Runtime::resume(config(), e.clone(), model()).unwrap().run().unwrap();
+    Runtime::restore(config(), e.clone(), model()).unwrap().run().unwrap();
     assert_eq!(
         read().iter().filter(|e| e["t"] == "tool").count(),
         3,
-        "completed resume must not re-append prior completions"
+        "completed restore must not re-append prior completions"
     );
     assert!(
         std::fs::read(dir.join("agent-0000/trace.jsonl"))
             .unwrap()
             .starts_with(&before)
     );
-    save("host-resumed", &events);
+    save("host-restored", &events);
     std::fs::remove_dir_all(dir).unwrap();
 }
 

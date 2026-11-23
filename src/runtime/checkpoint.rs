@@ -29,7 +29,7 @@ struct Saved {
     offset: u64,
     /// The SHA-256 of the journal's last `TAIL` bytes before `offset`.
     tail: String,
-    /// Every blob the journal before `offset` refers to: a resume from the image checks they
+    /// Every blob the journal before `offset` refers to: a restore from the image checks they
     /// exist, as a full replay would, without reading the journal.
     blobs: Vec<String>,
     image: Image,
@@ -44,7 +44,7 @@ struct Envelope<'a> {
     #[serde(borrow)]
     data: Option<&'a RawValue>,
 }
-/// What a resume checks before it reads the image.
+/// What a restore checks before it reads the image.
 #[derive(Deserialize)]
 struct Header<'a> {
     #[serde(default)]
@@ -152,7 +152,7 @@ pub(super) fn refs_in(line: &str, into: &mut BTreeSet<String>) {
 }
 
 /// The journal's bytes just before `offset`, hashed: an image belongs to this journal when they
-/// match and `offset` ends a line. Reading the whole prefix would make every resume O(history);
+/// match and `offset` ends a line. Reading the whole prefix would make every restore O(history);
 /// the journal stays authoritative, and a full replay still reads all of it.
 fn tail_hash(path: &Path, offset: u64) -> Result<String, String> {
     let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
@@ -333,11 +333,11 @@ impl Checkpoint {
         })
         .map_err(|e| e.to_string())?;
         // With AFFORDANCE_VERIFY_IMAGES set (the test suite sets it), an image of an idle agent
-        // is read back, as a resume would read it, and the agent it gives is compared with the
+        // is read back, as a restore would read it, and the agent it gives is compared with the
         // one it was taken from: the same state, the same outstanding work, the same counters.
         // Every image any test writes is checked this way, whatever the test is about.
         // (An image of a step boundary is of an earlier moment than the live agent, even within
-        // the same input: it is checked by the tests that resume from one.)
+        // the same input: it is checked by the tests that restore from one.)
         if why.is_none() && std::env::var_os("AFFORDANCE_VERIFY_IMAGES").is_some() {
             let read: Saved = serde_json::from_str(&data).map_err(|e| format!("image verification: {e}"))?;
             let blobs = agent.blobs_handle();
