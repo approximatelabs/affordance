@@ -243,7 +243,7 @@ fn text_records_do_not_reproduce_generated_ids() {
 
 /// A screen logged as decoded text re-encodes across the adjacent `<aff>` runs.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn decoded_screen_text_differs_from_screen_ids() {
     let enc = encoder("zai-org__GLM-5.3");
     let v = view("glm53.tsx", &enc);
@@ -261,7 +261,7 @@ fn decoded_screen_text_differs_from_screen_ids() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn model_ids_are_metadata_free_and_reducible() {
     let enc = encoder("zai-org__GLM-5.3");
     let v = view("glm53.tsx", &enc);
@@ -286,7 +286,7 @@ fn model_ids_are_metadata_free_and_reducible() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn template_apps_without_exact_model_turns_name_the_record() {
     let enc = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let dir = std::env::temp_dir().join(format!("aff-consumer-{}", std::process::id()));
@@ -339,7 +339,7 @@ fn template_apps_without_exact_model_turns_name_the_record() {
 /// The consumer's crash: a `p``...``` fragment reached a template slot that indexes its content.
 /// A general fragment rejects numeric indexing explicitly; the error says where (file:line per frame) and which log record.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn fragment_in_a_string_slot_names_file_line_and_record() {
     let enc = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let dir = std::env::temp_dir().join(format!("aff-consumer-frag-{}", std::process::id()));
@@ -397,7 +397,7 @@ export default function Main({{ log }}) {{
 
 /// The encoder is loaded once and shared; each render thread binds its own `View` to it.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn one_encoder_serves_sixteen_render_threads() {
     let enc = Arc::new(encoder("zai-org__GLM-5.3"));
     let state_json = json!({"log": [{"kind": "input", "content": "Task."}, {"kind": "model", "ids": [1, 2, 3]}], "handle": "agent-0001"});
@@ -429,7 +429,7 @@ fn one_encoder_serves_sixteen_render_threads() {
 /// the host serves those effect names (never the tool names) on worker threads, one of them slow,
 /// replays each handler when its effect completes, and logs the result as an `action` record.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn harness_api_effects_with_a_slow_external_call() {
     use std::sync::mpsc;
     use std::time::{Duration, Instant};

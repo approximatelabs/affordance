@@ -101,7 +101,7 @@ fn restores(dir: &Path) -> Vec<J> {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_loop_agent_stopped_mid_step_resumes_from_its_last_step_boundary() {
     let base = std::env::temp_dir().join(format!("aff-restore-image-{}", std::process::id()));
     let (a, b) = (base.join("image"), base.join("full"));
@@ -167,7 +167,7 @@ fn a_loop_agent_stopped_mid_step_resumes_from_its_last_step_boundary() {
 /// one that uses none: each app is imaged when its run ends, and a restore from that image reaches
 /// the state a full replay of the same journal reaches.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_promise_used_during_render_does_not_stop_recovery_images() {
     let base = std::env::temp_dir().join(format!("aff-render-promise-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);

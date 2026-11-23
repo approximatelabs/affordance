@@ -49,7 +49,7 @@ fn model_name(s: &affordance::emit::Span) -> &str {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn reusing_a_captured_tree_keeps_every_declared_tool_dispatchable() {
     let e = enc();
     let v = view(
@@ -80,7 +80,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn later_parent_layout_cannot_publish_hidden_tools() {
     let e = enc();
     let v = view(
@@ -111,7 +111,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn named_targets_keep_the_same_alias_after_reordering() {
     let e = enc();
     let v = view(
@@ -148,7 +148,7 @@ export default function Main({items}) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn one_object_parameter_does_not_invent_a_property_named_after_the_variable() {
     let e = enc();
     let v = view(
@@ -172,7 +172,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn ordinary_nested_array_and_number_children_stay_valid_in_an_adapter() {
     let e = enc();
     let v = view(
@@ -191,7 +191,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn passive_projection_keeps_prompt_and_schemas_without_callable_spans() {
     let e = enc();
     let v = view(

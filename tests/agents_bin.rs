@@ -157,7 +157,7 @@ fn serve_completions(mut s: std::net::TcpStream, req: &J, enc: &Encoder) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn completions_streaming_with_token_ids() {
     use affordance::runtime::{CancelToken, Completions, GenRequest, Model};
     let tokenizer = root().join("ref/tokenizers/zai-org__GLM-5.3.json");
@@ -177,7 +177,7 @@ fn completions_streaming_with_token_ids() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn sglang_streaming_cumulative_incremental_stop_stall_and_cut() {
     use affordance::runtime::{CancelToken, GenRequest, Model, Sglang};
     let tokenizer = root().join("ref/tokenizers/zai-org__GLM-5.3.json");
@@ -240,7 +240,7 @@ fn sglang_streaming_cumulative_incremental_stop_stall_and_cut() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn generic_runtime_binary_runs_an_app_from_config() {
     let tokenizer = root().join("ref/tokenizers/zai-org__GLM-5.3.json");
     let enc = shared::tokenizer(&tokenizer);
@@ -286,7 +286,7 @@ fn generic_runtime_binary_runs_an_app_from_config() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn the_binary_runs_a_root_app_that_mounts_a_fleet_on_a_machine_pool() {
     let tokenizer = root().join("ref/tokenizers/zai-org__GLM-5.3.json");
     let enc = shared::tokenizer(&tokenizer);
@@ -355,7 +355,7 @@ fn obsolete_memory_limit_and_unknown_fields_are_rejected() {
 /// A per-agent machine (`{id}` in its spec) serves the agent's mounted children too: a child
 /// (`a/kid`) runs on its root's machine, as `<Mount>` hands a child its parent's machines.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_mounted_child_uses_its_roots_per_agent_machine() {
     let tokenizer = root().join("ref/tokenizers/zai-org__GLM-5.3.json");
     let url = mock_sglang(shared::tokenizer(&tokenizer));

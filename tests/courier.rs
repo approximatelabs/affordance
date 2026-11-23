@@ -47,7 +47,7 @@ fn act(view: &View, enc: &Encoder, s: &J, action: &str) -> J {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn layouts_preserve_actions_and_state_transitions() {
     let enc = encoder();
     let view = load(&enc);
@@ -72,7 +72,7 @@ fn layouts_preserve_actions_and_state_transitions() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn entering_parcel_picks_it_up_and_entering_depot_finishes() {
     let enc = encoder();
     let view = load(&enc);
@@ -125,7 +125,7 @@ fn projected_actions_keep_distinct_targets_in_both_protocols() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn history_display_choices_are_causal_and_native_handlers_append() {
     let enc = encoder();
     let view = load(&enc);
@@ -168,7 +168,7 @@ fn history_display_choices_are_causal_and_native_handlers_append() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn pinned_history_retains_the_public_pickup_event() {
     let enc = encoder();
     let view = load(&enc);

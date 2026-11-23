@@ -83,7 +83,7 @@ fn run(mut runtime: Runtime) -> J {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn headers_and_response_match_nodes_native_web_apis() {
     let dir = Scratch::new();
     let cases = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/fetch_cases.tsx");
@@ -113,7 +113,7 @@ process.stdout.write(JSON.stringify(result));
 
 #[cfg(feature = "http")]
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn global_fetch_returns_standard_responses_and_reuses_existing_authority_checks() {
     use affordance::connectors::http::{Http, HttpConfig};
     let server = fixture::Server::new(|request| {
@@ -195,7 +195,7 @@ harness.stop({info, value, clone: await clone.json(), immutable, consumed, used:
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn fetch_is_a_first_class_function_and_named_bindings_are_explicit() {
     let dir = Scratch::new();
     let library = concat!(env!("CARGO_MANIFEST_DIR"), "/views/lib/http.tsx");
@@ -226,7 +226,7 @@ harness.stop({missing, result: await request(custom)});
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn unsupported_fetch_features_fail_before_io_and_globals_can_be_shadowed() {
     let dir = Scratch::new();
     let app = dir.app(

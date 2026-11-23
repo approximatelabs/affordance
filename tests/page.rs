@@ -146,7 +146,7 @@ fn calls(cmds: &[Command]) -> Vec<u64> {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_chat_is_quiet_until_spoken_to_and_after_it_answers() {
     let (mut rig, start) = Rig::new(CHAT, "chat_idle");
     assert!(generates(&start).is_empty(), "nothing to answer: no model call");
@@ -168,7 +168,7 @@ fn a_chat_is_quiet_until_spoken_to_and_after_it_answers() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn messages_during_an_answer_are_written_after_it_and_answered_together() {
     let (mut rig, _) = Rig::new(CHAT, "chat_three");
     let g = generates(&rig.message("m1"));
@@ -190,7 +190,7 @@ fn messages_during_an_answer_are_written_after_it_and_answered_together() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_listener_runs_while_a_tool_waits() {
     let (mut rig, _) = Rig::new(CHAT, "chat_tool");
     let g = generates(&rig.message("look it up"));
@@ -217,7 +217,7 @@ fn a_listener_runs_while_a_tool_waits() {
 /// An output that is never dispatched runs none of its calls; the log closes the turn with
 /// `not run` results (`log.close`), so the model sees what happened.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn an_output_not_dispatched_runs_nothing_and_closes_with_not_run_results() {
     let body = r#"
 export default function Main() {
@@ -253,7 +253,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn an_effect_cleans_up_when_its_deps_change() {
     let body = r#"
 export default function Main() {
@@ -287,7 +287,7 @@ export default function Main() {
 
 /// Replay: a journal of the three-messages chat restores to the same transcript and state.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn the_chat_replays_from_its_journal() {
     let (mut rig, _) = Rig::new(CHAT, "chat_replay");
     let mut journal = vec![];
@@ -354,7 +354,7 @@ fn the_chat_replays_from_its_journal() {
 /// A tool answers when its body returns (a Service Worker's `respondWith`): the model is called
 /// again at once, and the work it started without awaiting goes on and lands later.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_tool_answers_when_it_returns_and_its_unawaited_work_goes_on() {
     let body = r#"
 export default function Main() {
@@ -389,7 +389,7 @@ export default function Main() {
 
 /// `harness.wait({ms})` reads milliseconds as `setTimeout` does: a fraction is truncated, not "no deadline".
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_wait_with_fractional_ms_times_out() {
     let body = r#"
 export default function Main() {
@@ -412,7 +412,7 @@ export default function Main() {
 /// A declared function is a handler like an arrow (`onRun={lookup}`): it used to be dropped
 /// silently, leaving no tool and no error.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_declared_function_is_a_tool_handler() {
     let body = r#"
 function lookup({ q }) { return "found " + q; }
@@ -443,7 +443,7 @@ fn unused(_: J) {}
 /// keeps listeners mounted when hidden). Event delivery reads the evaluated document's listener
 /// table and lays nothing out; this pins that it finds the same listeners as before.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_listener_in_a_cropped_or_hidden_box_hears_its_event() {
     const APP: &str = r#"
 export default function Main() {
@@ -470,7 +470,7 @@ export default function Main() {
 /// `useRef`: storage that does not render. A handler's writes to it alone keep the last
 /// evaluated document current (no new evaluation for them); a render that reads it fails.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_ref_does_not_render() {
     const APP: &str = r#"
 export default function Main() {

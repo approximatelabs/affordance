@@ -50,7 +50,7 @@ fn rand_id(s: &str) -> u64 {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn scroll_demo_budget_and_affordances() {
     let Some(enc) = qwen() else { return };
     let view = View::load(&root().join("views/demo/scroll_list_actions.tsx"), "ScrollDemo", &enc).unwrap();
@@ -98,7 +98,7 @@ fn scroll_demo_budget_and_affordances() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn box_without_overflow_is_untouched() {
     let Some(enc) = qwen() else { return };
     let r = render_src(
@@ -112,7 +112,7 @@ fn box_without_overflow_is_untouched() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tok_size_pads_and_clips() {
     let Some(enc) = qwen() else { return };
     let pad = enc.token_id("<|endoftext|>").unwrap();
@@ -124,7 +124,7 @@ fn tok_size_pads_and_clips() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn img_placeholder_tokens() {
     let Some(enc) = qwen() else { return };
     let r = render_src(&enc, r#"export default function Main() { return <><|vision_start|><img tok_size={1024} t="<|image_pad|>"/><|vision_end|></>; }"#, json!({})).unwrap();
@@ -134,7 +134,7 @@ fn img_placeholder_tokens() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn literal_specials_are_ids_and_text_is_text() {
     let Some(enc) = qwen() else { return };
     let r = render_src(
@@ -150,7 +150,7 @@ fn literal_specials_are_ids_and_text_is_text() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn safe_text_blocks_injection() {
     let Some(enc) = qwen() else { return };
     let end = enc.token_id("<|im_end|>").unwrap();
@@ -176,7 +176,7 @@ fn safe_text_blocks_injection() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn runs_merge_across_pieces() {
     // "a " + "b" must encode as one run (space+letter merges); piecewise encoding differs.
     let Some(enc) = qwen() else { return };
@@ -193,7 +193,7 @@ fn runs_merge_across_pieces() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn errors_propagate() {
     let Some(enc) = qwen() else { return };
     // reading a property of undefined or null is a TypeError
@@ -234,7 +234,7 @@ fn errors_propagate() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn js_value_semantics() {
     let Some(enc) = qwen() else { return };
     let r = render_src(&enc, r#"export default function Main() {
@@ -247,7 +247,7 @@ fn js_value_semantics() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn bigint_json_stays_exact() {
     // A JSON integer beyond 64 bits must round-trip through tojson verbatim (a Python int), when
     // the engine reads the JSON text itself: `parse_json_exact`, as the commands do for state and
@@ -289,7 +289,7 @@ fn bigint_json_stays_exact() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tsx_scroll_demo_style_and_on_props() {
     let Some(enc) = qwen() else { return };
     let view = View::load(&root().join("views/demo/scroll_list.tsx"), "ScrollDemo", &enc).unwrap();
@@ -322,7 +322,7 @@ fn tsx_scroll_demo_style_and_on_props() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tss_stylesheet_cascade() {
     let Some(enc) = qwen() else { return };
     let view = View::load(&root().join("views/demo/styled_chat.tsx"), "StyledChat", &enc).unwrap();
@@ -360,7 +360,7 @@ fn tss_stylesheet_cascade() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tss_inline_style_overrides_sheet() {
     let Some(enc) = qwen() else { return };
     let dir = std::env::temp_dir().join(format!("avl_tss_{}", std::process::id()));
@@ -396,7 +396,7 @@ export default function Main({ t }) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tss_drop_start_drops_whole_messages() {
     let Some(enc) = qwen() else { return };
     let dir = std::env::temp_dir().join(format!("avl_drop_{}", std::process::id()));
@@ -436,7 +436,7 @@ export default function Main({ messages }) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn box_drop_start_drops_whole_items() {
     let Some(enc) = qwen() else { return };
     let src = r#"const Items = ({ msgs }) => msgs.map(m => p`${m}\n`);
@@ -470,7 +470,7 @@ export default function Main({ msgs }) { return <Items msgs={msgs} style={{ maxT
 
 /// An array child of a `<box>` (`{xs.map(..)}`) is one item per element.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn box_overflow_drops_whole_mapped_items() {
     let Some(enc) = qwen() else { return };
     let src = r#"export default function Main({ msgs }) {
@@ -500,7 +500,7 @@ fn box_overflow_drops_whole_mapped_items() {
 /// A drop box's items are one run, as the template wrote them: an item boundary is a mark, not
 /// a tokenization boundary, so a box that fits encodes exactly as its content without the box.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn drop_box_item_boundaries_do_not_change_the_encoding() {
     let Some(enc) = qwen() else { return };
     // "a\n" then "\nb": the tokenizer merges "\n\n" across the two items.
@@ -524,7 +524,7 @@ fn drop_box_item_boundaries_do_not_change_the_encoding() {
 
 /// A drop that would cut inside a token two items share is an error, not a silent re-encode.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn drop_box_cut_inside_a_shared_token_is_an_error() {
     let Some(enc) = qwen() else { return };
     let src = r#"export default function Main({ xs }) {
@@ -585,7 +585,7 @@ fn drop_box_lstrip_across_an_item_boundary() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn box_drop_end_drops_whole_items() {
     let Some(enc) = qwen() else { return };
     let src = r#"const Items = ({ msgs }) => msgs.map(m => p`${m}\n`);
@@ -626,7 +626,7 @@ export default function Main({ msgs }) { return <Items msgs={msgs} style={{ maxT
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn box_drop_keeps_at_least_one_item() {
     let Some(enc) = qwen() else { return };
     let item_txt = "payload words here";
@@ -656,7 +656,7 @@ export default function Main({ msgs }) { return <Items msgs={msgs} style={{ maxT
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn box_drop_clips_a_single_too_big_item() {
     let Some(enc) = qwen() else { return };
     let item_txt = "the quick brown fox jumps over the lazy dog";
@@ -685,7 +685,7 @@ export default function Main({ msgs }) { return <Items msgs={msgs} style={{ maxT
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn drop_more_marker_counts_in_budget() {
     let Some(enc) = qwen() else { return };
     let item_txt = "the quick brown fox jumps over the lazy dog";
@@ -718,7 +718,7 @@ export default function Main({ msgs }) { return <Items msgs={msgs} style={{ maxT
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn box_without_drop_is_unchanged_by_item_boundaries() {
     let Some(enc) = qwen() else { return };
     let msgs: Vec<String> = (0..5).map(|i| format!("line {}", i)).collect();
@@ -740,7 +740,7 @@ export default function Main({ msgs }) { return <Items msgs={msgs} style={{ maxT
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tss_component_rule_drops_whole_items() {
     let Some(enc) = qwen() else { return };
     let dir = std::env::temp_dir().join(format!("avl_drop_items_{}", std::process::id()));
@@ -776,7 +776,7 @@ export default function Main({ msgs }) { return <History msgs={msgs}/>; }
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn use_state_and_act_loop() {
     let Some(enc) = qwen() else { return };
     let view = View::load(&root().join("views/demo/scroll_state.tsx"), "ScrollState", &enc).unwrap();
@@ -823,7 +823,7 @@ fn use_state_and_act_loop() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn set_state_during_render_is_an_error() {
     let Some(enc) = qwen() else { return };
     let dir = std::env::temp_dir().join(format!("avl_us_{}", std::process::id()));
@@ -844,7 +844,7 @@ fn set_state_during_render_is_an_error() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn strict_tokens_reject_special_text_and_tok_values_work() {
     let Some(enc) = qwen() else { return };
     let dir = std::env::temp_dir().join(format!("avl_strict_{}", std::process::id()));
@@ -886,7 +886,7 @@ fn strict_tokens_reject_special_text_and_tok_values_work() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn strict_tokens_textortoken_unknown_tok_and_fragment_text() {
     let Some(enc) = qwen() else { return };
     let dir = std::env::temp_dir().join(format!("avl_strict2_{}", std::process::id()));
@@ -928,7 +928,7 @@ fn strict_tokens_textortoken_unknown_tok_and_fragment_text() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tools_must_be_a_list_of_schemas() {
     let Some(enc) = qwen() else { return };
     let view = View::load(&root().join("views/qwen/qwen2.tsx"), "Qwen2", &enc).unwrap();
@@ -966,7 +966,7 @@ fn tools_must_be_a_list_of_schemas() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_named_state_field_survives_changes_to_the_component_tree_and_is_shared() {
     // Version 2 adds a component and a hook before the counter: a positional hook would move to
     // another key; the named field `@count` is the same field in both, and in every component.
@@ -996,7 +996,7 @@ fn a_named_state_field_survives_changes_to_the_component_tree_and_is_shared() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn context_cover_matches_optmems_own_tree_cover() {
     // tests/fixtures/optmem_cover.json: OptMem's `cover(T, budget)` (github.com/VictorTaelin/OptMem,
     // the `memo` tool) for 24 sizes and budgets; views/strategies/context.tsx must tile the same.
@@ -1037,7 +1037,7 @@ fn context_cover_matches_optmems_own_tree_cover() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn native_elements_and_component_wrappers_share_style_resolution_and_visibility() {
     let Some(enc) = qwen() else { return };
     let dir = std::env::temp_dir().join(format!("aff-style-contract-{}", std::process::id()));
@@ -1106,7 +1106,7 @@ export default function Main(){{return <{tag} id="target" {inline}>one two three
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn scroll_viewports_slice_exact_ids_and_only_offer_visible_executable_actions() {
     let Some(enc) = qwen() else { return };
     let dir = std::env::temp_dir().join(format!("aff-viewport-contract-{}", std::process::id()));

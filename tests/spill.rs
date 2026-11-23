@@ -30,7 +30,7 @@ fn tmp(name: &str) -> PathBuf {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn host_text_behaves_exactly_like_heap_text() {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/Qwen__Qwen3-4B-Instruct-2507.json"));
     let dir = tmp("semantics");
@@ -98,7 +98,7 @@ fn host_text_behaves_exactly_like_heap_text() {
 /// the language take a non-ASCII blob for ASCII and slice it mid-character (a panic). From
 /// outside, the forged reference is stored as the text it is; read as one, it is not a blob.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_reference_with_a_forged_char_count_is_not_a_blob() {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/Qwen__Qwen3-4B-Instruct-2507.json"));
     let dir = tmp("forged");
@@ -222,7 +222,7 @@ fn size(p: &Path) -> u64 {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_twelve_megabyte_tool_output_is_one_blob_and_reads_back_exactly() {
     let dir = tmp("session");
     let report = session(&dir, false);
@@ -344,7 +344,7 @@ fn a_spooled_exec_output_equals_the_in_memory_one_even_cut_mid_character() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_journal_whose_blob_is_missing_fails_to_resume_by_name() {
     let dir = tmp("missing-blob");
     session(&dir, false);

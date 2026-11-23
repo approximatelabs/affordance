@@ -216,7 +216,7 @@ fn find_big_number_is_token_exact_in_two_official_templates() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn unrolling_and_last_turn_have_distinct_observation_history() {
     let e = encoder("Qwen__Qwen3.6-27B");
     let v = View::load(&root().join("tests/fixtures/turns_qwen36.tsx"), "Main", &e).unwrap();
@@ -239,7 +239,7 @@ fn unrolling_and_last_turn_have_distinct_observation_history() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn invalid_plans_and_unconsumed_strategy_fail_explicitly() {
     let e = encoder("Qwen__Qwen3.6-27B");
     let v = View::load(&root().join("tests/fixtures/turns_qwen36.tsx"), "Main", &e).unwrap();
@@ -362,7 +362,7 @@ fn find_big_number_scroll_edit_and_submit_survive_model_switch() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn projected_actions_cannot_be_cropped_after_strategy() {
     let e = encoder("Qwen__Qwen3.6-27B");
     let path = root().join("views/demo/find_big_number.tsx");
@@ -382,7 +382,7 @@ fn projected_actions_cannot_be_cropped_after_strategy() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn historical_fragments_keep_tokens_but_never_publish_past_handlers() {
     let e = encoder("Qwen__Qwen3.6-27B");
     let src = format!(
@@ -450,7 +450,7 @@ fn nemotron_port_matches_independent_thinking_tools_and_history_audit() {
 /// A conversation with nothing on the screen is the official template's prompt for the same
 /// messages: no empty user turn after the last message, and the generation prompt follows it.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn an_empty_screen_adds_no_turn() {
     let e = encoder("Qwen__Qwen3.6-27B");
     let views = root().join("views");

@@ -40,7 +40,7 @@ fn fresh(enc: &Encoder, view: &View, options: &Options, messages: &[J], kwargs: 
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn interleaved_growing_conversations_render_as_fresh_ones() {
     let kwargs = json!({"add_generation_prompt": true});
     for model in [
@@ -87,7 +87,7 @@ fn interleaved_growing_conversations_render_as_fresh_ones() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_request_the_template_rejects_is_raised_and_the_renderer_goes_on() {
     let options = options("Qwen__Qwen3.6-27B");
     let renderer = ChatRenderer::json(options).unwrap();
@@ -105,7 +105,7 @@ fn a_request_the_template_rejects_is_raised_and_the_renderer_goes_on() {
 
 /// A server's own message type: converted once, the first time it is seen at its place.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_message_is_converted_once() {
     #[derive(Debug, Clone, PartialEq)]
     struct Message(&'static str, String);
@@ -132,7 +132,7 @@ fn a_message_is_converted_once() {
 /// A tool-using conversation: the same ids as a fresh render with its tool list, and when the
 /// list changes mid-conversation the prompt is the one for the new list.
 #[test]
-#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_conversation_with_tools_renders_as_a_fresh_one() {
     let kwargs = json!({"add_generation_prompt": true});
     let tool = |name: &str| {
