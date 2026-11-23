@@ -107,7 +107,7 @@ fn safe_text_keeps_every_added_token_out_of_data_text() {
 /// pipeline-free path where the model has one, and it encodes exactly as the text-only tokenizer
 /// does, for data that spells every added token.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn safe_runs_match_the_text_only_tokenizer_on_reference_models() {
     let paths = each::reference_tokenizers();
     // Each tokenizer on its own thread.

@@ -60,9 +60,12 @@ default = ["http"]
 http = ["dep:reqwest", "dep:hyper", "dep:hyper-util", "dep:http-body-util", "dep:tokio", "dep:rustls", "dep:bytes"]
 # A sampling profile (SIGPROF, no perf events) of the benchmarks: AFFORDANCE_FLAMEGRAPH=out.svg turn_bench ..
 profile = ["dep:pprof"]
-# Tests against the reference data under ref/ (real model tokenizers, official template outputs,
-# conformance corpora; docs/DEVELOPING.md says how to fetch it). Without it they are ignored.
-reference-tests = []
+# Tests that load a few publishers' tokenizers, from the archive tools/fetch-test-tokenizers.sh
+# fetches (CI on Linux runs them). Without it they are ignored.
+test-tokenizers = []
+# Tests against all the reference data under ref/ (every model's tokenizer, official template
+# outputs, conformance corpora; docs/DEVELOPING.md says how to fetch it), and the tests above.
+reference-tests = ["test-tokenizers"]
 
 [lints.rust]
 # Kani proof harnesses (src/emit_proofs.rs) build only under `cargo kani`; the Verus

@@ -87,7 +87,7 @@ fn a_large_input_streams_through() {
 
 /// From an app: a large input is one blob on disk, never in the journal; the command gets its bytes.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn an_apps_large_input_is_a_blob_reference_in_the_journal() {
     let dir = tmp("app");
     let app = dir.join("app.tsx");

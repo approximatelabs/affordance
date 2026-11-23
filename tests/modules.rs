@@ -62,7 +62,7 @@ fn encoder() -> &'static Encoder {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn function_values_compose_through_props_members_and_returned_closures() {
     let f = Files::new();
     f.write(
@@ -90,7 +90,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn imports_keep_functions_closures_classes_and_defaults_in_their_defining_file() {
     let f = Files::new();
     f.write(
@@ -130,7 +130,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn side_effect_imports_and_transitive_dependencies_do_not_leak_names() {
     let f = Files::new();
     f.write(
@@ -151,7 +151,7 @@ fn side_effect_imports_and_transitive_dependencies_do_not_leak_names() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn diamond_imports_share_binding_identity_and_export_aliases() {
     let f = Files::new();
     f.write(
@@ -171,7 +171,7 @@ fn diamond_imports_share_binding_identity_and_export_aliases() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn jsx_aliases_and_mounts_keep_the_declared_child_entry() {
     let f = Files::new();
     f.write(
@@ -200,7 +200,7 @@ fn jsx_aliases_and_mounts_keep_the_declared_child_entry() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn schema_aliases_are_resolved_in_the_functions_own_module() {
     let f = Files::new();
     f.write(
@@ -218,7 +218,7 @@ fn schema_aliases_are_resolved_in_the_functions_own_module() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn imports_fail_explicitly_for_ambiguous_or_unsupported_graphs() {
     let f = Files::new();
     f.write("lib.tsx", "export function value(){return 1;}");
@@ -266,7 +266,7 @@ fn imports_fail_explicitly_for_ambiguous_or_unsupported_graphs() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn module_constants_have_a_temporal_dead_zone_and_imports_are_read_only() {
     let f = Files::new();
     f.write(
@@ -293,7 +293,7 @@ fn module_constants_have_a_temporal_dead_zone_and_imports_are_read_only() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn standard_library_internals_are_isolated_and_public_globals_can_be_shadowed() {
     let f = Files::new();
     f.write("app.tsx", "function headerName(){return 'broken';} function fetch(){return 'local';} export default function Main(){return new Headers({HELLO:'world'}).get('hello')+':'+fetch()+':'+typeof fetchBound;}");
@@ -303,7 +303,7 @@ fn standard_library_internals_are_isolated_and_public_globals_can_be_shadowed() 
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn imported_async_closures_keep_their_scope_across_effect_replay() {
     let f = Files::new();
     f.write("lib.tsx", "const label='library'; function helper(){return label;} export function make(){return async()=>{const first=await harness.machine.call({cmd:helper()}); return helper()+':'+first.output;};}");
@@ -348,7 +348,7 @@ fn imported_async_closures_keep_their_scope_across_effect_replay() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn source_modules_keep_private_bindings_imports_types_and_distinct_identity() {
     let f = Files::new();
     f.write(
@@ -390,7 +390,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn source_module_errors_are_catchable_and_initializers_cannot_use_the_caller() {
     let f = Files::new();
     let cases = [
@@ -425,7 +425,7 @@ fn source_module_errors_are_catchable_and_initializers_cannot_use_the_caller() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn replaced_source_keeps_its_imports_and_helpers_for_pending_work_and_replay() {
     let f = Files::new();
     f.write(
@@ -562,7 +562,7 @@ export default function Panel(){{return helper();}}
 /// of it, not an absolute path elsewhere, not through a symlink pointing out (the ticket's attack:
 /// an inline app reaching a fleet's shared directory).
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_served_app_imports_only_from_its_directory_and_the_library() {
     let enc = encoder();
     let base = std::env::temp_dir().join(format!("aff-contain-{}", std::process::id()));

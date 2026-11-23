@@ -178,7 +178,7 @@ fn fixture() -> Server {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn tsx_mcp_discovers_pages_invokes_and_replays_without_network() {
     let dir = Scratch::new();
     let app = dir.app(r#"
@@ -256,7 +256,7 @@ harness.stop({info, listed, results, required, continued});
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn protocol_rpc_and_http_errors_are_distinct_from_tool_errors() {
     let dir = Scratch::new();
     let app = dir.app("const listed = await mcpClient('/mcp').listTools(); harness.stop(listed);");
@@ -323,7 +323,7 @@ fn protocol_rpc_and_http_errors_are_distinct_from_tool_errors() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn network_authority_is_still_an_instance_binding() {
     let dir = Scratch::new();
     let app = dir.app("await mcpClient('/mcp').discover(); harness.stop('unexpected');");
@@ -345,7 +345,7 @@ fn network_authority_is_still_an_instance_binding() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn mcp_accepts_an_injected_fetch_function_with_standard_responses() {
     let dir = Scratch::new();
     let app = dir.app(
@@ -369,7 +369,7 @@ harness.stop(await client.listTools());
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn example_exposes_only_app_selected_tools_and_dispatches_the_alias() {
     use affordance::runtime::GenReply;
     let app = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/views/demo/mcp/app.tsx"));
@@ -441,7 +441,7 @@ fn example_exposes_only_app_selected_tools_and_dispatches_the_alias() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn mirrored_headers_encode_padding_newlines_and_literal_sentinels_and_skip_null() {
     let dir = Scratch::new();
     let app = dir.app(
@@ -478,7 +478,7 @@ harness.stop("done");
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn schema_annotations_are_checked_without_confusing_instance_data_with_schemas() {
     let dir = Scratch::new();
     let app = dir.app("harness.stop(await mcpClient('/mcp').listTools());");

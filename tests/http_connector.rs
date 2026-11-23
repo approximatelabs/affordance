@@ -237,7 +237,7 @@ fn completed_caller_cannot_cancel_a_later_request_on_its_pooled_connection() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn binary_configures_http_bindings_with_each_callers_credentials() {
     let server = Server::new(|request| {
         let caller = request.body.as_str();

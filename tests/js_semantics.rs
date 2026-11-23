@@ -52,7 +52,7 @@ fn js(enc: &Encoder, expr: &str) -> String {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn javascript_expressions_evaluate_as_in_javascript() {
     let enc = enc();
     let cases: &[(&str, &str)] = &[
@@ -175,7 +175,7 @@ fn javascript_expressions_evaluate_as_in_javascript() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn statements_in_a_js_file() {
     let enc = enc();
     let src = r#"function keysOf(o) { let s = ""; for (const k in o) s += k; return s; }
@@ -192,7 +192,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn destructuring_spread_and_updates() {
     let enc = enc();
     let src = r#"function sum(...xs) { return 0; }
@@ -212,7 +212,7 @@ export default function Main() {
 
 /// What JavaScript rejects, the views reject: no Python leniency.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn javascript_errors() {
     let enc = enc();
     let fails = |body: &str| {
@@ -252,7 +252,7 @@ fn javascript_errors() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn try_catch_throw_and_optional_chaining() {
     let enc = enc();
     let src = r#"function risky(n) { if (n > 1) throw new_error("too big: " + n); return n; }
@@ -278,7 +278,7 @@ export default function Main() {
 /// `catch` never catches a pending effect: the handler still parks on it, and a failed effect
 /// (an error outcome in the transcript) is caught on replay.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn catch_handles_failed_effects_but_not_pending_ones() {
     use affordance::effects::Outcome;
     let enc = enc();
@@ -337,7 +337,7 @@ fn catch_handles_failed_effects_but_not_pending_ones() {
 /// `await` is an operator only in an async function's own body, as in JavaScript: anywhere else
 /// it is a load error (it parsed, and the frame, which cannot suspend, dropped its task silently).
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn await_outside_an_async_function_is_a_syntax_error() {
     let enc = enc();
     let sync = [
@@ -386,7 +386,7 @@ fn await_outside_an_async_function_is_a_syntax_error() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_runaway_view_runs_out_of_fuel_instead_of_hanging() {
     let enc = enc();
     let started = std::time::Instant::now();
@@ -406,7 +406,7 @@ fn a_runaway_view_runs_out_of_fuel_instead_of_hanging() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn compound_assignment_operators() {
     let enc = enc();
     let out = run(&enc, "compound", "export default function Main() { let x = 6; x *= 7; x -= 2; x /= 4; let y = 5; for (let i = 0; i < 3; i *= 1) { y += 1; i += 1; } return `${x} ${y} ${3 * 4}`; }\n").unwrap();
@@ -416,7 +416,7 @@ fn compound_assignment_operators() {
 /// JSX spread attributes: `{...obj}` passes every entry; a later attribute of the same name wins,
 /// as in React; null spreads nothing; a non-object is a TypeError.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn jsx_spread_attributes_pass_an_objects_entries() {
     let enc = enc();
     let src = |main: &str| {
@@ -442,7 +442,7 @@ fn jsx_spread_attributes_pass_an_objects_entries() {
 /// holds it, with JavaScript's results: an alias keeps the old array, the new items see the old
 /// value, and a non-list is spread as written.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn growing_a_list_by_spreading_it_keeps_javascript_semantics() {
     let enc = enc();
     let run1 =
@@ -498,7 +498,7 @@ fn growing_a_list_by_spreading_it_keeps_javascript_semantics() {
 /// A model turn's `ids` is a token run (one laid-out fragment, no value per id) that reads like
 /// a list of ids; `tokens()` passes it through.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_token_run_reads_like_a_list_of_ids() {
     let enc = enc();
     let cases: &[(&str, &str)] = &[

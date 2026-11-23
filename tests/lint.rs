@@ -120,7 +120,7 @@ fn python_syntax_is_a_parse_error_that_names_the_migration() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn python_builtins_and_methods_fail_with_the_javascript_to_write() {
     let enc = Encoder::from_file(
         root()

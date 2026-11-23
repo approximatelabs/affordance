@@ -197,7 +197,7 @@ fn glm_call(think: &str, name: &str, args: &[(&str, &str)]) -> String {
 /// text (outside its schema) and again with text: the first is answered with its problem, the
 /// second runs and the notes are saved.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_bad_call_does_not_stop_a_good_call_to_the_same_tool() {
     let enc = encoder();
     let v = view(&enc);
@@ -227,7 +227,7 @@ fn a_bad_call_does_not_stop_a_good_call_to_the_same_tool() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn one_agent_session_is_exact_and_replays() {
     let enc = encoder();
     let v = view(&enc);
@@ -324,7 +324,7 @@ fn one_agent_session_is_exact_and_replays() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn messages_arrive_with_the_next_turn_and_wake_waits() {
     let enc = encoder();
     let v = view(&enc);
@@ -472,7 +472,7 @@ fn fleet_runtime(
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
     let dir = std::env::temp_dir().join(format!("aff-runtime-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -595,7 +595,7 @@ fn exec_over_ssh_localhost() {
 /// A refused model call is tried again as many times as the retry policy's `refused` says (here
 /// four), after a doubling wait and with the same prompt; then the app gets the error.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn model_errors_retry_with_backoff_then_stop() {
     let enc = encoder();
     let v = view(&enc);
@@ -663,7 +663,7 @@ fn model_errors_retry_with_backoff_then_stop() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn inference_outage_preserves_agent_and_retry_across_restore() {
     let enc = encoder();
     let v = view(&enc);
@@ -715,7 +715,7 @@ fn inference_outage_preserves_agent_and_retry_across_restore() {
 /// A reply cut off mid-thinking is recorded as thinking with
 /// `unclosed_think` + `cut_off`, never as content; a call cut off mid-way is never run.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn cut_off_replies_are_classified_not_misread() {
     let enc = encoder();
     let v = view(&enc);
@@ -828,7 +828,7 @@ fn cancelled_exec_kills_the_process_group() {
 
 /// A runtime that stops (here: max_wall) aborts commands its agents are still running.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn runtime_shutdown_cancels_running_commands() {
     let marker = format!("aff-shutdown-{}", std::process::id());
     let enc = encoder();
@@ -854,7 +854,7 @@ fn runtime_shutdown_cancels_running_commands() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
     use std::time::Duration;
     let dir = std::env::temp_dir().join(format!("aff-pause-clock-{}", std::process::id()));
@@ -998,7 +998,7 @@ fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn recovery_repairs_a_torn_tail_before_appending() {
     use std::io::Write;
     let dir = std::env::temp_dir().join(format!("aff-torn-tail-{}", std::process::id()));
@@ -1031,7 +1031,7 @@ fn recovery_repairs_a_torn_tail_before_appending() {
 /// A failing overflow handler (a summary that fails, perhaps for good) does not stop the agent:
 /// the turn proceeds with the prompt as it is, and the journal replays to the same agent.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_failing_overflow_handler_lets_the_turn_proceed() {
     let enc = encoder();
     let view = View::load(&root().join("views/demo/runtime/overflow_fails.tsx"), "Main", &enc).unwrap();
@@ -1083,7 +1083,7 @@ fn pinned_run(
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn resume_pins_the_app_and_detects_a_changed_one() {
     let dir = std::env::temp_dir().join(format!("aff-pins-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1134,7 +1134,7 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn harness_render_runs_a_component_once_on_the_model_through_the_harness() {
     let enc = encoder();
     let view = View::load(&root().join("views/demo/runtime/render_once.tsx"), "Main", &enc).unwrap();
@@ -1171,7 +1171,7 @@ fn harness_render_runs_a_component_once_on_the_model_through_the_harness() {
 /// is retried with the same prompt after a capped backoff, for as long as it fails, across a
 /// restore; the handler never sees the failure.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_render_rate_limited_is_retried_not_failed() {
     let enc = encoder();
     let v = View::load(&root().join("views/demo/runtime/render_once.tsx"), "Main", &enc).unwrap();
@@ -1266,7 +1266,7 @@ fn a_render_rate_limited_is_retried_not_failed() {
 /// A render's options reach its model call (budget, sampling, tag, priority); a render prompt over
 /// `max_prompt` is never sent, and the handler sees the error.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_render_has_its_own_options_and_respects_max_prompt() {
     use affordance::runtime::GenOptions;
     let enc = encoder();
@@ -1541,7 +1541,7 @@ fn tree_run(dir: &std::path::Path, restore: bool) -> affordance::runtime::Report
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_callbacks() {
     let dir = std::env::temp_dir().join(format!("aff-tree-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1620,7 +1620,7 @@ fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_ca
 /// render, on the layout event) when a prompt passes `trig` of the window (the binding's
 /// context less max_new), answers and submits; the root grades the answers.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn the_research_ladder_runs_its_policies_and_grades_answers() {
     let dir = std::env::temp_dir().join(format!("aff-research-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1728,7 +1728,7 @@ fn the_research_ladder_runs_its_policies_and_grades_answers() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
     let dir = std::env::temp_dir().join(format!("aff-send-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1838,7 +1838,7 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_prompt_over_the_hard_ceiling_is_never_sent() {
     let enc = encoder();
     let v = view(&enc);
@@ -1855,7 +1855,7 @@ fn a_prompt_over_the_hard_ceiling_is_never_sent() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_mount_boundary_takes_one_component_with_json_props_and_callbacks() {
     let enc = encoder();
     let dir = std::env::temp_dir().join(format!("aff-mount-rules-{}", std::process::id()));
@@ -1910,7 +1910,7 @@ fn a_mount_boundary_takes_one_component_with_json_props_and_callbacks() {
 
 /// Context folding (R5): a branch's turns leave the prompt when it returns; its call and summary stay.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_returned_branch_folds_to_its_call_and_summary() {
     let dir = std::env::temp_dir().join(format!("aff-fold-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -2007,7 +2007,7 @@ fn a_returned_branch_folds_to_its_call_and_summary() {
 /// of the memory's tree is compressed by the root (harness.render). The third wakes with older
 /// memories collapsed into summaries, finds the fact with `recall` and answers from it.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_memory_outlives_its_sessions_compresses_old_notes_and_recalls_them() {
     let dir = std::env::temp_dir().join(format!("aff-memory-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -2123,7 +2123,7 @@ fn a_memory_outlives_its_sessions_compresses_old_notes_and_recalls_them() {
 /// `llm_batch`; the harness answers the batch with parallel sub-LLM renders and resumes the cell,
 /// which counts and sets `answer`. The bench grades the count against the generator's.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
     let py = "python3";
     if std::process::Command::new(py).arg("--version").output().is_err() {
@@ -2278,7 +2278,7 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
 /// (streamed from the journal) rebuilds the same agent. The app's log is its own state, bounded
 /// by its own policy (`log.release`, views/lib/log.tsx).
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
     fn run(dir: &std::path::Path, restore: bool) -> affordance::runtime::Report {
         let enc = encoder();
@@ -2537,7 +2537,7 @@ fn a_cancelled_command_call_reaps_a_stubborn_descendant() {
 /// An agent's `capabilities` limit the platform APIs it may call: without `send`, a send is an
 /// error result; machines are bound by `machines`, not by capabilities.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn capabilities_limit_the_platform_apis_an_agent_may_call() {
     let enc = encoder();
     let mut cfg = RuntimeConfig::new(root().join("views/demo/runtime/messenger.tsx"));
@@ -2569,7 +2569,7 @@ fn capabilities_limit_the_platform_apis_an_agent_may_call() {
 
 /// session.tsx on each model family: its first prompt renders through the chosen template app.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn the_session_app_renders_for_each_template() {
     let ds = Encoder::from_file(
         root()
@@ -2614,7 +2614,7 @@ fn the_session_app_renders_for_each_template() {
 /// A message that arrives while the model is generating has not been seen by the model. A wait
 /// its reply then calls wakes at once on it, instead of sleeping until its deadline.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
     let enc = encoder();
     let v = view(&enc);
@@ -2675,7 +2675,7 @@ fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
 /// An immediate pause cancels a machine call in flight. That is the operator's, not the app's:
 /// no error result is journaled, and the restored fleet runs the call again.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
     use std::time::Duration;
     let dir = std::env::temp_dir().join(format!("aff-pause-call-{}", std::process::id()));
@@ -2748,7 +2748,7 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
 /// The same for a model call: a pause (or the run ending) cancels it, but that is the host's, not
 /// a model failure. No model error is journaled, and the restored run issues the call again.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
     use std::time::Duration;
     let dir = std::env::temp_dir().join(format!("aff-pause-model-{}", std::process::id()));
@@ -2808,7 +2808,7 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
 /// Kept running: an idle instance (nothing in flight, waiting only for events) keeps the run up,
 /// and a post with a named event reaches its listener. In batch mode the same run returns at once.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
     use std::time::{Duration, Instant};
     let dir = std::env::temp_dir().join(format!("aff-serve-{}", std::process::id()));
@@ -2862,7 +2862,7 @@ fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
 /// A handler error that is not a tool's (an effect, a callback) has no awaiter: the run's status
 /// counts it, so a host sees an instance that threw and went idle, and the trace keeps it.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn the_status_feed_counts_handler_errors() {
     use std::time::{Duration, Instant};
     let dir = std::env::temp_dir().join(format!("aff-handler-errors-{}", std::process::id()));
@@ -2924,7 +2924,7 @@ fn the_status_feed_counts_handler_errors() {
 /// A `<Mount>`'s callbacks (`mount:<key>:<prop>`) are the runtime's to deliver: a peer cannot
 /// send one (as a page cannot forge a trusted event), and a plain `<aff>` cannot claim a handler.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn mount_callbacks_and_handlers_cannot_be_forged() {
     let dir = std::env::temp_dir().join(format!("aff-forge-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -2987,7 +2987,7 @@ fn mount_callbacks_and_handlers_cannot_be_forged() {
 /// backslashes (a PEM key, a service account's JSON) never reaches agent.json or the trace, and
 /// the agent starts. A secret too short to redact is refused.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn secrets_with_newlines_and_quotes_are_redacted() {
     let dir = std::env::temp_dir().join(format!("aff-secrets-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);

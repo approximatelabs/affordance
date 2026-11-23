@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_close_is_answered_while_status_is_published() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let dir = std::env::temp_dir().join(format!("aff-close-{}", std::process::id()));
@@ -59,7 +59,7 @@ fn a_close_is_answered_while_status_is_published() {
 /// `delivered: false`), so the send stays outstanding in its journal and the restore delivers it,
 /// once, to the receiver that had not journaled it.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn closing_skips_queued_sends_and_the_restore_delivers_them_once() {
     for batch in [1, 16] {
         close_behind_a_backlog(batch);

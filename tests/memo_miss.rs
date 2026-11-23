@@ -73,7 +73,7 @@ export default function Main() {{
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_scan_that_reuses_nothing_is_reported_once_with_its_cause() {
     let misses = agent("{n: 0}", "null");
     assert_eq!(misses.len(), 1, "{misses:?}");

@@ -41,7 +41,7 @@ fn run(enc: &Encoder, src: &str) -> Result<String, String> {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_functions_type_is_its_tools_schema() {
     let enc = enc();
     let cases: &[(&str, &str)] = &[
@@ -77,7 +77,7 @@ function f({ unit, pts }: { unit?: Unit; pts: Array<Point> }) {}"#,
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn names_and_docs_come_from_the_declaration() {
     let src = r#"
 /**
@@ -101,7 +101,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_type_with_no_schema_is_an_error_naming_it() {
     let enc = enc();
     let e = run(
@@ -117,7 +117,7 @@ fn a_type_with_no_schema_is_an_error_naming_it() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn log_text_handles_model_calls_and_multimodal_results_without_losing_text() {
     let src = format!(
         r#"import {{recordText}} from '{}/views/lib/log.tsx';

@@ -19,7 +19,7 @@ fn scenarios(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn every_app_scenario_passes() {
     let mut found = vec![];
     scenarios(&root().join("views"), &mut found);
@@ -49,7 +49,7 @@ fn every_app_scenario_passes() {
 /// "My scenario can script a reply the app stopped, and one that ran out of tokens." The app
 /// stops its first model call with a signal and reads `aborted`; its second reply is `cut_off`.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_scenario_scripts_an_aborted_reply_and_a_cut_off_one() {
     let dir = std::env::temp_dir().join(format!("aff-scenario-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();

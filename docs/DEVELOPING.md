@@ -34,7 +34,8 @@ first (`cargo install cargo-audit --version 0.22.2 --locked`). Individual checks
 ```sh
 python3 tools/check-security.py
 cargo test --release                                  # needs no reference data
-cargo test --release --features reference-tests      # also the tests against ref/ (below)
+cargo test --release --features test-tokenizers      # also the tests that load a few tokenizers (below)
+cargo test --release --features reference-tests      # also the tests against all of ref/ (below)
 ./tools/test-parallel.sh                               # the same suite, its programs run 16 at a time (about a minute)
 cargo check --offline --all-features --all-targets
 cargo check --offline --no-default-features --all-targets
@@ -62,10 +63,16 @@ The box-fitting arithmetic (`src/fit.rs`) is also proved with Verus, outside thi
 `./tools/verify.sh` after a change to that file ([VERIFICATION.md](VERIFICATION.md) says what
 is proved and what is assumed).
 
-`cargo test` on a fresh clone needs no downloads: the tests that read the reference data under
-`ref/` (real model tokenizers, official template outputs, conformance corpora) are reported as
-ignored, with the reason, unless `--features reference-tests` is given. With the feature they
-fail loudly when the data is missing; none passes by skipping.
+`cargo test` on a fresh clone needs no downloads: the tests that read reference data under `ref/`
+are reported as ignored, with the reason, unless a feature asks for them. With the feature they
+fail loudly when the data is missing; none passes by skipping. There are two levels:
+
+- `--features test-tokenizers`: the tests that load one of a few publishers' tokenizers (Qwen3,
+  Qwen 3.6, DeepSeek V4.1, GLM-5.3). `./tools/fetch-test-tokenizers.sh` puts them in
+  `ref/tokenizers/` from this repository's `test-tokenizers-1` release (with their licenses).
+  CI on Linux runs these.
+- `--features reference-tests`: those, and the tests against every model's tokenizer, the official
+  template outputs and the conformance corpora (about 8 GB, set up below).
 
 The full conformance suite needs the cached tokenizers and reference outputs. On a new checkout:
 

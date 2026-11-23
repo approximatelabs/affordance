@@ -161,7 +161,7 @@ fn save(name: &str, events: &[J]) {
     }
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn completion_uses_dispatch_clock_and_preserves_answers_and_replay() {
     let e = enc();
     let v = fixture(
@@ -223,7 +223,7 @@ fn completion_uses_dispatch_clock_and_preserves_answers_and_replay() {
     save("completed-replay", &tools(&mut r));
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn thrown_error_and_abort_are_errors_without_invented_timeout() {
     let e = enc();
     let v = fixture(&e, "return await harness.machine.call({cmd:'private-command'});");
@@ -251,7 +251,7 @@ fn thrown_error_and_abort_are_errors_without_invented_timeout() {
     }
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn real_executor_timeout_is_explicit_and_not_an_exit_code_guess() {
     let e = enc();
     let v = fixture(
@@ -292,7 +292,7 @@ fn real_executor_timeout_is_explicit_and_not_an_exit_code_guess() {
     save("exit-not-timeout", &trace);
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn early_answer_background_failure_and_interrupted_recovery_count_once() {
     let e = enc();
     let v = fixture(
@@ -351,7 +351,7 @@ fn early_answer_background_failure_and_interrupted_recovery_count_once() {
     save("recovered", &trace);
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn pure_notes_send_wait_and_unavailable_or_undispatched_calls() {
     let e = enc();
     for (label, body, expected_ms) in [
@@ -423,7 +423,7 @@ fn pure_notes_send_wait_and_unavailable_or_undispatched_calls() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn session_shell_keeps_structured_timeout_through_inline_and_spilled_answers() {
     let e = enc();
     let v = View::load(&root().join("views/agents/session.tsx"), "Main", &e).unwrap();
@@ -520,7 +520,7 @@ fn session_shell_keeps_structured_timeout_through_inline_and_spilled_answers() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
     use affordance::runtime::{AgentSpec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
     use std::{
@@ -646,7 +646,7 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn concurrent_calls_keep_distinct_identities_without_counting_subcalls() {
     let e = enc();
     let v = fixture(
@@ -725,7 +725,7 @@ fn concurrent_calls_keep_distinct_identities_without_counting_subcalls() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn long_names_are_bounded_without_colliding_or_retaining_payloads() {
     let e = enc();
     let mut names = vec![];

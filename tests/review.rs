@@ -18,7 +18,7 @@ fn enc() -> Encoder {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn overflow_marker_never_exceeds_budget() {
     let enc = enc();
     let dir = std::env::temp_dir().join(format!("afr_review_{}", std::process::id()));
@@ -43,7 +43,7 @@ fn overflow_marker_never_exceeds_budget() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn arbitrary_apps_can_have_their_own_tools_state() {
     let enc = enc();
     let dir = std::env::temp_dir().join(format!("afr_review_{}", std::process::id()));
@@ -117,7 +117,7 @@ fn fast_unicode_and_whitespace_match_official_tokenizer() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn dropping_items_removes_hidden_actions_and_rebases_visible_spans() {
     let enc = enc();
     let dir = std::env::temp_dir().join(format!("afr_review_{}", std::process::id()));
@@ -152,7 +152,7 @@ export default function Main({ items, budget }) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn drop_children_never_clips_chat_control_tokens() {
     let enc = enc();
     let dir = std::env::temp_dir().join(format!("afr_review_{}", std::process::id()));

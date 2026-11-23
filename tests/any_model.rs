@@ -499,7 +499,7 @@ fn a_reply_from_a_format_with_no_tool_calls_is_read_as_text() {
 /// next prompt must still be the publisher's (unless `keep_replies`). Checked with tools (the
 /// agent app) and without (a plain chat).
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn a_past_replys_thinking_is_dropped_where_the_publisher_drops_it() {
     let index = load(root().join("views/index.json"));
     let protocols = load(root().join("views/reply_protocols.json"));

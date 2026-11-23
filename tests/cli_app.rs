@@ -26,7 +26,7 @@ fn run(input: &str, extra: &[&str]) -> Output {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn app_json_contains_native_ids_and_rebased_action_spans() {
     let out = run(&json!({"text":"Notes: copper","active":true}).to_string(), &[]);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
@@ -58,7 +58,7 @@ fn app_json_contains_native_ids_and_rebased_action_spans() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn app_batch_caching_preserves_each_states_actions() {
     let out = run(
         &json!([
@@ -85,7 +85,7 @@ fn app_batch_caching_preserves_each_states_actions() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn invalid_app_input_returns_failure() {
     for (input, flags, message) in [
         ("{", vec![], "invalid app state"),
@@ -99,7 +99,7 @@ fn invalid_app_input_returns_failure() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn rendering_error_is_machine_readable_and_fails_the_command() {
     let out = run(&json!({"text":{},"active":true}).to_string(), &[]);
     assert!(!out.status.success());
@@ -108,7 +108,7 @@ fn rendering_error_is_machine_readable_and_fails_the_command() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn an_installed_cli_can_render_with_explicit_files_outside_a_checkout() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_affordance"))
         .args(["render", "--view"])

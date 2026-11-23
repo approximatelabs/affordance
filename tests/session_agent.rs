@@ -140,7 +140,7 @@ struct Script {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn long_session_agent_is_one_view_file_on_the_generic_runtime() {
     let turns: usize = env("TURNS", 300);
     let (tmin, tmax): (u64, u64) = (env("THINK_MIN", 250), env("THINK_MAX", 700));

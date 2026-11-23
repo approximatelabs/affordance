@@ -71,7 +71,7 @@ async function sub(q) {
 }"#;
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn async_functions_issue_concurrent_requests_and_recover_in_completion_order() {
     let enc = enc();
     let v = view(
@@ -124,7 +124,7 @@ export function Main({{}}) {{ return <aff name="go" onGo={{async () => {{
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn async_arrow_and_root_requests_share_one_completion_transcript() {
     let enc = enc();
     let v = view(
@@ -154,7 +154,7 @@ fn async_arrow_and_root_requests_share_one_completion_transcript() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn unawaited_async_call_returns_a_promise_and_sync_body_settles() {
     let enc = enc();
     let v = view(
@@ -184,7 +184,7 @@ export function Main({}) { return <>{String(twice(21))}</>; }"#,
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn regex_literals_and_constructor() {
     let e = enc();
     let ev = |x: &str| eval(&e, "", x).unwrap();
@@ -206,7 +206,7 @@ fn regex_literals_and_constructor() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn regex_string_methods_follow_js() {
     let e = enc();
     let ev = |x: &str| eval(&e, "", x).unwrap();
@@ -255,7 +255,7 @@ fn regex_string_methods_follow_js() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs the test tokenizers: tools/fetch-test-tokenizers.sh")]
 fn unsupported_js_regex_features_are_errors() {
     let e = enc();
     for (src, what) in [

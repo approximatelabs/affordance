@@ -19,10 +19,10 @@ For a small engine or documentation contribution:
    reference environment. Template changes also need the full conformance gate documented there.
 
 What the checks on a pull request cover. `./tools/check-engine.sh`, which GitHub runs, is every
-test that needs no downloaded reference data. The tests that compare a model's prompt with its
-publisher's own template and tokenizer, and the tests of pictures and sound on real model
-formats, need about 8 GB of tokenizers and official outputs that the repository does not
-carry. A maintainer runs that full suite (`./tools/test-parallel.sh`, in
+test that needs no downloaded reference data beyond a few tokenizers (which it fetches from this
+repository's release). The tests that compare a model's prompt with its publisher's own template
+and tokenizer across every model, and the tests of pictures and sound on every model format, need
+about 8 GB of tokenizers and official outputs that the repository does not carry. A maintainer runs that full suite (`./tools/test-parallel.sh`, in
 [the validation guide](docs/DEVELOPING.md)) on a machine that has the data before a pull
 request is merged and before a release is tagged. A green check on GitHub therefore means the
 engine's own tests pass; it does not yet mean every model's tokens were compared.
