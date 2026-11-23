@@ -187,3 +187,64 @@ fn signal_twice(child: &Child) {
         std::thread::sleep(Duration::from_millis(200));
     }
 }
+
+/// "A restored agent keeps its own secret." Two agents override the deployment's secret `KEY` with
+/// values of their own. Secret values are never saved in the run directory; restored, each agent
+/// is given its own value again from the deployment, not the deployment-wide one.
+#[test]
+fn a_restored_agent_keeps_its_own_secret() {
+    let dir = std::env::temp_dir().join(format!("aff-control-secret-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("app.tsx"),
+        r#"export function Main() {
+  useEvent("check", () => harness.stop({length: harness.env.KEY.length}));
+  return <box>waiting</box>;
+}"#,
+    )
+    .unwrap();
+    let (wide, a, b) = (
+        "deployment-wide-value",
+        "alpha-agent-secret-1",
+        "bravo-agent-secret-value-22",
+    );
+    let d = json!({
+        "app": {"view": "app.tsx", "entry": "Main"},
+        "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
+        "env": {"KEY": wide},
+        "secrets": ["KEY"],
+        "agents": [{"id": "a", "model": null, "env": {"KEY": a}}, {"id": "b", "model": null, "env": {"KEY": b}}],
+        "dir": "run",
+        "keep_running": true,
+        "max_wall_s": 60
+    });
+    std::fs::write(dir.join("deployment.json"), d.to_string()).unwrap();
+    let child = start(&dir, false);
+    let mut c = Controller::connect(&dir.join("control.sock"));
+    wait_for("the run starts", || {
+        c.call(json!({"type": "status"}))["value"]["state"] == "running"
+    });
+    c.close(0);
+    summary(child);
+    let saved = std::fs::read_to_string(dir.join("run/a/agent.json")).unwrap();
+    assert!(!saved.contains(a), "a secret value is never saved: {saved}");
+    let child = start(&dir, true);
+    let mut c = Controller::connect(&dir.join("control.sock"));
+    for id in ["a", "b"] {
+        let posted = c.call(json!({"type": "event", "target": id, "name": "check"}));
+        assert_eq!(posted["type"], "result", "{posted}");
+    }
+    let report = summary(child);
+    let stopped = |id: &str| {
+        report["per_agent"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|x| x["id"] == id)
+            .unwrap()["stopped"]["length"]
+            .clone()
+    };
+    assert_eq!((stopped("a"), stopped("b")), (json!(a.len()), json!(b.len())));
+    std::fs::remove_dir_all(&dir).unwrap();
+}

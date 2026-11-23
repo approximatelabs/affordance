@@ -720,6 +720,13 @@ impl Runtime {
         self.journals.retain(|id, _| ids.contains(id));
         for spec in wanted {
             if let Some(old) = self.specs.iter_mut().find(|old| old.id == spec.id) {
+                // Secret values are never saved (`agent.json` leaves them out): they come from the
+                // deployment again, as the deployment-wide ones do.
+                for (k, v) in &spec.env {
+                    if self.cfg.secrets.contains(k) {
+                        old.env.insert(k.clone(), v.clone());
+                    }
+                }
                 old.machines = spec.machines;
                 old.capabilities = spec.capabilities;
                 old.inspect = spec.inspect;
