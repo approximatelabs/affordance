@@ -2,7 +2,7 @@
 
 The configuration contract is in [HARNESS.md §6](../spec/HARNESS.md#6-models).
 A binding combines a tokenizer and one stock client. `model` names the default binding;
-`models` adds names selected by `agents[].model` or `<Mount model="B">`. Every client has its
+`models` adds names selected by `instances[].model` or `<Mount model="B">`. Every client has its
 own endpoint, options, credentials, defaults and session table. Identical tokenizer
 paths share an immutable encoder in the CLI.
 
@@ -298,7 +298,7 @@ dispatched or replayed as unanswered native calls. Valid reasoning state remains
 
 `provider_options` accepts `reasoning`, `text`, `parallel_tool_calls`, `service_tier`, cache
 options and other provider extensions. A stable default `prompt_cache_key` hashes binding
-identity plus agent ID. It contains no credential path in clear text. An explicit nonempty
+identity plus the instance's name. It contains no credential path in clear text. An explicit nonempty
 key of at most 64 bytes may be supplied in provider options. Keep it stable across turns.
 Current models use `prompt_cache_options.ttl`; see the official
 [caching contract](https://developers.openai.com/api/docs/guides/prompt-caching).
@@ -308,7 +308,7 @@ Usage retains the provider's fields and adds `prompt_tokens`, `completion_tokens
 cache/reasoning details. Provider usage is authoritative; local tokenizer counts measure the
 transport document, including opaque state, and are not provider billing counts.
 
-A hosted client makes one attempt at a call. A failed call is made again by the agent, as the
+A hosted client makes one attempt at a call. A failed call is made again by the instance, as the
 binding's `retry` policy says (`spec/HARNESS.md`, "Model call failures and retries"). A valid
 numeric or HTTP-date `Retry-After` is the least the next attempt waits. On 429, OpenAI
 reset-duration headers and Anthropic reset-date headers are also read; the longest valid minimum is used.
@@ -331,7 +331,7 @@ file with an `OPENAI_API_KEY=` line. Provider reasoning rules are documented by
 
 A SGLang session belongs to one client identity. A changed endpoint, provider options,
 credential source or binding defaults requires a fresh client or `Sessions` value. Per-call
-sampling can vary. Two clients using the same server and agent ID still have separate sessions.
+sampling can vary. Two clients using the same server and instance name still have separate sessions.
 Server session loss retains the existing fallback to a full prompt; sockets and server sessions
 are never serialized into a journal.
 
@@ -426,7 +426,7 @@ Direct constructors remain available: `Sglang::new`, `Completions::new`, `Chat::
 `Chat::anthropic` and `Chat::responses` (whose `api` fields hold protocol settings).
 `model::with_template(client, ModelTemplate::new("glm53", options)?)` attaches presentation
 to any client while delegating its inference, streaming, cancellation and rank behavior.
-`Chat::new` advertises `messages` by default. Low-level `Agent` callers set
+`Chat::new` advertises `messages` by default. Low-level `Instance` callers set
 `InstanceConfig.template` to the same resolved `ModelTemplate` on fresh execution and restore;
 `Runtime` does this automatically for each binding, including mounted children.
 Wrapping a custom client preserves its identity opt-in: template metadata does not establish

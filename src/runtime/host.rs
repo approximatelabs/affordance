@@ -14,7 +14,7 @@
 //!   rebuilt from it), `trace.jsonl` (renders, model calls, effects, timings) and `store.jsonl`.
 use super::blobs::Blobs;
 use super::cancel::CancelToken;
-use super::exec::{CallContext, Executor};
+use super::exec::{CallContext, Client, Executor};
 use super::instance::{Command, Input, Instance, InstanceConfig, Metrics};
 use super::model::{GenRequest, Model};
 use super::store::Store;
@@ -2836,9 +2836,11 @@ fn dispatch_now(
                     );
                 };
                 let ctx = CallContext {
-                    agent: id.clone(),
-                    instance: shared.instance_key(&id),
-                    task,
+                    client: Client {
+                        id: shared.instance_key(&id),
+                        name: id.clone(),
+                    },
+                    call: task,
                     env: slot.agent.cfg.env.clone(),
                     // The call's own token: cancelling the call stops the generation and the pipe.
                     cancel: req.cancel.clone(),
@@ -2885,7 +2887,7 @@ fn dispatch_now(
                                 pipe.write(delta);
                             }
                             if let Some(f) = &observer {
-                                (f.0)(&req.agent, task, delta.into());
+                                (f.0)(&req.client, task, delta.into());
                             }
                             aborted = abort.load(Ordering::SeqCst);
                             !aborted
@@ -2900,7 +2902,7 @@ fn dispatch_now(
                     // A call the host cancelled (the run closing) is not the model's failure:
                     // nothing is journaled, the call stays outstanding, and a restore issues it again.
                     if result.is_err() && req.cancel.cancelled_by_host() {
-                        job_shared.done(&req.agent, incarnation, task);
+                        job_shared.done(&req.client, incarnation, task);
                         job_shared.inflight.fetch_sub(1, Ordering::SeqCst);
                         return;
                     }
@@ -2938,12 +2940,12 @@ fn dispatch_now(
                             error: format!("{e} ({}ms)", started.elapsed().as_millis()),
                         },
                     };
-                    job_shared.done(&req.agent, incarnation, task);
+                    job_shared.done(&req.client, incarnation, task);
                     let post = move || {
                         job_shared.answer(
                             w,
                             Msg::Input(
-                                req.agent,
+                                req.client,
                                 InputKind::Completion {
                                     incarnation,
                                     input: Box::new(kind),
@@ -2975,7 +2977,7 @@ fn dispatch_now(
                 push_local(shared, local, (id.clone(), InputKind::Result { task, outcome }))
             };
             if name != "inspect" && !name.starts_with("machine:") && !slot.spec.allows(&name) {
-                return reply(local, Outcome::Error(format!("this agent may not call {name}")));
+                return reply(local, Outcome::Error(format!("this instance may not call {name}")));
             }
             match name.as_str() {
                 "send" => {
@@ -2988,7 +2990,7 @@ fn dispatch_now(
                     if slot.spec.inspect.is_empty() {
                         return reply(
                             local,
-                            Outcome::Error("this agent may not call inspect (its spec grants no `inspect`)".into()),
+                            Outcome::Error("this instance may not call inspect (its spec grants no `inspect`)".into()),
                         );
                     }
                     let select = match super::inspect::parse_select(&args["select"]) {
@@ -3088,9 +3090,11 @@ fn dispatch_now(
                     ),
                     Some(exec) => {
                         let ctx = CallContext {
-                            agent: id.clone(),
-                            instance: shared.instance_key(&id),
-                            task,
+                            client: Client {
+                                id: shared.instance_key(&id),
+                                name: id.clone(),
+                            },
+                            call: task,
                             env: slot.agent.cfg.env.clone(),
                             cancel: shared.token(&id, incarnation, task),
                             blobs: shared.store.blobs().cloned(),
@@ -3111,7 +3115,7 @@ fn dispatch_now(
                         shared.inflight.fetch_add(1, Ordering::SeqCst);
                         let job_shared = shared.clone();
                         shared.exec_pool.submit(Box::new(move || {
-                            let (agent, token) = (ctx.agent.clone(), ctx.cancel.clone());
+                            let (agent, token) = (ctx.client.name.clone(), ctx.cancel.clone());
                             // Executors get text, never references; a large result goes to disk here,
                             // on the executor's thread, before it is queued for the agent.
                             let blobs = job_shared.store.blobs().cloned();

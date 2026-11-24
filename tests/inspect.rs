@@ -193,7 +193,7 @@ fn inspect_needs_an_explicit_grant() {
             .unwrap()
             .as_str()
             .unwrap()
-            .contains("this agent may not call inspect"),
+            .contains("this instance may not call inspect"),
         "{:?}",
         r.stopped
     );

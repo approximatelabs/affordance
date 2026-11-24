@@ -14,9 +14,11 @@ use std::{
 
 fn context() -> CallContext {
     CallContext {
-        agent: "caller".into(),
-        instance: String::new(),
-        task: 7,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "caller".into(),
+        },
+        call: 7,
         env: BTreeMap::from([("TOKEN".into(), "hidden-token".into())]),
         cancel: CancelToken::new(),
         blobs: None,

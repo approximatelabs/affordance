@@ -276,7 +276,7 @@ Host loop for one tool call (`name`, `args` parsed from the reply):
 3. When a result arrives, set `transcript[i].outcome = Some(Outcome::Ok(value))` (or
    `Outcome::Error(msg)`). Set `transcript[i].settled` to an increasing arrival counter, then call
    `act_effects` again. It reconstructs one execution and delivers those outcomes in arrival order
-   through the same queue as the live Agent, either parking or finishing (`done == true`).
+   through the same queue as a live `Instance`, either parking or finishing (`done == true`).
 4. When `done` becomes true, `step.value` is the handler's return value: the tool result.
    Continue serving `blocked` requests if it started unawaited work. Append
    `{"kind": "action", "name": name, "result": ...}`.

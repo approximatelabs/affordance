@@ -336,7 +336,7 @@ impl affordance::runtime::Model for Streaming {
             }
             if n == 4 {
                 let control = self.control.lock().unwrap();
-                drop(control.as_ref().unwrap().post(&req.agent, "stop", json!({}), None));
+                drop(control.as_ref().unwrap().post(&req.client, "stop", json!({}), None));
             }
         }
         Ok(affordance::runtime::GenReply {

@@ -20,7 +20,7 @@ The gate runs all library unit tests, including store append rollback/isolation 
 checkpoint images, plus memo and inspection regressions. These use the same small tokenizer
 fixture as the other engine tests. Real-vocabulary checks still need their optional local
 tokenizers; the complete release gate supplies the cached reference inventory below.
-The Promise suite runs the same small programs in Node, the live Agent, and transcript replay,
+The Promise suite runs the same small programs in Node, a live `Instance`, and transcript replay,
 then checks journal restoration. It includes FIFO await/reaction/adoption ordering, expression
 evaluation across awaits, loops, destructuring and exception/finally behavior. Lifecycle checks
 also exercise promises shared by handlers, cancellation and suspended markup.
@@ -231,7 +231,7 @@ or how a journal replays; they add capture, checking, diagnostics or test target
 
 | Variable | Effect |
 |---|---|
-| `AFFORDANCE_CAPTURE_DIR` | Write every model request and response (and stream event) there, per agent ([model bindings](MODEL_BINDINGS.md)). |
+| `AFFORDANCE_CAPTURE_DIR` | Write every model request and response (and stream event) there, per instance ([model bindings](MODEL_BINDINGS.md)). |
 | `AFFORDANCE_ROOT` | The source checkout `affordance`'s development commands use. |
 | `AFFORDANCE_RENDER_VERIFY` | Check every reused render against a fresh one. |
 | `AFFORDANCE_MEMO_VERIFY` | Recompute reused scans and compare them ([harness guide](HARNESS_GUIDE.md)). |

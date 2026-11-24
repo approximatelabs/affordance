@@ -216,7 +216,7 @@ harness.stop({missing, result: await request(custom)});
         "docs",
         Arc::new(move |ctx: &CallContext, args: &J| {
             calls.fetch_add(1, Ordering::SeqCst);
-            assert_eq!(ctx.agent, "a");
+            assert_eq!(ctx.client.name, "a");
             assert_eq!(args["path"], "/items");
             Ok(json!({"status": 200, "headers": {"content-type": ["application/json"]}, "body": "{\"ok\":true}"}))
         }),

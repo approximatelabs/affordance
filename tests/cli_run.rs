@@ -500,3 +500,79 @@ fn a_run_of_another_version_is_refused_until_set_aside() {
     assert!(affordance(&dir, &["run", "--restore"]).status.success());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// "A machine can tell a re-sent call from a new one." A `command` machine gets
+/// `{client: {id, name}, call, env, args}`. When a run is killed while a command is running, the
+/// restored run sends that command again, with the same client id and call number.
+#[test]
+fn a_command_resent_after_a_crash_carries_the_same_client_and_call() {
+    let dir = temp("resent");
+    let log = dir.join("calls.log");
+    let done = dir.join("let-it-finish");
+    std::fs::write(
+        dir.join("app.tsx"),
+        "export default function Main() { useEffect(() => { const go = async () => { \
+         const r = await harness.machine.get('ops').call({charge: 5}); harness.stop(r); }; go(); }, []); \
+         return 'x'; }",
+    )
+    .unwrap();
+    // The command records what it was sent, then waits until told to finish (so the one left
+    // running by the crash ends too).
+    let script = format!(
+        "line=$(cat); printf '%s\\n' \"$line\" >> '{log}'; \
+         while [ ! -e '{done}' ]; do sleep 0.05; done; echo '{{\"charged\": true}}'",
+        log = log.display(),
+        done = done.display()
+    );
+    std::fs::write(
+        dir.join("affordance.yaml"),
+        serde_json::to_string(&json!({
+            "instances": [{"id": "shop", "app": "app.tsx"}],
+            "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
+            "machines": {"ops": {"kind": "command", "argv": ["sh", "-c", script]}},
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut run = Command::new(env!("CARGO_BIN_EXE_affordance"))
+        .args(["run"])
+        .current_dir(&dir)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while !log.exists() {
+        assert!(std::time::Instant::now() < deadline, "the command never started");
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    // The crash: the runtime is killed outright, mid-command.
+    run.kill().unwrap();
+    run.wait().unwrap();
+    std::fs::write(&done, "").unwrap();
+    let out = affordance(&dir, &["run", "--restore"]);
+    let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap_or_else(|_| panic!("{}", stderr(&out)));
+    assert_eq!(
+        report["per_instance"][0]["stopped"],
+        json!({"charged": true}),
+        "{report}"
+    );
+    let calls: Vec<serde_json::Value> = std::fs::read_to_string(&log)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(calls.len(), 2, "{calls:?}");
+    let first = &calls[0];
+    assert_eq!(first["client"]["name"], "shop");
+    assert!(
+        first["client"]["id"].as_str().is_some_and(|id| id.len() == 36),
+        "{first}"
+    );
+    assert_eq!(first["args"], json!({"charge": 5}));
+    assert_eq!(
+        (&calls[1]["client"], &calls[1]["call"]),
+        (&first["client"], &first["call"]),
+        "the re-sent call is recognisable"
+    );
+}

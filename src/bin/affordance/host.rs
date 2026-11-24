@@ -52,7 +52,7 @@ impl Executor for Ui {
     fn call(&self, ctx: &CallContext, args: &J) -> Result<J, String> {
         if args.get("ask").is_none() {
             self.out
-                .send(json!({"type": "ui", "instance": ctx.agent, "value": args}));
+                .send(json!({"type": "ui", "instance": ctx.client.name, "value": args}));
             return Ok(J::Null);
         }
         let request = self.next.fetch_add(1, Ordering::SeqCst);
@@ -62,7 +62,7 @@ impl Executor for Ui {
         // request (a forged `exit`, another question's number).
         let mut event = args.as_object().cloned().map(J::Object).unwrap_or_else(|| json!({}));
         event["type"] = json!("question");
-        event["instance"] = json!(ctx.agent);
+        event["instance"] = json!(ctx.client.name);
         event["request"] = json!(request);
         self.out.send(event);
         // Until the frontend answers, or the call is no longer wanted (an abort, the run's end).

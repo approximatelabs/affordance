@@ -10,14 +10,14 @@ processes of its own. Everything outside it goes through something the deploymen
 
 - **Machines** (`machines` in the deployment): `bash` on this host (`local`), in a bubblewrap
   sandbox (`bwrap`, no network by default), in a Docker container (`docker`), over SSH, or a
-  command of your own. An agent with no machine bound cannot run a command.
+  command of your own. An instance with no machine bound cannot run a command.
 - **HTTP roles** (`http` machines): `fetch` reaches only the origin the deployment bound, with
   bounded request and response sizes. A protected header is inserted by the host, so app code
-  cannot replace it, and its value is not written to the journal. A value taken from the agent's
+  cannot replace it, and its value is not written to the journal. A value taken from the instance's
   `env` is readable by app code through `harness.env`; one that must stay out of app code belongs
   in the executor's own configuration ([HTTP_AND_MCP.md](HTTP_AND_MCP.md#credentials)).
-- **Platform APIs** (`send`, `store.*`): limited per agent by `capabilities`. Reading another
-  agent's history (`harness.inspect`) is off unless the agent's spec lists the ids it may read.
+- **Platform APIs** (`send`, `store.*`): limited per instance by `capabilities`. Reading another
+  instance's history (`harness.inspect`) is off unless the instance's spec lists the ids it may read.
 
 So the deployment file is the security boundary. Read it the way you would read a container's
 mounts and network settings.

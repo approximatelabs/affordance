@@ -115,7 +115,7 @@ different capitalization. Headers can be executor-owned literal values or enviro
 ```
 
 The environment source is the actual caller's `CallContext.env`. Supply the value through
-deployment/agent `env` and list its key in `secrets` for persistence/redaction controls.
+deployment or instance `env` and list its key in `secrets` for persistence/redaction controls.
 These values remain readable by TSX through `harness.env`. For credentials that must stay
 outside app code, keep the protected header value exclusively in the host executor's
 configuration, outside the app environment. Bindings do not hide credentials from another
