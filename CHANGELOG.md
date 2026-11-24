@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.2.0 (beta)
+
+A run is now controlled the way a browser's embedder controls a page, and its files are laid out
+by id. Runs written by 0.1 are refused, with what to do (finish them with 0.1, or start over with
+`--fresh`). Deployments, apps that use `harness.agent`, and `command` machines need the changes
+listed under "Changed".
+
+### Added
+
+- `Control` (`Runtime::control()` in Rust): post an event to an instance, close the run with a
+  time limit for running calls, read its status, and change a model binding's limit. A posted
+  event is answered once it is committed, and one posted again with the same `key` is delivered
+  once. The same protocol runs over stdio (`affordance host`) and over a Unix socket
+  (`affordance run --control PATH`). SIGINT and SIGTERM close a run; a second signal closes it at
+  once.
+- `subscribe {streams: ["status"]}` on the control protocol pushes the run's status each time it
+  changes.
+- `dispatch(output, {calls: [i]})` runs only the tool calls an app picks, each once. The library's
+  loops run a reply's calls one after another by default; `{order: "parallel"}` and
+  `{stop_on_error: true}` change that.
+- `run.json` records which version of Affordance wrote a run directory. A run of another version
+  is refused before anything in it is read, and `--fresh` moves the whole directory under
+  `retired/`.
+
+### Changed
+
+- `--resume` is `--restore`.
+- A deployment lists its instances as `instances: [{id, app?, count?, ...}]`. An entry with
+  `count: N` is N copies.
+- Each instance's files are in `instances/<UUIDv7>/`, named by an id the runtime assigns: an
+  instance's name never becomes a path. `per_instance` machine places are named by that id.
+- The core says instance: `harness.instance` (was `harness.agent`), `InstanceSpec`,
+  `add_instance`, `instance.json`, and the status and report keys `instances` and `per_instance`.
+- A `command` machine receives `{client: {id, name}, call, env, args}` (was `{agent, task, env,
+  args}`). A call sent again after a restore carries the same `client.id` and `call`, so a
+  machine doing something that cannot be undone can recognise a repeat. In Rust,
+  `CallContext.client` and `CallContext.call`; model captures and hosted session ids say `client`.
+- `input_batch` groups journal writes only: each event in a batch takes its own turn.
+- The clock stands still while a run closes and while its instances restore, so a timer neither
+  fires nor loses time then.
+
+### Removed
+
+- The file-based control: `control/pause.json`, the inbox and receipt files, `model_inflight`,
+  `observed.json` and the root `checkpoint.json`. Use the control protocol instead.
+
+### Fixed
+
+- DeepSeek V4.1 without tools kept a past reply's thinking, which its official template drops.
+- Eight models sent no pictures at all. A picture rule that fails is now a render error.
+- One malformed tool call no longer fails the good calls to the same tool in a reply.
+- A restored instance keeps its own secret. A journal missing committed inputs fails its restore
+  instead of replaying a shorter history.
+- Hosted model bindings report an unreachable server and a cancelled call as the native ones do.
+- ssh machines put `--` before the host, and an instance's environment reaches ssh and docker
+  machines on standard input, not the command line. Snapshots hide secret values, and an app
+  cannot forge fields of the host protocol.
+- A streamed reply no longer holds a model thread while a slow reader catches up, and the native
+  bindings stream too.
+
 ## 0.1.0 (beta)
 
 The first public release.

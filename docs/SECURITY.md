@@ -65,7 +65,7 @@ journals and traces.
 
 ## We want to hear about it
 
-Affordance is at v0.1. If you find a way out of the boundary above, or a way to read what an
+Affordance is at v0.2. If you find a way out of the boundary above, or a way to read what an
 app should not, please open a private security advisory on the GitHub repository and we will
 work on it with you.
 
