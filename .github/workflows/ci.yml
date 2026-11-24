@@ -2,9 +2,10 @@
 # write access or secrets.
 #
 # Five jobs run side by side: the checks, and the tests in two halves on Linux and on macOS. Each
-# compiles once. The tests are built in the `ci` profile
-# (Cargo.toml): Affordance's own code built fast, its dependencies optimized. Compiled
-# dependencies are kept between runs (rust-cache), so a run recompiles only what changed.
+# compiles once. The tests are built in the `ci` profile (Cargo.toml): Affordance's own code
+# lightly optimized and built incrementally, its dependencies fully optimized. Compiled
+# dependencies are kept between runs (rust-cache), and so is the compiler's saved work on
+# Affordance's own code (from main), so a run recompiles what changed. Releases build from scratch.
 name: ci
 on:
   pull_request:
@@ -17,7 +18,6 @@ concurrency:
   cancel-in-progress: true
 env:
   CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: "0"
 jobs:
   # Every test that needs no reference data beyond a few tokenizers, in two halves of about the
   # same length: half 1 the long single-threaded tests and a few heavy files, half 2 every other
@@ -56,18 +56,34 @@ jobs:
           key: test-tokenizers-${{ hashFiles('tools/fetch-test-tokenizers.sh') }}
       - if: steps.tokenizers.outputs.cache-hit != 'true'
         run: ./tools/fetch-test-tokenizers.sh
+      # The compiler's saved work on Affordance's own code, from the latest build of main.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/ci/incremental
+          key: incremental-linux-${{ github.sha }}
+          restore-keys: incremental-linux-
       - name: Tests (half ${{ matrix.half }})
         run: |
           if [ "${{ matrix.half }}" = 1 ]; then filters=($HALF_1)
           else filters=(); for f in $HALF_1; do filters+=(--skip "$f"); done; fi
           cargo test --profile ci --locked --features test-tokenizers --lib --bins --tests -- --test-threads=8 "${filters[@]}"
+      # The same features as the tests, so it reuses their build.
       - if: matrix.half == 2
-        run: cargo run --profile ci --locked --bin affordance -- lint
+        run: cargo run --profile ci --locked --features test-tokenizers --bin affordance -- lint
+      # Main saves it for the pull requests after it (before rust-cache's own cleanup, which
+      # deletes it).
+      - if: github.ref == 'refs/heads/main' && matrix.half == 1
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/ci/incremental
+          key: incremental-linux-${{ github.sha }}
   # Formatting, clippy (every feature, and none), the docs, the package's file list, and a check
   # that the minimum supported Rust version still builds.
   check:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -121,8 +137,21 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: macos-${{ matrix.half }}
+      # The compiler's saved work on Affordance's own code, from the latest build of main.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/ci/incremental
+          key: incremental-macos-${{ github.sha }}
+          restore-keys: incremental-macos-
       - name: Tests (half ${{ matrix.half }})
         run: |
           if [ "${{ matrix.half }}" = 1 ]; then filters=($HALF_1)
           else filters=(); for f in $HALF_1; do filters+=(--skip "$f"); done; fi
           cargo test --profile ci --locked --lib --bins --tests --no-fail-fast -- --test-threads=8 "${filters[@]}"
+      # Main saves it for the pull requests after it (before rust-cache's own cleanup, which
+      # deletes it).
+      - if: github.ref == 'refs/heads/main' && matrix.half == 1
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: target/ci/incremental
+          key: incremental-macos-${{ github.sha }}

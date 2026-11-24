@@ -122,13 +122,14 @@ path = "tests/suite.rs"
 name = "closures_freed"
 path = "tests/closures_freed.rs"
 
-# The test build in CI: Affordance's own code built fast, its dependencies optimized (they are
-# built once and cached). Release builds are unchanged.
+# The test build in CI: Affordance's own code optimized lightly and built incrementally, so the
+# compiler's saved work (kept in CI's cache from main) is redone only where a change reaches; its
+# dependencies optimized fully (built once and cached). Release builds are unchanged.
 [profile.ci]
 inherits = "dev"
-opt-level = 0
+opt-level = 1
 debug = false
-incremental = false
+incremental = true
 
 [profile.ci.package."*"]
 opt-level = 3
