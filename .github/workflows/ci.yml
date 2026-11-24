@@ -63,13 +63,17 @@ jobs:
           key: incremental-linux-${{ github.sha }}
           restore-keys: incremental-linux-
       - name: Tests (half ${{ matrix.half }})
+        env:
+          # rust-cache turns incremental compilation off for the steps after it.
+          CARGO_INCREMENTAL: "1"
         run: |
           if [ "${{ matrix.half }}" = 1 ]; then filters=($HALF_1)
           else filters=(); for f in $HALF_1; do filters+=(--skip "$f"); done; fi
           cargo test --profile ci --locked --features test-tokenizers --lib --bins --tests -- --test-threads=8 "${filters[@]}"
-      # The same features as the tests, so it reuses their build.
+      # The command the tests built (`cargo run` would build it again: the tests' build turns on
+      # features of their own dependencies).
       - if: matrix.half == 2
-        run: cargo run --profile ci --locked --features test-tokenizers --bin affordance -- lint
+        run: ./target/ci/affordance lint
       # Main saves it for the pull requests after it (before rust-cache's own cleanup, which
       # deletes it).
       - if: matrix.half == 1 # MEASURE: every run saves, for this branch's timing only
@@ -144,6 +148,9 @@ jobs:
           key: incremental-macos-${{ github.sha }}
           restore-keys: incremental-macos-
       - name: Tests (half ${{ matrix.half }})
+        env:
+          # rust-cache turns incremental compilation off for the steps after it.
+          CARGO_INCREMENTAL: "1"
         run: |
           if [ "${{ matrix.half }}" = 1 ]; then filters=($HALF_1)
           else filters=(); for f in $HALF_1; do filters+=(--skip "$f"); done; fi

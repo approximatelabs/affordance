@@ -14,5 +14,5 @@ cargo fmt --all --check
 cargo clippy --offline --all-features --all-targets -- -D warnings
 cargo clippy --offline --no-default-features --all-targets -- -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --offline --no-deps --all-features
-cargo run --profile ci --offline --bin affordance -- lint
+./target/ci/affordance lint
 ./tools/check-package.sh
