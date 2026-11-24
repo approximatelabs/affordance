@@ -193,7 +193,9 @@ fn sglang_streaming_cumulative_incremental_stop_stall_and_cut() {
     let req = |sampling: J| -> (Sglang, GenRequest) {
         let mut m = Sglang::new(&url, 1);
         m.sampling = sampling;
-        m.stall = std::time::Duration::from_millis(300);
+        // Wide enough that a loaded machine's slow first byte is not a stall; the stalled server
+        // below waits well past it.
+        m.stall = std::time::Duration::from_millis(1500);
         (
             m,
             GenRequest::new("a", prompt.clone(), 64, vec![obs], None, CancelToken::new()),
@@ -225,7 +227,7 @@ fn sglang_streaming_cumulative_incremental_stop_stall_and_cut() {
     let reply = m.generate_stream(&r, &mut |_| false).unwrap();
     assert_eq!(reply.ids.len(), 3);
     // A stalled stream and a stream cut without a finish reason are errors (and would be retried).
-    let (m, r) = req(json!({"stall_ms": 2000}));
+    let (m, r) = req(json!({"stall_ms": 4000}));
     let e = m.generate(&r).unwrap_err();
     assert!(
         e.message.contains("stalled") && e.kind.may_pass(),

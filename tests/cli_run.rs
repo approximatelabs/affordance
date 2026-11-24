@@ -117,7 +117,7 @@ fn run_finds_its_file_and_explains_what_it_will_not_do() {
     std::fs::write(dir.join("affordance.yaml"), "app: {view: x.tsx}\n").unwrap();
     // A directory that holds an earlier run (its record).
     std::fs::create_dir_all(dir.join(".affordance")).unwrap();
-    std::fs::write(dir.join(".affordance/run.json"), "{}").unwrap();
+    std::fs::write(dir.join(".affordance/run.json"), "{\"contract\":9}").unwrap();
     let rerun = stderr(&affordance(&dir, &["run"]));
     assert!(rerun.contains("--restore") && rerun.contains("--fresh"), "{rerun}");
     let _ = std::fs::remove_dir_all(&dir);
@@ -448,4 +448,55 @@ fn an_initialized_agent_is_testable_and_a_prose_reply_is_its_answer() {
     std::fs::write(agent.join("none.json"), r#"{"stepz": []}"#).unwrap();
     let refused = affordance(&agent, &["test", "app.tsx", "none.json"]);
     assert!(!refused.status.success());
+}
+
+/// "A run directory belongs to the version that wrote it." A directory a version before stamps
+/// left (instance directories, a commit log, no run.json) is refused by `run` and `--restore` with
+/// what to do, and nothing in it is touched; `--fresh` sets all of it aside under retired/ and
+/// starts a run stamped with this version.
+#[test]
+fn a_run_of_another_version_is_refused_until_set_aside() {
+    let dir = temp("versions");
+    std::fs::write(
+        dir.join("app.tsx"),
+        "export default function Main() { return <>hi</>; }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("affordance.yaml"),
+        "app: {view: app.tsx}\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\ninstances: [{id: a, model: null}]\n",
+    )
+    .unwrap();
+    // What Affordance 0.1 left: an instance directory named after it, and its commit log.
+    let old = dir.join(".affordance");
+    std::fs::create_dir_all(old.join("a")).unwrap();
+    std::fs::write(old.join("a/agent.json"), "{\"id\":\"a\"}").unwrap();
+    std::fs::write(old.join("a/journal.jsonl"), "{\"input\":\"tick\",\"clock_ms\":1}\n").unwrap();
+    std::fs::write(old.join("commit.jsonl"), "{\"closed\":true}\n").unwrap();
+    std::fs::write(old.join("runtime.lock"), "").unwrap();
+    for args in [&["run"][..], &["run", "--restore"][..]] {
+        let said = stderr(&affordance(&dir, args));
+        assert!(
+            said.contains("earlier version of Affordance") && said.contains("--fresh"),
+            "{said}"
+        );
+    }
+    assert!(
+        old.join("a/journal.jsonl").is_file() && !old.join("run.json").exists(),
+        "nothing was touched"
+    );
+    let out = affordance(&dir, &["run", "--fresh"]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let retired: Vec<_> = std::fs::read_dir(old.join("retired")).unwrap().flatten().collect();
+    assert_eq!(retired.len(), 1);
+    assert!(
+        retired[0].path().join("a/journal.jsonl").is_file(),
+        "the old run is kept"
+    );
+    let stamp: serde_json::Value = serde_json::from_slice(&std::fs::read(old.join("run.json")).unwrap()).unwrap();
+    assert_eq!(stamp["contract"], affordance::runtime::host::CONTRACT_VERSION);
+    // A run of this version asks for a choice, and --restore continues it.
+    assert!(stderr(&affordance(&dir, &["run"])).contains("--restore"));
+    assert!(affordance(&dir, &["run", "--restore"]).status.success());
+    let _ = std::fs::remove_dir_all(&dir);
 }

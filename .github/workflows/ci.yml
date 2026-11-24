@@ -19,8 +19,8 @@ env:
   CARGO_INCREMENTAL: "0"
 jobs:
   # Every test that needs no reference data beyond a few tokenizers, in five shards that run at
-  # the same time, each about the same length: shard 1 is the one long test file, shards 2 to 4
-  # groups of the slower files, shard 5 every other test (and the TSX lint of the shipped views).
+  # the same time, each about the same length: shards 1 to 4 groups of the slower files, shard 5
+  # every other test (and the TSX lint of the shipped views).
   # The filters are name filters, so each test runs in exactly one shard. The tokenizers come
   # from this repository's own release (tools/fetch-test-tokenizers.sh), kept in the cache.
   test:
@@ -31,9 +31,9 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5]
     env:
-      SHARD_1: "resume_image::"
+      SHARD_1: "resume_image:: session_agent::"
       SHARD_2: "hardening:: group_commit::"
-      SHARD_3: "runtime:: session_agent:: page:: serve:: harness_consumer:: tool_traces::"
+      SHARD_3: "runtime:: page:: serve:: harness_consumer:: tool_traces::"
       SHARD_4: "runtime_http:: model_bindings:: features:: chat_render:: window:: pause_latency::"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -756,6 +756,7 @@ impl Runtime {
     /// outstanding work is submitted again. Secret env values come from `cfg.env` again.
     pub fn restore(cfg: RuntimeConfig, enc: Arc<Encoder>, model: Arc<dyn Model>) -> Result<Self, String> {
         let dir = cfg.dir.clone().ok_or("restore needs a run directory")?;
+        super::layout::holds(&dir, CONTRACT_VERSION)?;
         let mut rt = Runtime::new(cfg, enc, model);
         rt.owner = Some(durable::own(&dir)?);
         // A crash leaves the journals as the last commit made them, before anything reads them.
@@ -879,10 +880,12 @@ impl Runtime {
                     .map_err(|e| e.to_string())?;
             }
         }
-        // The run's own record: the directory holds a run (`layout::holds_a_run`).
+        // The run directory belongs to the version that wrote it: one of another version is never
+        // read (`layout::holds`). A new one is stamped with this version.
         if let Some(dir) = &self.cfg.dir
-            && !dir.join(super::layout::RUN).exists()
+            && super::layout::holds(dir, CONTRACT_VERSION)? == super::layout::Holds::Nothing
         {
+            std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
             atomic_value(&dir.join(super::layout::RUN), &json!({"contract": CONTRACT_VERSION}))?;
         }
         let blobs = match &self.cfg.dir {
@@ -1732,22 +1735,9 @@ fn start_instance(
         {
             pins["model"] = super::model_config::fingerprint(json!({"binding":name,"client":identity})).into();
         }
+        // (The run directory's stamp says which contract wrote it, checked once for the whole run
+        // before any instance is opened: `layout::holds`.)
         let pinned = before.as_ref().map(|v| v["pins"].clone()).filter(|p| !p.is_null());
-        if let Some(old) = pinned
-            .as_ref()
-            .map(|p| p["contract"].clone())
-            .filter(|c| *c != json!(CONTRACT_VERSION))
-        {
-            return fail(
-                slots,
-                cfg,
-                spec,
-                app,
-                format!(
-                    "restore refused: the journal was written under harness contract {old}, and this binary runs contract {CONTRACT_VERSION}; restore it with a contract-{old} binary"
-                ),
-            );
-        }
         if restored && pinned.as_ref().and_then(|old| old.get("model")) != pins.get("model") {
             if shared.cfg.strict_replay {
                 return fail(slots,cfg,spec,app,"strict restore refused: model binding identity changed or was not recorded; restore the original binding configuration, or use warning replay explicitly".into());
