@@ -13,7 +13,7 @@ fragments, and returns exact token IDs plus the actions still visible in the fin
 Adapters project those actions into each model's protocol. Cropping never leaves an invisible
 action callable by the model.
 
-The agent state machine takes one input and returns commands. The host runs model requests,
+An instance's state machine takes one input and returns commands. The host runs model requests,
 machine calls, timers, and message delivery, then feeds their results back as journaled inputs.
 Each instance owns its state and children. The host owns external I/O, permissions, and durable
 storage. Replaying the journal reconstructs the instance. Eligible idle/stopped data states

@@ -8,7 +8,7 @@ says how the tree is laid out, how to check a change, and what a change must not
 | Path | What it holds |
 |---|---|
 | `src/` | The Rust library: parser and interpreter for the TSX subset (`parser.rs`, `interp.rs`, `js*.rs`), layout and token emission (`emit.rs`, `style.rs`, `turns.rs`), reply parsing (`reply.rs`) |
-| `src/runtime/` | The agent runtime: one instance's event loop (`agent.rs`), the multi-agent host (`host.rs`), model bindings (`model.rs`), machines (`exec.rs`), journals and recovery images |
+| `src/runtime/` | The runtime: one instance's event loop (`instance.rs`), the host that runs many (`host.rs`), model bindings (`model.rs`), machines (`exec.rs`), journals and recovery images |
 | `src/bin/affordance/` | The `affordance` command: `run` a deployment (`affordance.yaml`), `serve` it over HTTP, `host` it for a frontend over stdio, `config`, `init`, and `render`, `test`, `lint`, `check` |
 | `views/` | TSX: chat-template apps per model family, libraries (`views/lib/`), context strategies, demos |
 | `spec/` | The normative contracts: `LANGUAGE.md` (the TSX subset and layout), `HARNESS.md` (instances, effects, replay), `CONTRACTS.md` (the map) |

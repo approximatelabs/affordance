@@ -92,8 +92,8 @@ The agent's tools reach the model as tool definitions, so the server must parse 
 is what `--jinja` (llama.cpp) and `--tool-call-parser` (vLLM, SGLang; the parser's name depends on
 the model) turn on. If the server returns a tool call as plain text, `affordance run` says so. If
 the server is not reachable, `affordance run` says so and keeps trying for five minutes
-(`model.retry.for_s`). Each agent's journal and trace
-are in `.affordance/<agent>/`. The journal records every input the agent received, so
+(`model.retry.for_s`). The run's journals and traces
+are in `.affordance/`, one folder per instance under `instances/`. A journal records every input its instance received, so
 `affordance run --restore` continues the run exactly; `affordance run --fresh` starts over.
 
 ### Change a setting

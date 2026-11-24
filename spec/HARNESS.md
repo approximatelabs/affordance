@@ -130,7 +130,7 @@ Each member takes its own turn, as if it had arrived alone: its listeners run fr
 the current state, its microtasks drain, and its effects and reconciliation run, with a fresh
 execution allowance. A frame is a journal record, not an app-visible unit: batching never changes
 what an app computes (two queued `setN(n + 1)` give `n + 2`, as without it). A member that stops
-the instance ends the frame. Recorded batch boundaries govern replay. Agent `journal_len` counts logical members; JSONL line count
+the instance ends the frame. Recorded batch boundaries govern replay. An instance's `journal_len` counts logical members; JSONL line count
 counts physical frames. Checkpoint offsets and hashes remain byte-based. Existing individual
 records retain their semantics; older binaries cannot read the new batch shape.
 Every await yields to the instance's FIFO microtask queue. The current input's listeners run
@@ -286,10 +286,10 @@ read it never runs it as script. A `command` machine gets it as `args.stdin`.
 
 Output past `spill_bytes` is written straight to a blob (§7). Capture is bounded (16 MiB).
 
-**Capabilities.** An agent's `capabilities` (e.g. `["store.*"]`; a trailing `*` matches a
+**Capabilities.** An instance's `capabilities` (e.g. `["store.*"]`; a trailing `*` matches a
 prefix) limit the platform APIs it may call (`send`, `store.*`). A call outside them returns the
-error `this agent may not call <api>`. Absent means all. Children inherit their parent's.
-`harness.inspect` is not among them: an agent's spec `inspect` lists the id prefixes it may read
+error `this instance may not call <api>`. Absent means all. Children inherit their parent's.
+`harness.inspect` is not among them: an instance's spec `inspect` lists the id prefixes it may read
 (`["*"]`, `["agent-"]`); it is empty by default and children do not inherit it. A spec with
 `inspectable: false` (inherited) is never read.
 Machines are bound by `machines`, never by capabilities.
@@ -516,24 +516,24 @@ Deployment environment and credentials must be supplied again on restore.
 **Recovery checkpoints.** With a run directory the host may write an instance's `checkpoint.json`,
 an optional recovery cache. It keeps the complete journal and all historical data. A compatible
 image restores supported data/metadata at a complete input boundary, then applies only newer
-journal inputs. An image is of an idle agent (no pending execution, cleanup closures or
-undispatched views) or of an agent at a **step boundary**: the point inside an input where the
+journal inputs. An image is of an idle instance (no pending execution, cleanup closures or
+undispatched views) or of an instance at a **step boundary**: the point inside an input where the
 work that ended has drained and the effects pass it asks for has not run, so nothing executes
 (a `useLoop` agent reaches one at the end of every step). A step-boundary image records that the
 pass is pending; restore runs it, exactly as the original did there, before the newer inputs.
-The agent keeps its latest step boundary in memory (shared values, no copy) and the host writes
-it when an image is due. Stopped agents may omit execution metadata that can never run again.
+The instance keeps its latest step boundary in memory (shared values, no copy) and the host writes
+it when an image is due. Stopped instances may omit execution metadata that can never run again.
 Functions/modules, class instances, promises, collections and rendered markup fall back to full
 replay, as does any object a `memoScan` step or the turn cache made that is reachable from state
-or effect dependencies (a restored agent's cold cache would make a new object where the
+or effect dependencies (a restored instance's cold cache would make a new object where the
 original reused that one); scans whose outputs stay in the render do not prevent an image.
 Opaque token buffers without markup/spans are supported as data. Shared data identity, frozen
 flags, undefined/numeric distinctions, environment/token-namespace references, effect
 dependencies, change notes (`harness.inspect`), counters, clock/randomness and dispatch results
 are preserved.
 
-The host writes an image after 256 additional inputs (of the agent if idle, else of its latest
-step boundary), and at shutdown and stop, so a close images every agent that reached a step
+The host writes an image after 256 additional inputs (of the instance if idle, else of its latest
+step boundary), and at shutdown and stop, so a close images every instance that reached a step
 boundary and its restore replays at most the current step's inputs. Instances with configured
 secret environment values do not use recovery caches. Checkpoints require the same app source,
 entry, tokenizer, contract, complete InstanceConfig, replay mode, spill threshold and model
@@ -635,7 +635,7 @@ fails or resends the call; it is logged, counted in the status's and the run rep
 
 ### Semantic tool completion traces
 
-The journal's clock (`clock_ms`) is logical: it stands still while a run's agents restore and
+The journal's clock (`clock_ms`) is logical: it stands still while a run's instances restore and
 from the moment the run begins closing, and continues from there, so neither a slow restore nor
 the time a run is closed takes anything from waits and timeouts. Each start and restore writes a trace record
 `{t:"clock", at_ms, wall_ms}`; until the next one, wall time is `at_ms + (wall_ms - at_ms)`.
@@ -657,7 +657,7 @@ At the first answer of a valid dispatched tool, the runtime emits one additive
 `ms`. `tool` is the
 canonical tool name; names over 128 Unicode characters use a 63-character
 prefix plus `#` and the full SHA256 of the name to remain bounded and distinct.
-`(agent, dispatch, index)` identifies the semantic call. `ms` is nonnegative logical elapsed milliseconds
+`(instance, dispatch, index)` identifies the semantic call. `ms` is nonnegative logical elapsed milliseconds
 from actual dispatch, not the earlier clock captured by its view. It includes
 logical time passing across close/restore; it is not executor CPU time. `status` is
 `"error"` for a thrown handler error or, in a `{result, ...meta}` answer, explicit

@@ -2975,7 +2975,7 @@ fn dispatch_now(
                 push_local(shared, local, (id.clone(), InputKind::Result { task, outcome }))
             };
             if name != "inspect" && !name.starts_with("machine:") && !slot.spec.allows(&name) {
-                return reply(local, Outcome::Error(format!("this agent may not call {name}")));
+                return reply(local, Outcome::Error(format!("this instance may not call {name}")));
             }
             match name.as_str() {
                 "send" => {
@@ -2988,7 +2988,7 @@ fn dispatch_now(
                     if slot.spec.inspect.is_empty() {
                         return reply(
                             local,
-                            Outcome::Error("this agent may not call inspect (its spec grants no `inspect`)".into()),
+                            Outcome::Error("this instance may not call inspect (its spec grants no `inspect`)".into()),
                         );
                     }
                     let select = match super::inspect::parse_select(&args["select"]) {

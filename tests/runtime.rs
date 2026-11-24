@@ -2588,7 +2588,7 @@ fn capabilities_limit_the_platform_apis_an_agent_may_call() {
         .as_str()
         .unwrap()
         .to_string();
-    assert!(result.contains("this agent may not call send"), "{result}");
+    assert!(result.contains("this instance may not call send"), "{result}");
 }
 
 /// session.tsx on each model family: its first prompt renders through the chosen template app.
