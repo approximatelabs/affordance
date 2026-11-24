@@ -1,8 +1,8 @@
-//! The agent runtime: the "browser" that runs agent apps (views) as tabs.
+//! The runtime: the "browser" that runs apps (views) as tabs, each running copy an instance.
 //!
-//! - [`agent`]: one agent as a deterministic state machine with no I/O (journaled inputs in,
+//! - [`instance`]: one instance as a deterministic state machine with no I/O (journaled inputs in,
 //!   commands out). Replaying its journal reproduces it exactly.
-//! - [`host`]: the multi-agent runtime: a shared tokenizer, render workers, the model client,
+//! - [`host`]: the runtime of many instances: a shared tokenizer, render workers, the model client,
 //!   primitives (`exec`, `send`, `wait`, `store.*`), the app-scoped environ, journals and traces.
 //!
 //! See `docs/RUNTIME.md` for the app contract and the primitives.
