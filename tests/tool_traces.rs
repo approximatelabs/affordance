@@ -262,6 +262,7 @@ fn real_executor_timeout_is_explicit_and_not_an_exit_code_guess() {
     let (task, _, args) = call(&cmds);
     let ctx = CallContext {
         agent: "agent-0000".into(),
+        instance: String::new(),
         task,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),

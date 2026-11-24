@@ -11,8 +11,12 @@ use std::time::{Duration, Instant};
 /// Who is calling, as the runtime knows it (never taken from the app's arguments).
 #[derive(Debug, Clone)]
 pub struct CallContext {
-    /// The instance that calls.
+    /// The instance that calls (its name).
     pub agent: String,
+    /// The instance's id in its run: a safe path component the runtime assigned, never derived from
+    /// the name (empty outside a run: the name, escaped, stands in). A machine's per-instance place
+    /// is named by it.
+    pub instance: String,
     /// The call's task, unique within the instance.
     pub task: u64,
     /// The agent's environ (plain and secret values).
@@ -161,12 +165,13 @@ impl<F: Fn(&CallContext, &J) -> Result<J, String> + Send + Sync> Executor for F 
 /// Where `exec` runs.
 #[derive(Debug, Clone)]
 pub enum Target {
-    /// This host's shell. With `home` (`{agent}` filled, created on first use), commands start
-    /// there and see it as `$HOME`: a working directory per agent, not a sandbox.
-    Local { home: Option<String> },
+    /// This host's shell. With `home` (created on first use), commands start there and see it as
+    /// `$HOME`: a working directory, not a sandbox; with `per_instance`, each instance its own
+    /// (`home/<instance id>`).
+    Local { home: Option<String>, per_instance: bool },
     /// `user@host` over SSH with key auth; one ControlMaster connection per target is reused,
-    /// so a command costs a channel open rather than a handshake. `{agent}` in the target or key
-    /// path is replaced by the agent id (one VM per agent).
+    /// so a command costs a channel open rather than a handshake. A machine per instance is a
+    /// machine (a role) per instance in the deployment.
     Ssh {
         /// `user@host`.
         target: String,
@@ -177,16 +182,17 @@ pub enum Target {
         /// The known-hosts file the connection checks.
         known_hosts: String,
     },
-    /// A container per agent: `name` (`{agent}` filled) is started from `image` on first use and
-    /// kept running; commands run in it with `docker exec`.
+    /// A container per instance, `<name>-<instance id>`, started from `image` on first use and kept
+    /// running; commands run in it with `docker exec`.
     Docker { image: String, name: String },
     /// A bubblewrap sandbox: the system's programs and libraries read-only (`/usr`, `/bin`,
-    /// `/sbin`, `/lib*`, `/etc`, `/opt`), `home` (`{agent}` filled, created on first use)
-    /// writable, a private /tmp, and nothing else of the host: no other user's files, no home
+    /// `/sbin`, `/lib*`, `/etc`, `/opt`), `home` (with `per_instance`, `home/<instance id>`;
+    /// created on first use) writable, a private /tmp, and nothing else of the host: no other user's files, no home
     /// directories, no mounted data. `read` names more paths to show read-only (a toolchain
     /// kept under a home directory). No network unless `network`.
     Bwrap {
         home: String,
+        per_instance: bool,
         network: bool,
         read: Vec<String>,
     },
@@ -208,10 +214,32 @@ impl Exec {
     /// The local shell, with the default limits.
     pub fn local() -> Self {
         Exec {
-            target: Target::Local { home: None },
+            target: Target::Local {
+                home: None,
+                per_instance: false,
+            },
             default_timeout_s: 60,
             max_capture: 16 << 20,
         }
+    }
+}
+
+/// The calling instance's id: the one the runtime assigned, or (outside a run) its name escaped.
+fn instance_of(ctx: &CallContext) -> String {
+    if ctx.instance.is_empty() {
+        instance_component(&ctx.agent)
+    } else {
+        ctx.instance.clone()
+    }
+}
+
+/// A machine's directory for the calling instance: `base` itself, or with `per_instance` the
+/// instance's own under it (`base/<instance id>`): named by its id, never by its name.
+fn place(base: &str, per_instance: bool, ctx: &CallContext) -> String {
+    if per_instance {
+        format!("{}/{}", base.trim_end_matches('/'), instance_of(ctx))
+    } else {
+        base.to_string()
     }
 }
 
@@ -285,12 +313,12 @@ impl Executor for Exec {
             // A local command sees the agent's environ, never the runtime's own environment.
             // The shell leads its own process group, so a SIGTERM to that group stops everything
             // the command started.
-            Target::Local { home } => {
+            Target::Local { home, per_instance } => {
                 let mut c = Proc::new("bash");
                 c.env_clear();
                 for k in ["PATH", "HOME", "LANG"] { if let Ok(v) = std::env::var(k) { c.env(k, v); } }
                 if let Some(home) = home {
-                    let home = home.replace("{agent}", &instance_component(&ctx.agent));
+                    let home = place(home, *per_instance, ctx);
                     std::fs::create_dir_all(&home).map_err(|e| format!("local home {home}: {e}"))?;
                     c.env("HOME", &home).current_dir(&home);
                 }
@@ -298,19 +326,18 @@ impl Executor for Exec {
                 c.args(["-l", "-s"]).process_group(0).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()
             }
             Target::Ssh { target, key, control_dir, known_hosts } => {
-                let target = target.replace("{agent}", &instance_component(&ctx.agent));
                 let mut c = Proc::new("ssh");
                 // A guest sharing a CPU quota with thousands of others can take tens of seconds to
                 // answer a handshake or a keepalive; those are not dead hosts, so the limits are loose.
                 c.args(["-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new",
                         "-o", &format!("UserKnownHostsFile={known_hosts}"), "-o", "ConnectTimeout=30", "-o", "ControlMaster=auto",
                         "-o", &format!("ControlPath={control_dir}/%r@%h:%p"), "-o", "ControlPersist=600", "-o", "ServerAliveInterval=30", "-o", "ServerAliveCountMax=6"]);
-                if let Some(k) = key { c.args(["-i", &k.replace("{agent}", &instance_component(&ctx.agent))]); }
+                if let Some(k) = key { c.args(["-i", k]); }
                 // `--` before the host: a target that starts with `-` is a host name, never an option.
                 c.arg("--").arg(target).arg(&remote).process_group(0).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()
             }
             Target::Docker { image, name } => {
-                let name = name.replace("{agent}", &instance_component(&ctx.agent));
+                let name = format!("{name}-{}", instance_of(ctx));
                 if name.is_empty() || !name.as_bytes()[0].is_ascii_alphanumeric()
                     || !name.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'-')) {
                     return Err("docker: invalid container name".into());
@@ -323,8 +350,8 @@ impl Executor for Exec {
                     "affordance-docker", &name, image, &timeout_s.to_string()])
                     .process_group(0).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()
             }
-            Target::Bwrap { home, network, read } => {
-                let home = home.replace("{agent}", &instance_component(&ctx.agent));
+            Target::Bwrap { home, per_instance, network, read } => {
+                let home = place(home, *per_instance, ctx);
                 std::fs::create_dir_all(&home).map_err(|e| format!("bwrap home {home}: {e}"))?;
                 let mut c = Proc::new("bwrap");
                 c.env_clear();

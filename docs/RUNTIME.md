@@ -178,15 +178,17 @@ machine.
 
 | Kind | Config | Runs |
 |---|---|---|
-| `local` | (none) | `bash` on this host, with only the agent's environ. |
+| `local` | `home?`, `per_instance?` | `bash` on this host, with only the agent's environ, in `home` when given (with `per_instance`, each instance its own directory under it, `home/<instance id>`). |
 | `ssh` | `target`, `key?`, `control_dir?`, `known_hosts?` | `bash` on a VM over a shared SSH connection. A host's key is accepted the first time it is seen and checked from then on. The known-hosts file and the connection sockets are kept in `~/.config/affordance/ssh`, which only this user can enter, unless the deployment names other places. |
-| `docker` | `image`, `name?` (default `aff-{agent}`) | `bash` in a container per agent, started on first use and kept. |
-| `bwrap` | `home`, `network?` (default false), `read?` | `bash` in a bubblewrap sandbox. The command sees the system's programs and libraries read-only (`/usr`, `/bin`, `/sbin`, `/lib*`, `/etc`, `/opt`), its `home` writable and a private /tmp. No other file on the host is there for it: not a home directory, not mounted data. `read` lists more paths to show read-only. Linux, where the kernel lets an ordinary user make a sandbox. |
+| `docker` | `image`, `name?` (default `aff`) | `bash` in a container per instance, `<name>-<instance id>`, started on first use and kept. |
+| `bwrap` | `home`, `per_instance?`, `network?` (default false), `read?` | `bash` in a bubblewrap sandbox. The command sees the system's programs and libraries read-only (`/usr`, `/bin`, `/sbin`, `/lib*`, `/etc`, `/opt`), its `home` writable and a private /tmp. No other file on the host is there for it: not a home directory, not mounted data. `read` lists more paths to show read-only. Linux, where the kernel lets an ordinary user make a sandbox. |
 | `command` | `argv` | An external executor: JSON requests on stdin, JSON responses on stdout. |
 | `http` | `url`, `headers?`, `timeout_ms?`, byte limits | HTTP requests on a bound origin. Grant the role `http` for global `fetch(input, init)`. See [Fetch and MCP](HTTP_AND_MCP.md). |
 
-`{n}` (the agent's index) and `{id}` in a machine's config make one machine per agent. An agent
-spec's `machines` lists the roles it is bound to; without it, every deployment machine.
+An instance's place on a machine is named by the id the runtime gave it, never by its name. An
+instance's `machines` lists the roles it is bound to; without it, every deployment machine. A
+pool, `"vm-{n:03}": {..., count: 512}`, binds the roles `vm-000` to `vm-511`, with `{n}` (the
+member's number) filled in each member's fields; a root app hands them out (`<Mount machine>`).
 
 ## Folding (context policy in the app)
 
@@ -241,9 +243,10 @@ agent's own `env`. The runtime process's real environment is never visible.
 
 `affordance run`, or `Runtime` from Rust. The contract is `spec/HARNESS.md`; this section is how
 to run it.
-- **A root app or a list.** `{"root": {"app": "fleet.tsx", "props": {...}}}` runs a root app that
-  mounts the rest (`views/demo/tree/fleet.tsx` mounts one agent per machine of a pool);
-  `{"app": {...}, "agents": ...}` runs one app as a list of agents.
+- **The instances.** `instances` lists them: `[{"id": "root", "app": "fleet.tsx", "props": {...}}]`
+  runs a root app that mounts the rest (`views/demo/tree/fleet.tsx` mounts one agent per machine
+  of a pool), and `[{"id": "a"}, {"id": "b"}]` runs the deployment's `app` twice. An entry with
+  `count: N` is N copies, `<id>-0` to `<id>-(N-1)`, with the same fields.
 - **Where apps import from.** An app's own directory (and below), and the library, which
   `@affordance/...` imports name: `library` in the deployment; else the library checkout the app
   lives in (the nearest directory above it holding `index.json`, or a checkout's `views/`); else
@@ -347,13 +350,12 @@ model:
   ranks: 8
   sampling: {temperature: 0.6}
 machines:
-  home: {kind: ssh, target: "agent@10.0.1.{n}", key: keys/agent_ed25519, timeout_s: 60}
-agents:
-  count: 512
-  id: "agent-{n:04}"
-  max_new: 4096
-  max_turns: 300
-  props: {id: "{id}", n_agents: 512, task: "...", c_hi: 48000, c_lo: 20000}
+  "vm-{n:03}": {kind: ssh, target: "agent@10.0.1.{n}", key: keys/agent_ed25519, timeout_s: 60, count: 512}
+instances:
+  - id: root
+    app: fleet.tsx            # mounts one session per machine of the pool, as views/demo/tree/fleet.tsx does
+    max_new: 4096
+    props: {task: "...", c_hi: 48000, c_lo: 20000}
 env: {SUB_MODEL_KEY: "${SUB_MODEL_KEY}"}
 secrets: [SUB_MODEL_KEY]
 workers: 8
@@ -362,7 +364,7 @@ exec_threads: 1024
 max_wall_s: 86400
 ```
 
-`{n}` and `{id}` are filled per agent in agent fields and machine configs: one VM per agent.
+The pool binds 512 roles, one VM each; the root app gives each mounted session its own.
 
 `ranks` is the model server's data-parallel size: each agent is pinned to one rank, so its prefix
 stays in one engine's cache (`sglang`: `routed_dp_rank`; `completions`, vLLM: the

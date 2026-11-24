@@ -15,7 +15,7 @@ fn deployment(name: &str, app: &str, home: Option<&Path>) -> PathBuf {
     let mut d = json!({
         "app": {"view": "app.tsx", "entry": "Main"},
         "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
-        "agents": [{"id": "a", "model": null}],
+        "instances": [{"id": "a", "model": null}],
         "dir": "run",
         "keep_running": true,
         "max_wall_s": 60
@@ -216,7 +216,7 @@ fn a_restored_agent_keeps_its_own_secret() {
         "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
         "env": {"KEY": wide},
         "secrets": ["KEY"],
-        "agents": [{"id": "a", "model": null, "env": {"KEY": a}}, {"id": "b", "model": null, "env": {"KEY": b}}],
+        "instances": [{"id": "a", "model": null, "env": {"KEY": a}}, {"id": "b", "model": null, "env": {"KEY": b}}],
         "dir": "run",
         "keep_running": true,
         "max_wall_s": 60
@@ -267,7 +267,7 @@ fn a_journal_missing_committed_inputs_fails_its_own_restore() {
     let d = json!({
         "app": {"view": "app.tsx", "entry": "Main"},
         "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
-        "agents": [{"id": "a", "model": null}, {"id": "b", "model": null}],
+        "instances": [{"id": "a", "model": null}, {"id": "b", "model": null}],
         "dir": "run",
         "keep_running": true,
         "max_wall_s": 60
@@ -340,7 +340,7 @@ fn names_like_the_runs_own_files_are_only_names() {
     let d = json!({
         "app": {"view": "app.tsx", "entry": "Main"},
         "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
-        "agents": names.iter().map(|n| json!({"id": n, "model": null})).collect::<Vec<_>>(),
+        "instances": names.iter().map(|n| json!({"id": n, "model": null})).collect::<Vec<_>>(),
         "dir": "run",
         "keep_running": true,
         "max_wall_s": 60

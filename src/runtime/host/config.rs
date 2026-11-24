@@ -195,9 +195,6 @@ pub struct AgentSpec {
     /// The seed of `Math.random` and `harness.random`.
     #[serde(default)]
     pub seed: u64,
-    /// The agent's index in its deployment (fills `{n}` in machine configs, e.g. its VM).
-    #[serde(default)]
-    pub index: usize,
     /// Its app (a .tsx file); `None`: the runtime's `view`.
     #[serde(default)]
     pub app: Option<String>,
@@ -239,7 +236,6 @@ impl AgentSpec {
             inspectable: true,
             rank: None,
             seed: 1,
-            index: 0,
             app: None,
             entry: None,
             model: default_model(),

@@ -21,6 +21,7 @@ fn tmp(name: &str) -> PathBuf {
 fn ctx() -> CallContext {
     CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: Default::default(),
         cancel: Default::default(),
@@ -30,7 +31,10 @@ fn ctx() -> CallContext {
 }
 fn exec() -> Exec {
     Exec {
-        target: Target::Local { home: None },
+        target: Target::Local {
+            home: None,
+            per_instance: false,
+        },
         default_timeout_s: 30,
         max_capture: 16 << 20,
     }

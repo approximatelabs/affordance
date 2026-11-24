@@ -314,13 +314,17 @@ fn a_spooled_exec_output_equals_the_in_memory_one_even_cut_mid_character() {
     let blobs = Arc::new(Blobs::new(dir.join("blobs"), 1024).unwrap());
     // 2-byte characters, capped at an odd byte count: the cut splits the last character.
     let exec = Exec {
-        target: Target::Local { home: None },
+        target: Target::Local {
+            home: None,
+            per_instance: false,
+        },
         default_timeout_s: 30,
         max_capture: 100_001,
     };
     let args = json!({"cmd": "for i in $(seq 1 1000); do printf 'é%.0s' $(seq 1 100); done; exit 3"});
     let ctx = |b: Option<Arc<Blobs>>| CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: Default::default(),
         cancel: Default::default(),

@@ -462,6 +462,13 @@ impl Shared {
     fn instance_dir(&self, id: &str) -> Option<PathBuf> {
         self.store.layout()?.dir(id)
     }
+    /// An instance's id in the run (its directory's name), for a machine's per-instance place;
+    /// empty without a run directory (`CallContext.instance`).
+    fn instance_key(&self, id: &str) -> String {
+        self.instance_dir(id)
+            .and_then(|d| d.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .unwrap_or_default()
+    }
     /// Begin closing: the clock stops at this moment, no new call starts, and calls still queued
     /// for a model are left outstanding for a restore.
     fn begin_closing(&self) {
@@ -2840,6 +2847,7 @@ fn dispatch_now(
                 };
                 let ctx = CallContext {
                     agent: id.clone(),
+                    instance: shared.instance_key(&id),
                     task,
                     env: slot.agent.cfg.env.clone(),
                     // The call's own token: cancelling the call stops the generation and the pipe.
@@ -3091,6 +3099,7 @@ fn dispatch_now(
                     Some(exec) => {
                         let ctx = CallContext {
                             agent: id.clone(),
+                            instance: shared.instance_key(&id),
                             task,
                             env: slot.agent.cfg.env.clone(),
                             cancel: shared.token(&id, incarnation, task),

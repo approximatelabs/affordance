@@ -72,7 +72,7 @@ fn mock_sglang(enc: Arc<Encoder>) -> String {
                         "Note.</think><tool_call>set_notes<arg_key>text</arg_key><arg_value>hello seen</arg_value></tool_call>"
                     }
                     3 => {
-                        "Ping.</think><tool_call>send_message<arg_key>to</arg_key><arg_value>agent-0000</arg_value><arg_key>text</arg_key><arg_value>ping</arg_value></tool_call>"
+                        "Ping.</think><tool_call>send_message<arg_key>to</arg_key><arg_value>agent-0</arg_value><arg_key>text</arg_key><arg_value>ping</arg_value></tool_call>"
                     }
                     _ => "Rest.</think><tool_call>wait<arg_key>seconds</arg_key><arg_value>1</arg_value></tool_call>",
                 };
@@ -252,7 +252,7 @@ fn generic_runtime_binary_runs_an_app_from_config() {
         "app": {"view": root().join("views/demo/runtime/agent.tsx"), "tokenizer": tokenizer},
         "model": {"kind": "sglang", "url": url, "ranks": 2},
         "machines": {"home": {"kind": "local"}},
-        "agents": {"count": 3, "id": "agent-{n:04}", "props": {"task": "Agent {n} of 3: say hello."}, "max_new": 256, "max_turns": 4},
+        "instances": [{"id": "agent", "count": 3, "props": {"task": "Say hello."}, "max_new": 256, "max_turns": 4}],
         "env": {"DEPLOY_ENV": "staging"},
         "dir": dir, "workers": 2, "max_wall_s": 60
     });
@@ -277,8 +277,8 @@ fn generic_runtime_binary_runs_an_app_from_config() {
         "{report}"
     );
     assert_eq!(report["exact_appends"], 9);
-    // The journal of agent-0000 holds the messages from its two peers.
-    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "agent-0000/journal.jsonl")).unwrap();
+    // The journal of agent-0 holds the messages from its two peers.
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "agent-0/journal.jsonl")).unwrap();
     assert_eq!(journal.matches("\"name\":\"message\"").count(), 2, "{journal}");
     // A local command sees the agent's environ (DEPLOY_ENV) but not the runtime's (HOSTSECRET).
     assert!(journal.contains("hello\\nstaging\\n\\n"), "{journal}");
@@ -295,7 +295,7 @@ fn the_binary_runs_a_root_app_that_mounts_a_fleet_on_a_machine_pool() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let config = json!({
-        "root": {"app": root().join("views/demo/tree/fleet.tsx"), "props": {"task": "Say hello."}, "max_turns": 4},
+        "instances": [{"id": "root", "app": root().join("views/demo/tree/fleet.tsx"), "props": {"task": "Say hello."}, "max_turns": 4}],
         "model": {"kind": "sglang", "url": url, "tokenizer": tokenizer},
         "machines": {"vm-{n:02}": {"kind": "local", "count": 3}},
         "env": {"DEPLOY_ENV": "staging"},
@@ -359,7 +359,7 @@ fn obsolete_memory_limit_and_unknown_fields_are_rejected() {
 /// (`a/kid`) runs on its root's machine, as `<Mount>` hands a child its parent's machines.
 #[test]
 #[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
-fn a_mounted_child_uses_its_roots_per_agent_machine() {
+fn a_mounted_child_gets_its_own_place_on_a_per_instance_machine() {
     let tokenizer = root().join("ref/tokenizers/zai-org__GLM-5.3.json");
     let url = mock_sglang(shared::tokenizer(&tokenizer));
     let dir = std::env::temp_dir().join(format!("aff-agents-child-{}", std::process::id()));
@@ -378,8 +378,8 @@ export default function Main() {
     let config = json!({
         "app": {"view": app, "tokenizer": tokenizer},
         "model": {"kind": "sglang", "url": url},
-        "machines": {"home": {"kind": "local", "home": dir.join("homes/{id}")}},
-        "agents": [{"id": "a"}],
+        "machines": {"home": {"kind": "local", "home": dir.join("homes"), "per_instance": true}},
+        "instances": [{"id": "a"}],
         "dir": dir.join("run"), "workers": 1, "max_wall_s": 20
     });
     let cfg_path = dir.join("config.json");
@@ -390,8 +390,11 @@ export default function Main() {
         .output()
         .unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    // The child's own place, named by the id the runtime gave it (never by its name).
+    let kid = crate::shared::instance_dir(&dir.join("run"), "a/kid");
+    let place = dir.join("homes").join(kid.file_name().unwrap());
     let state = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/journal.jsonl")).unwrap();
-    assert!(state.contains(&format!("{}", dir.join("homes/a").display())), "{state}");
+    assert!(state.contains(&format!("{}", place.display())), "{state}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -415,7 +418,7 @@ fn help_and_a_failed_agent_fail_the_run() {
     .unwrap();
     let tokenizer = affordance_support_tokenizer(&dir);
     let config = json!({"app": {"view": dir.join("app.tsx"), "tokenizer": tokenizer},
-        "model": {"kind": "sglang", "url": "http://127.0.0.1:1", "context": "none"}, "agents": [{"id": "a"}], "max_wall_s": 5});
+        "model": {"kind": "sglang", "url": "http://127.0.0.1:1", "context": "none"}, "instances": [{"id": "a"}], "max_wall_s": 5});
     std::fs::write(dir.join("config.json"), config.to_string()).unwrap();
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_affordance"))
         .arg("run")

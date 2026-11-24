@@ -266,24 +266,20 @@ There is no other way out of the harness. Running on the harness's own host mean
 
 | Kind | Config | Runs |
 |---|---|---|
-| `local` | `home?` (`{agent}` filled) | `bash` on this host with only the instance's environ, in `home` when given. |
+| `local` | `home?`, `per_instance?` | `bash` on this host with only the instance's environ, in `home` when given (with `per_instance`, `home/<instance id>`). |
 | `ssh` | `target`, `key?`, `control_dir?`, `known_hosts?` | `bash` on a VM over a shared connection. |
-| `docker` | `image`, `name?` | `bash` in a container per instance, started on first use. |
-| `bwrap` | `home`, `network?` | `bash` in a bubblewrap sandbox: host read-only, `home` writable, no network by default. *Tested only where bubblewrap is installed.* |
+| `docker` | `image`, `name?` | `bash` in a container per instance (`<name>-<instance id>`), started on first use. |
+| `bwrap` | `home`, `per_instance?`, `network?`, `read?` | `bash` in a bubblewrap sandbox: host read-only, `home` writable, no network by default. *Tested only where bubblewrap is installed.* |
 | `command` | `argv`, `max_reply_bytes?` | A machine that brings its own executor: each call runs `argv` in its own process group, with `{agent, task, env, args}` as JSON on stdin, and takes a JSON result from stdout (at most `max_reply_bytes`, default 128 MiB: past it the call fails and the group is stopped). A cancelled call's group gets SIGTERM, then SIGKILL after 5 s. |
 | `http` | `url`, `headers?`, `timeout_ms?`, `max_request_bytes?`, `max_response_bytes?` | A generic HTTP executor on a bound origin. Calls take `{path?, method?, headers?, body?, timeout_ms?}` and return `{status, statusText, url, headers, body}`. Global Fetch uses the role `http`; named fetch functions use their assigned role. Protected headers are inserted by the host. See `docs/HTTP_AND_MCP.md`. |
 
-Local and bubblewrap home templates and Docker name templates replace `{agent}` with a safe,
-collision-free component: `i-` followed by UTF-8 bytes, retaining ASCII letters, digits, `-`
-and `.`, and escaping every other byte as `_hh` (including `_`). Example: `root/child` becomes
-`i-root_2fchild`, distinct from `root_child` (`i-root_5fchild`). Docker names are validated and
-names/images are passed as arguments. SSH target/key templates retain their documented raw ID
-substitution. Upgrading an existing local/bubblewrap deployment requires moving each old home
-to its new component path, or using an explicit fixed home; instance IDs and journals do not
-change. Docker deployments similarly need their old containers renamed if retaining them.
-
-`{n}` and `{id}` in a machine's config make one machine per agent. `count` makes a pool of roles
-(`vm-{n:04}`) that a root hands out.
+An instance's place on a machine (a `per_instance` home, its container) is named by the instance's
+id in the run (`instances/<id>/`), never by its name; outside a run (an executor called directly)
+the name stands in, escaped into one component (`i-` and the UTF-8 bytes, ASCII letters, digits,
+`-` and `.` kept and every other byte `_hh`: `root/child` is `i-root_2fchild`). Docker names are
+validated and names and images are passed as arguments. An ssh target and key are what the
+deployment says. `count` makes a pool of roles (`vm-{n:04}`, `{n}` the member's number) that a
+root hands out.
 
 A call's `stdin` reaches the command byte for byte as its standard input; a command that does not
 read it never runs it as script. A `command` machine gets it as `args.stdin`.

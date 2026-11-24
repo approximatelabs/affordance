@@ -266,7 +266,7 @@ export default function Main() {
     .unwrap();
     std::fs::write(
         dir.join("affordance.yaml"),
-        "root: {app: app.tsx}\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\nserve: {listen: \"127.0.0.1:0\", timeout_s: 4}\n",
+        "instances: [{id: root, app: app.tsx}]\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\nserve: {listen: \"127.0.0.1:0\", timeout_s: 4}\n",
     )
     .unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_affordance"))

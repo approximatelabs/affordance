@@ -403,7 +403,7 @@ The endpoint addresses and credential paths are supplied by the deployment opera
       "provider_options": {"logprobs": 1}
     }
   },
-  "agents": [
+  "instances": [
     {"id": "one", "model": "default", "props": {"task": "Say hello."}},
     {"id": "two", "model": "B", "props": {"task": "Say hello."}},
     {"id": "three", "model": "C", "props": {"task": "Say hello."}}

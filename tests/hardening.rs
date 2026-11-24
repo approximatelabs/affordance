@@ -182,13 +182,15 @@ fn local_instance_home_names_do_not_alias() {
     let f = Files::new();
     let e = Exec {
         target: Target::Local {
-            home: Some(format!("{}/{{agent}}", f.0.display())),
+            home: Some(f.0.display().to_string()),
+            per_instance: true,
         },
         default_timeout_s: 1,
         max_capture: 1024,
     };
     let context = |id: &str| CallContext {
         agent: id.into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),
@@ -621,6 +623,7 @@ fn docker_names_and_images_are_arguments_never_host_shell_source() {
     let marker = std::env::var("AFFORDANCE_DOCKER_MARKER").unwrap();
     let ctx = CallContext {
         agent: format!("root/child$(touch${{IFS}}{marker})"),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),
@@ -630,7 +633,7 @@ fn docker_names_and_images_are_arguments_never_host_shell_source() {
     let executor = Exec {
         target: Target::Docker {
             image: format!("unused$(touch${{IFS}}{marker})"),
-            name: "aff-{agent}".into(),
+            name: "aff".into(),
         },
         default_timeout_s: 1,
         max_capture: 1000,

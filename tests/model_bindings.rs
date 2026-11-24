@@ -456,7 +456,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let run = files.0.join("run");
     let capture = files.0.join("capture");
     let path = files.0.join("deployment.json");
-    let mut config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},"model":a,"models":{"A":a,"B":b,"C":c},"agents":[{"id":"one","model":"A"},{"id":"two","model":"B"},{"id":"three","model":"C"}],"dir":run,"replay":"strict","max_wall_s":5});
+    let mut config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},"model":a,"models":{"A":a,"B":b,"C":c},"instances":[{"id":"one","model":"A"},{"id":"two","model":"B"},{"id":"three","model":"C"}],"dir":run,"replay":"strict","max_wall_s":5});
     let first = cli(&config, &path, &capture, false);
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
     let report: J = serde_json::from_slice(&first.stdout).unwrap();
@@ -899,7 +899,7 @@ fn one_retry_policy_is_stated_in_the_deployment_or_on_the_call() {
         });
         let config = json!({"app":{"view":write(name, call),"tokenizer":tokenizer::path()},
           "model":{"kind":"completions","url":peer.url,"name":"test","stream":false,"retry":binding},
-          "agents":[{"id":"a"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":20,"replay":"strict"});
+          "instances":[{"id":"a"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":20,"replay":"strict"});
         let path = files.0.join(format!("{name}.json"));
         let output = cli(&config, &path, &files.0.join(format!("capture-{name}")), false);
         let report: J = serde_json::from_slice(&output.stdout)
@@ -924,7 +924,7 @@ fn one_retry_policy_is_stated_in_the_deployment_or_on_the_call() {
     let peer = Peer::stock();
     let config = json!({"app":{"view":write("bad", "{}"),"tokenizer":tokenizer::path()},
       "model":{"kind":"completions","url":peer.url,"name":"test","retry":{"on":["sometimes"]}},
-      "agents":[{"id":"a"}],"dir":files.0.join("run-bad")});
+      "instances":[{"id":"a"}],"dir":files.0.join("run-bad")});
     let output = cli(&config, &files.0.join("bad.json"), &files.0.join("capture-bad"), false);
     assert!(!output.status.success());
     assert!(
@@ -963,7 +963,7 @@ fn a_token_id_servers_retry_after_is_the_least_the_next_attempt_waits() {
         });
         let config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},
           "model":{"kind":"completions","url":peer.url,"name":"test","stream":streaming,"retry":{"wait_s":[0.02,0.05]}},
-          "agents":[{"id":"a"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":20,"replay":"strict"});
+          "instances":[{"id":"a"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":20,"replay":"strict"});
         let output = cli(
             &config,
             &files.0.join(format!("{name}.json")),
@@ -1008,7 +1008,7 @@ fn completions_capture_each_attempt_and_stream_event_without_credentials() {
         let config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},
           "model":{"kind":"completions","url":peer.url,"name":"test","stream":streaming,"retry":{"wait_s":[0.05,1]},
             "key_file":files.credentials(name),"key_name":"KEY"},
-          "agents":[{"id":"native-agent"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":5,"replay":"strict"});
+          "instances":[{"id":"native-agent"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":5,"replay":"strict"});
         let path = files.0.join(format!("{name}.json"));
         let output = cli(&config, &path, &capture, false);
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
@@ -1087,7 +1087,7 @@ fn chat_captures_requests_responses_and_usage_without_credentials() {
     let config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},
       "model":{"kind":"chat","context":200000,"url":peer.url,"model":"test","key_file":files.credentials("chat-capture"),"key_name":"KEY",
         "headers":{"HTTP-Referer":"https://example.test/","X-Title":"Affordance"}},
-      "agents":[{"id":"chat-agent"}],"dir":run,"max_wall_s":5,"replay":"strict"});
+      "instances":[{"id":"chat-agent"}],"dir":run,"max_wall_s":5,"replay":"strict"});
     let path = files.0.join("deployment.json");
     let output = cli(&config, &path, &capture, false);
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
@@ -1152,7 +1152,7 @@ export default function Main(){{return <><Mount key='native' model='native'><Chi
     let native =
         json!({"kind":"sglang","url":peer.url,"tokenizer":tokenizer::path(),"stream":false,"template":"glm53"});
     let hosted = json!({"kind":"chat","context":200000,"url":peer.url,"tokenizer":tokenizer::path(),"model":"test","key_file":files.credentials("presentation"),"key_name":"KEY"});
-    let mut config = json!({"root":{"app":app},"model":native,"models":{"native":native,"hosted":hosted},
+    let mut config = json!({"instances":[{"id":"root","app":app}],"model":native,"models":{"native":native,"hosted":hosted},
         "dir":files.0.join("run"),"max_wall_s":5,"replay":"strict"});
     let path = files.0.join("deployment.json");
     let capture = files.0.join("capture");
@@ -1235,7 +1235,7 @@ export default function Main(){{
     let mut config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},
       "model":{"kind":"anthropic","context":200000,"url":peer.url,"model":"claude-test","key_file":files.credentials("claude"),"key_name":"KEY",
         "headers":{"anthropic-beta":"thinking-binding-controls-2026-08-01"}},
-      "agents":[{"id":"claude"}],"dir":files.0.join("run"),"max_wall_s":5,"replay":"strict"});
+      "instances":[{"id":"claude"}],"dir":files.0.join("run"),"max_wall_s":5,"replay":"strict"});
     let path = files.0.join("deployment.json");
     let first = cli(&config, &path, &capture, false);
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
@@ -1329,7 +1329,7 @@ fn captures_are_best_effort_and_streams_capture_their_response() {
             json!({"kind":"sglang","url":peer.url,"stream":streaming})
         };
         let config = json!({"app":{"view":if kind == "chat" {&chat} else {&native},"tokenizer":tokenizer::path()},"model":model,
-          "agents":[{"id":"agent"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":5,"replay":"strict"});
+          "instances":[{"id":"agent"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":5,"replay":"strict"});
         let capture = if name == "captured" {
             files.0.join("captures")
         } else {
@@ -1383,7 +1383,7 @@ fn hosted_captures_do_not_name_the_server() {
     let port = 9;
     let config = json!({"app":{"view":chat_app(&files),"tokenizer":tokenizer::path()},
       "model":{"kind":"chat","context":200000,"url":format!("http://127.0.0.1:{port}"),"model":"test","key_file":files.credentials("closed"),"key_name":"KEY"},
-      "agents":[{"id":"agent"}],"dir":files.0.join("run"),"max_wall_s":2,"replay":"strict"});
+      "instances":[{"id":"agent"}],"dir":files.0.join("run"),"max_wall_s":2,"replay":"strict"});
     let capture = files.0.join("captures");
     cli(&config, &files.0.join("closed.json"), &capture, false);
     let captured = texts(&capture);

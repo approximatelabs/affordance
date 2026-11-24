@@ -285,7 +285,7 @@ fn a_model_layer_serves_another_harnesss_conversation() {
     .unwrap();
     std::fs::write(
         dir.join("affordance.yaml"),
-        format!("root: {{app: app.tsx, model: default}}\nmodel: {{kind: chat, url: \"{url}\", model: local, context: 8192}}\n"),
+        format!("instances: [{{id: root, app: app.tsx, model: default}}]\nmodel: {{kind: chat, url: \"{url}\", model: local, context: 8192}}\n"),
     )
     .unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_affordance"))

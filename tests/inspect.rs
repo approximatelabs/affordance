@@ -243,6 +243,7 @@ print(json.dumps({"ids": a.ids(), "count": z["count"], "items": [i["n"] for i in
         Arc::new(Exec {
             target: Target::Local {
                 home: Some(dir.join("home").display().to_string()),
+                per_instance: false,
             },
             default_timeout_s: 30,
             max_capture: 1 << 20,

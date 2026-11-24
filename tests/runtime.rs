@@ -572,6 +572,7 @@ fn exec_over_ssh_localhost() {
     };
     let ctx = CallContext {
         agent: "agent-0001".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
@@ -804,6 +805,7 @@ fn cancelled_exec_kills_the_process_group() {
     let token = CancelToken::new();
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: token.clone(),
@@ -946,7 +948,7 @@ fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
         "app": {"view": "app.tsx", "entry": "Main"},
         "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
         "machines": {"home": {"kind": "local", "home": home}},
-        "agents": [
+        "instances": [
             {"id": "busy", "model": null, "props": {"busy": true}},
             {"id": "timer", "model": null, "props": {"busy": false}}
         ],
@@ -1367,7 +1369,7 @@ fn a_docker_machine_is_one_container_per_agent() {
         eprintln!("no docker daemon: skipped");
         return;
     }
-    let name = format!("aff-test-{{agent}}-{}", std::process::id());
+    let name = format!("aff-test-{}", std::process::id());
     let m = Exec {
         target: Target::Docker {
             image: "ubuntu:24.04".into(),
@@ -1378,6 +1380,7 @@ fn a_docker_machine_is_one_container_per_agent() {
     };
     let ctx = |agent: &str| CallContext {
         agent: agent.into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
@@ -1400,10 +1403,10 @@ fn a_docker_machine_is_one_container_per_agent() {
         "each agent has its own"
     );
     assert_eq!(run("a", "exit 3")["exit"], 3);
-    // The machine names an agent's container after the agent's directory name (`i-a`), not the
-    // bare id: removing `...-a-...` removed nothing, and every run left two containers behind.
+    // The machine names an instance's container `<name>-<instance id>` (outside a run, the name
+    // escaped: `i-a`).
     for agent in ["a", "b"] {
-        let container = name.replace("{agent}", &format!("i-{agent}"));
+        let container = format!("{name}-i-{agent}");
         let removed = std::process::Command::new("docker")
             .args(["rm", "-f", &container])
             .output()
@@ -1451,10 +1454,11 @@ fn a_bwrap_machine_shows_a_command_the_system_and_its_home_and_no_other_files() 
         std::fs::create_dir_all(dir).unwrap();
         std::fs::write(dir.join("note"), "a note\n").unwrap();
     }
-    let home = base.join("home-{agent}");
+    let home = base.join("homes");
     let m = Exec {
         target: Target::Bwrap {
             home: home.display().to_string(),
+            per_instance: true,
             network: false,
             read: vec![shown.display().to_string()],
         },
@@ -1463,6 +1467,7 @@ fn a_bwrap_machine_shows_a_command_the_system_and_its_home_and_no_other_files() 
     };
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
@@ -1697,7 +1702,8 @@ fn the_research_ladder_runs_its_policies_and_grades_answers() {
             &format!("m{n}"),
             Arc::new(Exec {
                 target: affordance::runtime::Target::Local {
-                    home: Some(dir.join("homes/{agent}").display().to_string()),
+                    home: Some(dir.join("homes").display().to_string()),
+                    per_instance: true,
                 },
                 default_timeout_s: 30,
                 max_capture: 1 << 20,
@@ -1978,7 +1984,8 @@ fn a_returned_branch_folds_to_its_call_and_summary() {
         "m0",
         Arc::new(Exec {
             target: affordance::runtime::Target::Local {
-                home: Some(dir.join("homes/{agent}").display().to_string()),
+                home: Some(dir.join("homes").display().to_string()),
+                per_instance: true,
             },
             default_timeout_s: 30,
             max_capture: 1 << 20,
@@ -2233,7 +2240,8 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
         "m0",
         Arc::new(Exec {
             target: affordance::runtime::Target::Local {
-                home: Some(dir.join("homes/{agent}").display().to_string()),
+                home: Some(dir.join("homes").display().to_string()),
+                per_instance: true,
             },
             default_timeout_s: 60,
             max_capture: 1 << 20,
@@ -2368,6 +2376,7 @@ fn a_command_machine_runs_its_program_per_call() {
     use affordance::runtime::{CallContext, CommandMachine, Executor};
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 7,
         env: BTreeMap::from([("K".into(), "v".into())]),
         cancel: Default::default(),
@@ -2391,6 +2400,7 @@ fn a_command_reply_past_its_bound_fails_the_call() {
     use affordance::runtime::{CallContext, CommandMachine, Executor};
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 1,
         env: BTreeMap::new(),
         cancel: Default::default(),
@@ -2458,6 +2468,7 @@ fn a_cancelled_command_call_lets_the_command_clean_up() {
     let cancel = CancelToken::new();
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: cancel.clone(),
@@ -2498,6 +2509,7 @@ fn a_cancelled_command_call_reaps_a_stubborn_descendant() {
     let cancel = CancelToken::new();
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: cancel.clone(),

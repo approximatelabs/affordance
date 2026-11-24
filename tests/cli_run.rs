@@ -45,7 +45,7 @@ fn config_layers_files_and_overrides_in_order() {
     std::fs::write(
         dir.join("affordance.yaml"),
         "app: {view: app/main.tsx}\nmodel: {kind: chat, url: http://base/v1, model: m, context: 100}\n\
-         agents: [{id: a, max_turns: 2}, {id: b}]\nworkers: 2\nenv: {KEY: \"${DEPLOY_TEST_KEY:-unset}\"}\nsecrets: [KEY]\n",
+         instances: [{id: a, max_turns: 2}, {id: b}]\nworkers: 2\nenv: {KEY: \"${DEPLOY_TEST_KEY:-unset}\"}\nsecrets: [KEY]\n",
     )
     .unwrap();
     std::fs::write(
@@ -62,7 +62,7 @@ fn config_layers_files_and_overrides_in_order() {
             "-f",
             "over/more.yaml",
             "--set",
-            "agents[1].max_turns=9",
+            "instances[1].max_turns=9",
             "--set",
             "workers=null",
             "--set",
@@ -76,7 +76,7 @@ fn config_layers_files_and_overrides_in_order() {
     assert_eq!(config["model"]["context"], 200);
     assert_eq!(config["model"]["model"], "0.10", "a quoted value stays a string");
     assert_eq!(
-        config["agents"],
+        config["instances"],
         json!([{"id": "a", "max_turns": 2}, {"id": "b", "max_turns": 9}])
     );
     assert!(config.get("workers").is_none(), "null removes a key");
@@ -239,7 +239,7 @@ export default function Main() {
     .unwrap();
     std::fs::write(
         dir.join("affordance.yaml"),
-        "root: {app: app.tsx}\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: none, context: 4096}\nmachines:\n  home: {kind: local, home: work}\n",
+        "instances: [{id: root, app: app.tsx}]\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: none, context: 4096}\nmachines:\n  home: {kind: local, home: work}\n",
     )
     .unwrap();
     std::fs::create_dir_all(dir.join("work")).unwrap();
@@ -393,7 +393,7 @@ fn a_command_runs_its_later_lines_after_one_that_reads_standard_input() {
     .unwrap();
     std::fs::write(
         dir.join("affordance.yaml"),
-        "root: {app: app.tsx}\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\nmachines: {home: {kind: local}}\n",
+        "instances: [{id: root, app: app.tsx}]\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\nmachines: {home: {kind: local}}\n",
     )
     .unwrap();
     let report: serde_json::Value = serde_json::from_str(&stdout(&affordance(&dir, &["run"]))).unwrap();
@@ -412,7 +412,7 @@ fn config_hides_a_secret_value_in_props_and_headers() {
         dir.join("affordance.yaml"),
         "app: {view: app.tsx}\nenv: {API: \"${AUDIT_SECRET}\"}\nsecrets: [API]\n\
          model: {kind: chat, url: http://base/v1, model: m, context: 100, headers: {X-Gateway: \"token ${AUDIT_SECRET}\"}}\n\
-         agents: [{id: a, props: {key: \"${AUDIT_SECRET}\"}}]\n",
+         instances: [{id: a, props: {key: \"${AUDIT_SECRET}\"}}]\n",
     )
     .unwrap();
     let out = Command::new(env!("CARGO_BIN_EXE_affordance"))

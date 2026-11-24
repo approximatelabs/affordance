@@ -15,6 +15,7 @@ use std::{
 fn context() -> CallContext {
     CallContext {
         agent: "caller".into(),
+        instance: String::new(),
         task: 7,
         env: BTreeMap::from([("TOKEN".into(), "hidden-token".into())]),
         cancel: CancelToken::new(),
@@ -261,7 +262,7 @@ useEffect(() => { (async () => {
         "app": {"view": app, "tokenizer": concat!(env!("CARGO_MANIFEST_DIR"), "/ref/tokenizers/Qwen__Qwen3-4B-Instruct-2507.json")},
         "model": {"kind": "sglang", "url": "http://127.0.0.1:1", "context": "none"},
         "machines": {"api": {"kind": "http", "url": server.url, "headers": {"Authorization": {"env": "TOKEN", "prefix": "Bearer "}}}},
-        "agents": [{"id": "alice", "model": null, "env": {"TOKEN": "alice-private"}},
+        "instances": [{"id": "alice", "model": null, "env": {"TOKEN": "alice-private"}},
                    {"id": "bob", "model": null, "env": {"TOKEN": "bob-private"}}],
         "secrets": ["TOKEN"], "dir": dir.join("run"), "max_wall_s": 5
     });

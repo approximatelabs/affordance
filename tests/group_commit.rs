@@ -63,7 +63,7 @@ fn a_crash_between_commits_resumes_from_a_consistent_cut() {
             .push(json!({"id": format!("asker-{i}"), "model": null, "props": {"role": "asker", "hub": "hub", "n": N}}));
     }
     let cfg = json!({"app": {"view": app, "tokenizer": tokenizer::path()}, "model": {"kind": "sglang", "url": "http://127.0.0.1:1", "context": "none"},
-        "agents": agents, "dir": dir, "workers": 2});
+        "instances": agents, "dir": dir, "workers": 2});
     let cfg_path = root.join("run.json");
     std::fs::write(&cfg_path, cfg.to_string()).unwrap();
 
@@ -235,7 +235,7 @@ fn a_crash_between_commits_keeps_every_blob_and_store_entry_a_committed_line_ref
         agents.push(json!({"id": format!("asker-{i}"), "model": null, "props": {"role": "asker", "hub": "hub", "n": N, "me": format!("asker-{i}")}}));
     }
     let cfg = json!({"app": {"view": app, "tokenizer": tokenizer::path()}, "model": {"kind": "sglang", "url": "http://127.0.0.1:1", "context": "none"},
-        "agents": agents, "dir": dir, "workers": 2});
+        "instances": agents, "dir": dir, "workers": 2});
     let cfg_path = root.join("run.json");
     std::fs::write(&cfg_path, cfg.to_string()).unwrap();
     let mut ids = vec!["hub".to_string()];

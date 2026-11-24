@@ -9,7 +9,7 @@ model:
 machines:
   home:
     kind: local
-agents:
+instances:
   - id: first
     max_turns: 3
     max_new: 512

@@ -29,7 +29,7 @@ Usage:
       -f FILE                 another file over it (repeatable, in order)
       --set KEY=VALUE         one value over the files (repeatable; KEY dotted, VALUE YAML)
       --dir DIR               the journal directory (default .affordance beside the file)
-      --app FILE              the app (overrides root.app or app.view)
+      --app FILE              the deployment's app (app.view)
       --restore                continue the run in the journal directory
       --fresh                 start over (the previous run's instances are kept under retired/)
       --keep-running          stay up while agents are idle (a chat waiting for its user)
