@@ -62,7 +62,7 @@ export default function Main({ task }) {
   /** Replace your notes. */
   function set_notes({text}: {text: string}) { setNotes(text); return "saved"; }
   const app = <>
-    <box label="status">{`${harness.agent} | notes: ${notes}\n`}</box>
+    <box label="status">{`${harness.instance} | notes: ${notes}\n`}</box>
     <Tool fn={shell}>{"[shell]"}</Tool>
     <Tool fn={set_notes}>{" [set_notes]\n"}</Tool>
     <aff event="message" onCallback={async ({ from, text }) => {
@@ -233,7 +233,7 @@ agent's own `env`. The runtime process's real environment is never visible.
 - An app may read its secrets and use them, the way a page reads its cookies. Showing a secret to
   the model is the app's choice.
 - Values of keys listed in `secrets` are redacted (`[secret:KEY]`) in `trace.jsonl` and
-  `agent.json`, as values (a PEM key with newlines and quotes is found). On restore they come
+  `instance.json`, as values (a PEM key with newlines and quotes is found). On restore they come
   from the config again. A secret under 4 bytes is refused: it cannot be told from text.
 - `journal.jsonl` stores inputs verbatim (replay needs them). Treat it as sensitive.
 - The runtime's own credentials (SSH keys, endpoints, API keys) are machine and model
@@ -283,7 +283,7 @@ to run it.
   See [the configuration contract](../spec/HARNESS.md#6-models) and
   [multi-binding examples, sessions and recovery](MODEL_BINDINGS.md).
 - **Files in the journal directory (`dir`):**
-  - `<dir>/instances/<id>/agent.json`: its name and spec (each instance lives under an id the
+  - `<dir>/instances/<id>/instance.json`: its name and spec (each instance lives under an id the
     runtime assigned, never under its name);
   - `journal.jsonl`: every input, appended before it takes effect (durable at the next
     commit, below);
@@ -372,9 +372,9 @@ stays in one engine's cache (`sglang`: `routed_dp_rank`; `completions`, vLLM: th
 its engines and most of each prompt is prefilled again.
 
 The Rust API: `Runtime::new(config, Arc<Encoder>, Arc<dyn Model>)` (the `default` model), then
-`.bind_model(name, enc, model)` and `.bind_machine(role, machine)`, then `.add_agent(spec)` or
+`.bind_model(name, enc, model)` and `.bind_machine(role, machine)`, then `.add_instance(spec)` or
 `Runtime::restore`, then `.run() -> Report`.
-`runtime::Agent` is the single-agent core with no I/O (`start`, `handle(input) -> commands`,
+`runtime::Instance` is one instance's core with no I/O (`start`, `handle(input) -> commands`,
 `restore(journal)`), for custom hosts and tests. Its one exception: with `set_blobs`, it writes
 large strings as content-addressed blob files (idempotent, so replay is unchanged).
 
@@ -429,14 +429,14 @@ and keeps running; stdout carries only the protocol (the summary goes to stderr)
   "payload"}` posts an event to the first instance (or to `target`), and `close`, `status`,
   `set_model_limit` and `subscribe` work as there; `{"type": "answer", "request", "value"}`
   answers a question. The end of stdin closes the run (`--restore` continues it).
-- **Out** (stdout): `ready {agent}` once the agents are running; `delta {agent, task, text, reasoning?}` (or `delta {agent, task, call: {index, id?, name?, arguments}}`,
+- **Out** (stdout): `ready {instance}` once the agents are running; `delta {instance, task, text, reasoning?}` (or `delta {instance, task, call: {index, id?, name?, arguments}}`,
   more of a hosted reply's tool call: its place in the reply, its id and name when they arrive, and more of
   its arguments' JSON text), a model's reply as it
-  is generated; `output {agent, task, text}`, a command's output as it is written;
-  `trace {agent, record}`, the trace records (renders, replies, each model call's `generate`
+  is generated; `output {instance, task, text}`, a command's output as it is written;
+  `trace {instance, record}`, the trace records (renders, replies, each model call's `generate`
   statistics such as `first_token_ms` and `tokens_per_s`, finished tools, handler errors, the
   app's `console` lines);
-  `ui {agent, value}` and `question {agent, request, ...}`; answers to requests that had an `id`
+  `ui {instance, value}` and `question {instance, request, ...}`; answers to requests that had an `id`
   (`result {id, value}`, `error {id, message}`), and `error {message}` for a failed one without;
   `exit {error?}`.
 - **The machine `ui` is the frontend.** A call with `ask` (`{ask: {kind: "permission", ...}}`)

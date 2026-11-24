@@ -169,7 +169,11 @@ fn an_initialized_agent_runs_outside_a_checkout() {
     let url = server(vec![answer]);
     let out = affordance(&dir.join("agent"), &["run", "--set", &format!("model.url={url}")]);
     let report: serde_json::Value = serde_json::from_str(&stdout(&out)).unwrap();
-    assert_eq!(report["per_agent"][0]["stopped"], json!({"answer": "done"}), "{report}");
+    assert_eq!(
+        report["per_instance"][0]["stopped"],
+        json!({"answer": "done"}),
+        "{report}"
+    );
     assert!(crate::shared::inst(&dir, "agent/.affordance/first/journal.jsonl").is_file());
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -247,7 +251,7 @@ export default function Main() {
     let report: serde_json::Value =
         serde_json::from_str(&stdout(&out)).unwrap_or_else(|e| panic!("{e}: {}", stderr(&out)));
     assert_eq!(
-        report["per_agent"][0]["stopped"],
+        report["per_instance"][0]["stopped"],
         json!([
             "wrote notes/it's a file.txt",
             "one\ntwo 'q' \"d\" $HOME\nthree\nthree\n",
@@ -295,9 +299,9 @@ fn a_run_with_no_model_server_says_so_and_stops_when_its_retry_time_has_passed()
     assert!(said.contains("is not tried again: the app gets the error"), "{said}");
     // The report is printed, and the run fails: a script can tell the agent never got an answer.
     assert!(!out.status.success());
-    assert!(said.contains("1 of 1 agents failed"), "{said}");
+    assert!(said.contains("1 of 1 instances failed"), "{said}");
     let report: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(report["per_agent"][0]["stopped"]["reason"], "loop_error", "{report}");
+    assert_eq!(report["per_instance"][0]["stopped"]["reason"], "loop_error", "{report}");
 }
 
 /// Render a one-file app with the command and return the text it prints (or its error).
@@ -398,7 +402,7 @@ fn a_command_runs_its_later_lines_after_one_that_reads_standard_input() {
     .unwrap();
     let report: serde_json::Value = serde_json::from_str(&stdout(&affordance(&dir, &["run"]))).unwrap();
     assert_eq!(
-        report["per_agent"][0]["stopped"],
+        report["per_instance"][0]["stopped"],
         json!({"output": "first\nAFTER\n", "exit": 7}),
         "{report}"
     );

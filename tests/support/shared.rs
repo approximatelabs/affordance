@@ -22,7 +22,7 @@ pub fn tokenizer(path: &Path) -> Arc<Encoder> {
 }
 
 /// An instance's directory in a run directory, found by its name (instances live under
-/// `instances/<id>/`, each naming itself in its `agent.json`).
+/// `instances/<id>/`, each naming itself in its `instance.json`).
 pub fn instance_dir(run: &Path, name: &str) -> PathBuf {
     find_instance(run, name).unwrap_or_else(|| panic!("no instance {name:?} in {}", run.display()))
 }
@@ -33,7 +33,7 @@ pub fn find_instance(run: &Path, name: &str) -> Option<PathBuf> {
         .flatten()
         .map(|e| e.path())
         .find(|p| {
-            std::fs::read(p.join("agent.json"))
+            std::fs::read(p.join("instance.json"))
                 .ok()
                 .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
                 .is_some_and(|v| v["id"] == name)
@@ -64,6 +64,6 @@ pub fn new_instance(run: &Path, name: &str) -> PathBuf {
         .join("instances")
         .join(affordance::runtime::exec::instance_component(name));
     std::fs::create_dir_all(&d).unwrap();
-    std::fs::write(d.join("agent.json"), serde_json::json!({"id": name}).to_string()).unwrap();
+    std::fs::write(d.join("instance.json"), serde_json::json!({"id": name}).to_string()).unwrap();
     d
 }

@@ -5,10 +5,10 @@
 //!      `subscribe`; an event goes to the first instance unless it names a `target`), and
 //!      `{"type":"answer","request","value"}`, which answers a question. The end of stdin closes
 //!      the run, which `--restore` continues.
-//! Out: `ready {agent}` once the agents are running; `delta {agent, task, text, reasoning?}` (a
-//!      model's reply as it is generated); `output {agent, task, text}` (a command's output as it
-//!      is written); `trace {agent, record}` (renders, replies, finished tools, handler errors);
-//!      `ui {agent, value}` and `question {agent, request, ...}` (the app's calls on the machine
+//! Out: `ready {instance}` once the instances are running; `delta {instance, task, text, reasoning?}` (a
+//!      model's reply as it is generated); `output {instance, task, text}` (a command's output as it
+//!      is written); `trace {instance, record}` (renders, replies, finished tools, handler errors);
+//!      `ui {instance, value}` and `question {instance, request, ...}` (the app's calls on the machine
 //!      `ui`); answers (`result`, `error`); `exit {error?}`.
 //!
 //! The machine `ui` is the frontend: a call with `ask` waits for the frontend's `answer` (a
@@ -51,7 +51,8 @@ struct Ui {
 impl Executor for Ui {
     fn call(&self, ctx: &CallContext, args: &J) -> Result<J, String> {
         if args.get("ask").is_none() {
-            self.out.send(json!({"type": "ui", "agent": ctx.agent, "value": args}));
+            self.out
+                .send(json!({"type": "ui", "instance": ctx.agent, "value": args}));
             return Ok(J::Null);
         }
         let request = self.next.fetch_add(1, Ordering::SeqCst);
@@ -61,7 +62,7 @@ impl Executor for Ui {
         // request (a forged `exit`, another question's number).
         let mut event = args.as_object().cloned().map(J::Object).unwrap_or_else(|| json!({}));
         event["type"] = json!("question");
-        event["agent"] = json!(ctx.agent);
+        event["instance"] = json!(ctx.agent);
         event["request"] = json!(request);
         self.out.send(event);
         // Until the frontend answers, or the call is no longer wanted (an abort, the run's end).
@@ -135,12 +136,14 @@ pub fn start(rt: &mut Runtime, out: Out, target: String) -> Result<(), String> {
     rt.observe(Observer(Arc::new(move |agent: &str, task: u64, seen: Observed<'_>| {
         let event = match seen {
             Observed::Ids(ids) => match decoder.lock().unwrap().text(agent, task, ids) {
-                Some(text) if !text.is_empty() => json!({"type": "delta", "agent": agent, "task": task, "text": text}),
+                Some(text) if !text.is_empty() => {
+                    json!({"type": "delta", "instance": agent, "task": task, "text": text})
+                }
                 _ => return,
             },
-            Observed::Text(text) => json!({"type": "delta", "agent": agent, "task": task, "text": text}),
+            Observed::Text(text) => json!({"type": "delta", "instance": agent, "task": task, "text": text}),
             Observed::Reasoning(text) => {
-                json!({"type": "delta", "agent": agent, "task": task, "text": text, "reasoning": true})
+                json!({"type": "delta", "instance": agent, "task": task, "text": text, "reasoning": true})
             }
             Observed::Call {
                 index,
@@ -155,12 +158,12 @@ pub fn start(rt: &mut Runtime, out: Out, target: String) -> Result<(), String> {
                 if let Some(name) = name {
                     call["name"] = json!(name);
                 }
-                json!({"type": "delta", "agent": agent, "task": task, "call": call})
+                json!({"type": "delta", "instance": agent, "task": task, "call": call})
             }
             Observed::Output(bytes) => {
-                json!({"type": "output", "agent": agent, "task": task, "text": String::from_utf8_lossy(bytes)})
+                json!({"type": "output", "instance": agent, "task": task, "text": String::from_utf8_lossy(bytes)})
             }
-            Observed::Trace(record) => json!({"type": "trace", "agent": agent, "record": record}),
+            Observed::Trace(record) => json!({"type": "trace", "instance": agent, "record": record}),
         };
         watcher.send(event);
     })));
@@ -171,7 +174,7 @@ pub fn start(rt: &mut Runtime, out: Out, target: String) -> Result<(), String> {
         std::thread::spawn(move || {
             loop {
                 match control.status()["state"].as_str() {
-                    Some("running") => break out.send(json!({"type": "ready", "agent": target})),
+                    Some("running") => break out.send(json!({"type": "ready", "instance": target})),
                     Some("closing" | "closed") => break,
                     _ => std::thread::sleep(Duration::from_millis(10)),
                 }

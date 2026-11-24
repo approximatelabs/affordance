@@ -252,7 +252,7 @@ fn binary_configures_http_bindings_with_each_callers_credentials() {
         &app,
         r#"export default function Main() {
 useEffect(() => { (async () => {
- const response = await harness.machine.get("api").call({method: "POST", body: harness.agent});
+ const response = await harness.machine.get("api").call({method: "POST", body: harness.instance});
  harness.stop(JSON.parse(response.body));
 })(); }, []); return "waiting";
 }"#,

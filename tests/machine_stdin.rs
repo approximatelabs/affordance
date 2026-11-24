@@ -3,7 +3,7 @@
 //! blob reference and is written to disk once (the journal holds only the result), as `fetch` sends a Blob body.
 use affordance::emit::Encoder;
 use affordance::runtime::{
-    AgentSpec, CallContext, Exec, Executor, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig, Target,
+    CallContext, Exec, Executor, FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig, Target,
 };
 use serde_json::{Value as J, json};
 use std::path::PathBuf;
@@ -118,15 +118,15 @@ fn an_apps_large_input_is_a_blob_reference_in_the_journal() {
     let model = Arc::new(FnModel(|_: &GenRequest| Ok(GenReply::default())));
     let mut rt = Runtime::new(cfg, enc, model);
     rt.bind_machine("home", Arc::new(exec()));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
     assert_eq!(
-        report.agents[0].stopped,
+        report.instances[0].stopped,
         Some(json!("20000")),
         "{:?}",
-        report.agents[0].error
+        report.instances[0].error
     );
     // The journal records the call's result (its arguments are recomputed on replay); the input
     // crossed as a blob reference, so it sat on disk once, not on the heap.

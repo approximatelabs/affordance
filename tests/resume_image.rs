@@ -2,7 +2,7 @@
 //! is imaged at its step boundaries, a run stopped in the middle of a step leaves an image of
 //! the last boundary, and restoring from it replays only that step's inputs and reaches exactly the
 //! state a full replay of the same journal reaches.
-use affordance::runtime::{AgentSpec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+use affordance::runtime::{FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
 use serde_json::{Value as J, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -70,10 +70,10 @@ fn run(dir: &Path, restore: bool, hang_at: Option<usize>) -> affordance::runtime
         Ok(json!({"output": format!("{}\n", cmd.trim_start_matches("echo ")), "exit": 0, "seconds": 0.01, "timed_out": false, "truncated": false}))
     }));
     if !restore {
-        let mut spec = AgentSpec::new("agent-0", json!({"id": "agent-0", "task": "Keep going."}));
+        let mut spec = InstanceSpec::new("agent-0", json!({"id": "agent-0", "task": "Keep going."}));
         spec.max_turns = Some(14);
         spec.max_new = 256;
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     rt.run().unwrap()
 }
@@ -112,10 +112,10 @@ fn a_loop_agent_stopped_mid_step_resumes_from_its_last_step_boundary() {
     assert!(
         !first.complete,
         "{:?} {:?}",
-        first.agents[0].stopped, first.agents[0].metrics
+        first.instances[0].stopped, first.instances[0].metrics
     );
-    assert!(first.agents[0].error.is_none(), "{:?}", first.agents[0].error);
-    let journal = first.agents[0].journal_len;
+    assert!(first.instances[0].error.is_none(), "{:?}", first.instances[0].error);
+    let journal = first.instances[0].journal_len;
     let image: J = serde_json::from_slice(
         &std::fs::read(crate::shared::inst(&a, "agent-0/checkpoint.json")).expect("a loop agent is imaged"),
     )
@@ -143,7 +143,7 @@ fn a_loop_agent_stopped_mid_step_resumes_from_its_last_step_boundary() {
     let from_image = run(&a, true, None);
     let full = run(&b, true, None);
     for r in [&from_image, &full] {
-        assert!(r.complete, "{:?}", r.agents[0].error);
+        assert!(r.complete, "{:?}", r.instances[0].error);
     }
     let restore = restores(&a);
     assert_eq!(restore.len(), 2, "both resumes used an image: {restore:?}");
@@ -157,11 +157,11 @@ fn a_loop_agent_stopped_mid_step_resumes_from_its_last_step_boundary() {
     let copy_restores = restores(&b);
     assert_eq!(copy_restores.len(), 1, "{copy_restores:?}");
     assert_eq!(
-        from_image.agents[0].state, full.agents[0].state,
+        from_image.instances[0].state, full.instances[0].state,
         "image restore equals full replay"
     );
-    assert_eq!(from_image.agents[0].metrics, full.agents[0].metrics);
-    assert_eq!(from_image.agents[0].journal_len, full.agents[0].journal_len);
+    assert_eq!(from_image.instances[0].metrics, full.instances[0].metrics);
+    assert_eq!(from_image.instances[0].journal_len, full.instances[0].journal_len);
     std::fs::remove_dir_all(&base).unwrap();
 }
 
@@ -205,22 +205,26 @@ fn a_promise_used_during_render_does_not_stop_recovery_images() {
                 Runtime::new(cfg, enc, model)
             };
             if !restore {
-                let mut spec = AgentSpec::new("agent-0", json!({}));
+                let mut spec = InstanceSpec::new("agent-0", json!({}));
                 spec.model = None;
-                rt.add_agent(spec).unwrap();
+                rt.add_instance(spec).unwrap();
             }
             rt.run().unwrap()
         };
         let (image, full) = (dir.join("image"), dir.join("full"));
         let first = run(&image, false);
-        assert!(first.agents[0].error.is_none(), "{name}: {:?}", first.agents[0].error);
-        assert_eq!(first.agents[0].state["__ui"]["@n"], json!(3), "{name}");
+        assert!(
+            first.instances[0].error.is_none(),
+            "{name}: {:?}",
+            first.instances[0].error
+        );
+        assert_eq!(first.instances[0].state["__ui"]["@n"], json!(3), "{name}");
         let saved = std::fs::read(crate::shared::inst(&image, "agent-0/checkpoint.json"))
             .unwrap_or_else(|_| panic!("{name}: the agent was not imaged"));
         let saved: J = serde_json::from_slice(&saved).unwrap();
         assert_eq!(
             saved["data"]["image"]["journaled"].as_u64(),
-            Some(first.agents[0].journal_len as u64),
+            Some(first.instances[0].journal_len as u64),
             "{name}"
         );
         copy(&image, &full);
@@ -229,12 +233,12 @@ fn a_promise_used_during_render_does_not_stop_recovery_images() {
         assert_eq!(restores(&image).len(), 1, "{name}: the restore used the image");
         assert!(restores(&full).is_empty(), "{name}");
         assert_eq!(
-            from_image.agents[0].state, replayed.agents[0].state,
+            from_image.instances[0].state, replayed.instances[0].state,
             "{name}: image restore equals full replay"
         );
-        assert_eq!(from_image.agents[0].metrics, replayed.agents[0].metrics, "{name}");
+        assert_eq!(from_image.instances[0].metrics, replayed.instances[0].metrics, "{name}");
         assert_eq!(
-            from_image.agents[0].journal_len, replayed.agents[0].journal_len,
+            from_image.instances[0].journal_len, replayed.instances[0].journal_len,
             "{name}"
         );
     }

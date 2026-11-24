@@ -83,7 +83,7 @@ fn a_controller_posts_reads_the_status_and_closes_a_run_over_its_socket() {
     assert_eq!(unknown["type"], "error", "{unknown}");
     assert_eq!(c.call(json!({"type": "set_model_limit", "limit": 0}))["type"], "result");
     let status = c.call(json!({"type": "status"}))["value"].clone();
-    assert_eq!(status["agents"][0]["id"], "a", "{status}");
+    assert_eq!(status["instances"][0]["id"], "a", "{status}");
     // A second controller sees the same run; the first disconnecting leaves it running.
     drop(c);
     let mut c = Controller::connect(&dir.join("control.sock"));
@@ -229,7 +229,7 @@ fn a_restored_agent_keeps_its_own_secret() {
     });
     c.close(0);
     summary(child);
-    let saved = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/agent.json")).unwrap();
+    let saved = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/instance.json")).unwrap();
     assert!(!saved.contains(a), "a secret value is never saved: {saved}");
     let child = start(&dir, true);
     let mut c = Controller::connect(&dir.join("control.sock"));
@@ -239,7 +239,7 @@ fn a_restored_agent_keeps_its_own_secret() {
     }
     let report = summary(child);
     let stopped = |id: &str| {
-        report["per_agent"]
+        report["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -300,7 +300,7 @@ fn a_journal_missing_committed_inputs_fails_its_own_restore() {
     let out = child.wait_with_output().unwrap();
     let report: J = serde_json::from_slice(&out.stdout).unwrap();
     let agent = |id: &str| {
-        report["per_agent"]
+        report["per_instance"]
             .as_array()
             .unwrap()
             .iter()

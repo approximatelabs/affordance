@@ -1,7 +1,7 @@
 //! Where a run keeps each instance's files. An instance's name is a label for addressing it
 //! (`a`, `a/kid`) and never becomes a path: each instance lives in `instances/<id>/`, under an id
 //! the runtime assigns when it is first created (a UUIDv7: random, ordered by creation), and its
-//! `agent.json` records its name. The run's own files (`run.json`, `commit.jsonl`, `blobs/`,
+//! `instance.json` records its name. The run's own files (`run.json`, `commit.jsonl`, `blobs/`,
 //! `clock.json`, the lock) sit beside `instances/`, where no name can reach them. An instance
 //! replaced by a fresh mount moves to `retired/<id>/`; the new one gets a new id.
 use std::collections::HashMap;
@@ -44,7 +44,7 @@ impl Layout {
         std::fs::create_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
         // Named from the start: a directory a crash leaves before its full record (the runtime
         // writes that next) is still found by its name.
-        let record = d.join("agent.json");
+        let record = d.join("instance.json");
         std::fs::write(&record, serde_json::json!({"id": name}).to_string())
             .map_err(|e| format!("{}: {e}", record.display()))?;
         by_name.insert(name.to_string(), d.clone());
@@ -81,7 +81,7 @@ impl Layout {
     }
 }
 
-/// Every instance of the run directory `root`, by name: each `instances/<id>/` whose `agent.json`
+/// Every instance of the run directory `root`, by name: each `instances/<id>/` whose `instance.json`
 /// names it. A directory whose record cannot be read is not listed (its own restore reports it).
 pub(crate) fn scan(root: &Path) -> Vec<(String, PathBuf)> {
     let mut found = vec![];
@@ -90,7 +90,7 @@ pub(crate) fn scan(root: &Path) -> Vec<(String, PathBuf)> {
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let name = std::fs::read(path.join("agent.json"))
+        let name = std::fs::read(path.join("instance.json"))
             .ok()
             .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
             .and_then(|v| v["id"].as_str().map(str::to_owned));
@@ -156,7 +156,7 @@ mod tests {
         for name in ["blobs", "commit.jsonl", "instances", "a b", "..x"] {
             let d = layout.dir_or_new(name).unwrap();
             assert!(d.starts_with(root.join("instances")), "{name}: {}", d.display());
-            std::fs::write(d.join("agent.json"), serde_json::json!({"id": name}).to_string()).unwrap();
+            std::fs::write(d.join("instance.json"), serde_json::json!({"id": name}).to_string()).unwrap();
         }
         assert!(!root.join("blobs").exists());
         let found: Vec<String> = super::scan(&root).into_iter().map(|(n, _)| n).collect();

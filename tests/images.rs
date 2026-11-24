@@ -5,7 +5,7 @@
 use affordance::View;
 use affordance::effects::Outcome;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -57,8 +57,8 @@ export default function Main({{ pinned }}) {{
     View::load(&path, "Main", enc).unwrap()
 }
 
-fn config(pinned: bool) -> AgentConfig {
-    AgentConfig {
+fn config(pinned: bool) -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -76,11 +76,11 @@ fn config(pinned: bool) -> AgentConfig {
 }
 
 /// Run an agent whose replies call `look` once, then end: the Generate commands it sent.
-fn run(pinned: bool) -> (Vec<(Vec<u32>, Vec<String>)>, Agent) {
+fn run(pinned: bool) -> (Vec<(Vec<u32>, Vec<String>)>, Instance) {
     let enc = encoder();
     let view = app(&enc, PNG);
     let eos = enc.token_id("<｜end▁of▁sentence｜>").unwrap();
-    let mut agent = Agent::new(config(pinned)).unwrap();
+    let mut agent = Instance::new(config(pinned)).unwrap();
     let mut queue: std::collections::VecDeque<Command> = agent.start(&view, &enc).unwrap().into();
     let (mut sent, mut clock) = (vec![], 1_791_000_000_000i64);
     while let Some(cmd) = queue.pop_front() {
@@ -400,7 +400,7 @@ fn an_image_source_is_data_never_a_url_or_a_path() {
     let enc = encoder();
     let start = |screen: &str| {
         let view = app(&enc, screen);
-        let mut agent = Agent::new(config(true)).unwrap();
+        let mut agent = Instance::new(config(true)).unwrap();
         let commands = agent.start(&view, &enc).unwrap();
         (commands, agent)
     };

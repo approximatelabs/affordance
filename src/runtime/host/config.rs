@@ -45,7 +45,7 @@ pub struct RuntimeConfig {
     pub strict_replay: bool,
     /// The deployment layer of every agent's environ.
     pub env: BTreeMap<String, String>,
-    /// Environ keys whose values are redacted in traces and in `agent.json`.
+    /// Environ keys whose values are redacted in traces and in `instance.json`.
     pub secrets: BTreeSet<String>,
     /// Give up after this long (agents keep their journals; `restore` continues them).
     pub max_wall: Option<Duration>,
@@ -155,7 +155,7 @@ impl RuntimeConfig {
 
 /// One agent to run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentSpec {
+pub struct InstanceSpec {
     /// The agent's id: its directory name, and how other agents address it.
     pub id: String,
     /// A private render worker for this startup root and its descendants.
@@ -186,7 +186,7 @@ pub struct AgentSpec {
     /// `false`: no instance may inspect this one (nor its children).
     #[serde(default = "yes", skip_serializing_if = "is_yes")]
     pub inspectable: bool,
-    /// The hard prompt ceiling (see `AgentConfig::max_prompt`); children inherit it.
+    /// The hard prompt ceiling (see `InstanceConfig::max_prompt`); children inherit it.
     #[serde(default)]
     pub max_prompt: Option<usize>,
     /// Data-parallel rank to pin to; `None`: a stable hash of the id.
@@ -219,10 +219,10 @@ pub(super) fn is_no(b: &bool) -> bool {
     !*b
 }
 
-impl AgentSpec {
+impl InstanceSpec {
     /// An agent `id` with root props `props` and default limits.
     pub fn new(id: &str, props: J) -> Self {
-        AgentSpec {
+        InstanceSpec {
             id: id.into(),
             dedicated_worker: false,
             props,

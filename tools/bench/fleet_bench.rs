@@ -10,7 +10,7 @@
 //! - per turn: render ms (agent traces), queue ms before the model call, request bytes, the
 //!   HTTP round trip.
 use affordance::emit::Encoder;
-use affordance::runtime::{AgentSpec, CallContext, Runtime, RuntimeConfig, Sglang};
+use affordance::runtime::{CallContext, InstanceSpec, Runtime, RuntimeConfig, Sglang};
 use serde_json::{Value as J, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
@@ -194,13 +194,13 @@ fn main() {
     let turns = (context_k * 1000).div_ceil(2100) as u64 + window;
     for i in 0..agents {
         let id = format!("agent-{i:05}");
-        let mut spec = AgentSpec::new(
+        let mut spec = InstanceSpec::new(
             &id,
             json!({"id": id, "n_agents": agents, "task": "Keep the build green.", "c_hi": 10_000_000, "c_lo": 5_000_000}),
         );
         spec.max_turns = Some(turns);
         spec.max_new = 4096;
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     let (rss0, anon0) = (status_kib("VmRSS:"), status_kib("RssAnon:"));
     let started = Instant::now();
@@ -291,7 +291,7 @@ fn main() {
     let (peak_rss, peak_anon) = sampler.join().unwrap();
     let wall = started.elapsed().as_secs_f64();
     let cpu = cpu_s() - cpu0;
-    let total: u64 = report.agents.iter().map(|a| a.metrics.turns).sum();
+    let total: u64 = report.instances.iter().map(|a| a.metrics.turns).sum();
     // The last window: requests served in the final `window` turns of every agent.
     let samples = samples.lock().unwrap().clone();
     let last_start = total.saturating_sub(window * agents as u64);
@@ -303,7 +303,7 @@ fn main() {
     let (t1, n1, c1) = samples.last().copied().unwrap_or((wall, total, cpu));
     // Per-turn costs from the traces of a sample of agents.
     let (mut render, mut queue, mut http) = (vec![], vec![], vec![]);
-    for a in report.agents.iter().take(64) {
+    for a in report.instances.iter().take(64) {
         for l in std::fs::read_to_string(dir.join(&a.id).join("trace.jsonl"))
             .unwrap_or_default()
             .lines()
@@ -336,7 +336,7 @@ fn main() {
     println!(
         "{}",
         json!({
-            "agents": agents, "context_k": context_k, "workers": workers, "turns": total, "errors": report.agents.iter().filter(|a| a.error.is_some()).count(),
+            "agents": agents, "context_k": context_k, "workers": workers, "turns": total, "errors": report.instances.iter().filter(|a| a.error.is_some()).count(),
             "wall_s": r2(wall), "turns_per_s": r2(total as f64 / wall), "turns_per_s_at_context": r2((n1 - n0) as f64 / (t1 - t0).max(1e-9)),
             "cores": r2(cpu / wall), "cores_at_context": r2((c1 - c0) / (t1 - t0).max(1e-9)), "cpu_ms_per_turn": r2(cpu * 1000.0 / total as f64),
             "cpu_ms_per_turn_at_context": r2((c1 - c0) * 1000.0 / ((n1 - n0).max(1)) as f64),

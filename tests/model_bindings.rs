@@ -463,7 +463,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     assert_eq!(report["turns"], 3);
     assert_eq!(report["model_errors"], 0);
     assert!(
-        report["per_agent"]
+        report["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -490,7 +490,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     assert!(restored.status.success());
     let restored: J = serde_json::from_slice(&restored.stdout).unwrap();
     assert!(
-        restored["per_agent"]
+        restored["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -502,7 +502,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     config["models"]["A"]["provider_options"]["lora_path"] = json!("changed");
     let changed = cli(&config, &path, &capture, true);
     let changed: J = serde_json::from_slice(&changed.stdout).unwrap();
-    let one = changed["per_agent"]
+    let one = changed["per_instance"]
         .as_array()
         .unwrap()
         .iter()
@@ -517,7 +517,8 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let stored = texts(&run) + &texts(&capture) + &String::from_utf8(first.stdout).unwrap();
     assert!(!stored.contains("fixture-secret-"));
     assert!(texts(&capture).contains("[redacted]"));
-    let pins: J = serde_json::from_slice(&std::fs::read(crate::shared::inst(&run, "one/agent.json")).unwrap()).unwrap();
+    let pins: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&run, "one/instance.json")).unwrap()).unwrap();
     assert_eq!(pins["pins"]["model"].as_str().unwrap().len(), 64);
     // The digest does not depend on credential contents; rotation keeps completed recovery valid.
     config["models"]["A"]["provider_options"]["lora_path"] = json!("variant-a");
@@ -525,7 +526,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let rotated = cli(&config, &path, &capture, true);
     let rotated: J = serde_json::from_slice(&rotated.stdout).unwrap();
     assert!(
-        rotated["per_agent"]
+        rotated["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -540,7 +541,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     moved["models"]["A"]["sampling"]["temperature"] = json!(0.3);
     let moved: J = serde_json::from_slice(&cli(&moved, &path, &capture, true).stdout).unwrap();
     assert!(
-        moved["per_agent"]
+        moved["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -562,9 +563,10 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     // prefix and every other file as it is.
     let mut journals = serde_json::Map::new();
     for id in ["one", "two", "three"] {
-        let saved: J =
-            serde_json::from_slice(&std::fs::read(crate::shared::instance_dir(&run, id).join("agent.json")).unwrap())
-                .unwrap();
+        let saved: J = serde_json::from_slice(
+            &std::fs::read(crate::shared::instance_dir(&run, id).join("instance.json")).unwrap(),
+        )
+        .unwrap();
         let len = std::fs::metadata(crate::shared::instance_dir(&run, id).join("journal.jsonl")).map_or(0, |m| m.len());
         journals.insert(id.into(), json!([saved["incarnation"], len]));
     }
@@ -576,7 +578,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let outstanding = cli(&config, &path, &capture, true);
     let outstanding: J = serde_json::from_slice(&outstanding.stdout).unwrap();
     assert!(
-        outstanding["per_agent"]
+        outstanding["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -589,7 +591,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     assert!(last.headers.contains("Bearer rotated-fixture-secret"));
     assert_eq!(last.body["lora_path"], "variant-a");
     // Warning recovery of an unpinned journal cannot manufacture a strict identity pin.
-    let saved = crate::shared::inst(&run, "one/agent.json");
+    let saved = crate::shared::inst(&run, "one/instance.json");
     let mut legacy: J = serde_json::from_slice(&std::fs::read(&saved).unwrap()).unwrap();
     legacy.as_object_mut().unwrap().remove("pins");
     std::fs::write(&saved, legacy.to_string()).unwrap();
@@ -602,7 +604,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let strict = cli(&config, &path, &capture, true);
     let strict: J = serde_json::from_slice(&strict.stdout).unwrap();
     assert!(
-        strict["per_agent"]
+        strict["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -904,7 +906,7 @@ fn one_retry_policy_is_stated_in_the_deployment_or_on_the_call() {
         let output = cli(&config, &path, &files.0.join(format!("capture-{name}")), false);
         let report: J = serde_json::from_slice(&output.stdout)
             .unwrap_or_else(|_| panic!("{name}: {}", String::from_utf8_lossy(&output.stderr)));
-        let reason = &report["per_agent"][0]["stopped"];
+        let reason = &report["per_instance"][0]["stopped"];
         assert_eq!(reason.get("reason").unwrap_or(reason), stopped, "{name}: {report}");
         let calls = peer.requests().iter().filter(|w| w.path == "/v1/completions").count();
         assert_eq!(calls, requests, "{name}");
@@ -1013,7 +1015,7 @@ fn completions_capture_each_attempt_and_stream_event_without_credentials() {
         let output = cli(&config, &path, &capture, false);
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         let report: J = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(report["per_agent"][0]["stopped"], "done", "{report}");
+        assert_eq!(report["per_instance"][0]["stopped"], "done", "{report}");
         let mut attempts = std::collections::BTreeMap::<String, std::collections::BTreeMap<String, J>>::new();
         for entry in std::fs::read_dir(capture.join("i-native-agent")).unwrap() {
             let path = entry.unwrap().path();
@@ -1160,7 +1162,7 @@ export default function Main(){{return <><Mount key='native' model='native'><Chi
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
     let report: J = serde_json::from_slice(&first.stdout).unwrap();
     for (child, template) in [("native", "glm53"), ("hosted", "messages")] {
-        let agent = report["per_agent"]
+        let agent = report["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -1240,7 +1242,7 @@ export default function Main(){{
     let first = cli(&config, &path, &capture, false);
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
     let report: J = serde_json::from_slice(&first.stdout).unwrap();
-    let agent = &report["per_agent"][0];
+    let agent = &report["per_instance"][0];
     assert_eq!(agent["error"], J::Null, "{report}");
     assert_eq!(agent["stopped"]["binding"]["template"], "messages");
     assert_eq!(
@@ -1339,7 +1341,7 @@ fn captures_are_best_effort_and_streams_capture_their_response() {
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         let report: J = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(
-            (&report["per_agent"][0]["stopped"], &report["model_errors"]),
+            (&report["per_instance"][0]["stopped"], &report["model_errors"]),
             (&json!("done"), &json!(0)),
             "{name}: {report}"
         );
@@ -1512,7 +1514,7 @@ fn a_hosted_request_ignores_the_users_curlrc() {
 /// healthy: an outage is retried for as long as it lasts. Once the server answers, it goes on.
 #[test]
 fn a_retrying_agent_shows_in_the_status_feed() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     let files = Scratch::new();
     let up = Arc::new(AtomicBool::new(false));
     let serving = up.clone();
@@ -1534,14 +1536,14 @@ fn a_retrying_agent_shows_in_the_status_feed() {
     let mut model = Sglang::new(&peer.url, 1);
     model.stream = false;
     let mut rt = Runtime::new(cfg, Arc::new(tokenizer::encoder()), Arc::new(model));
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let control = rt.control();
     let run = std::thread::spawn(move || rt.run().unwrap());
     let started = std::time::Instant::now();
     let agent = loop {
         assert!(started.elapsed() < Duration::from_secs(30), "never shown retrying");
         let status = control.status();
-        let agent = status["agents"][0].clone();
+        let agent = status["instances"][0].clone();
         if agent["state"] == "retrying" && agent["retrying"]["failures"].as_u64() >= Some(2) {
             break agent;
         }
@@ -1555,7 +1557,7 @@ fn a_retrying_agent_shows_in_the_status_feed() {
     assert!(!agent.to_string().contains("127.0.0.1"), "{agent}");
     up.store(true, Ordering::SeqCst);
     let report = run.join().unwrap();
-    assert_eq!(report.agents[0].stopped, Some(json!({"reason": "done"})));
+    assert_eq!(report.instances[0].stopped, Some(json!({"reason": "done"})));
 }
 
 /// A model server that answers `/v1/models` and `/get_server_info` with these bodies (HTTP 404
@@ -1589,7 +1591,7 @@ fn served(window: usize) -> J {
 /// out in it, and never sends a prompt over it: the call fails with a ContextError instead.
 #[test]
 fn a_native_binding_takes_its_window_from_the_server_and_never_sends_a_prompt_over_it() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     let peer = reporting(served(4096), J::Null);
     let enc = Arc::new(tokenizer::encoder());
     let model = from_config(&json!({"kind":"sglang","url":peer.url,"stream":false}), enc.clone()).unwrap();
@@ -1619,14 +1621,14 @@ fn a_native_binding_takes_its_window_from_the_server_and_never_sends_a_prompt_ov
     cfg.max_wall = Some(Duration::from_secs(60));
     let mut rt = Runtime::new(cfg, enc, model);
     for (id, words) in [("small", 100), ("large", 6000)] {
-        let mut spec = AgentSpec::new(id, json!({"words": words}));
+        let mut spec = InstanceSpec::new(id, json!({"words": words}));
         spec.max_new = 256;
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     let control = rt.control();
     let report = rt.run().unwrap();
     let stopped = |id: &str| {
-        let a = report.agents.iter().find(|a| a.id == id).unwrap();
+        let a = report.instances.iter().find(|a| a.id == id).unwrap();
         a.stopped
             .clone()
             .unwrap_or_else(|| panic!("{id}: {:?} {}", a.error, a.state))

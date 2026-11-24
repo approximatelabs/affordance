@@ -3,7 +3,7 @@
 //! changed, a granted prefix bounds what may be read, an instance can refuse to be read, the copy
 //! can be one string of JSON lines, and the reader's journal replays it exactly.
 use crate::tokenizer;
-use affordance::runtime::{AgentSpec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+use affordance::runtime::{FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
 use serde_json::{Value as J, json};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -20,7 +20,7 @@ const TARGET: &str = r#"export default function Main() {
   const [data] = useState({"a.b": [1, 2], a: {b: [3]}, "": 4}, "data");
   useEvent("bump", () => {
     setCount(c => c + 1);
-    setItems(xs => [...xs, {n: xs.length, at: harness.agent}]);
+    setItems(xs => [...xs, {n: xs.length, at: harness.instance}]);
     setM(prev => new Map(prev).set(`k${prev.size}`, prev.size));
   });
   return <text>{`count=${count}`}</text>;
@@ -48,8 +48,8 @@ const OVERSEER: &str = r#"export default function Main() {
       const paths = await harness.inspect("agent-0", {select: [
         {key: "data", path: ["a.b"], tail: 1}, {key: "data", path: ["a", "b"]}, {key: "data", path: [""]}
       ]});
-      const shape = (r) => Object.fromEntries(Object.entries(r.agents).map(([id, a]) => [id, a.changed === false ? "unchanged" : a.error || a.changes]));
-      harness.stop({r1: shape(r1), r2: shape(r2), r3: shape(r3), r4: shape(r4), more: shape(more), expanded: shape(expanded), whole: shape(whole), paths: shape(paths), phase: r1.agents["agent-1"].status.phase, denied, named: shape(named), text: t.text});
+      const shape = (r) => Object.fromEntries(Object.entries(r.instances).map(([id, a]) => [id, a.changed === false ? "unchanged" : a.error || a.changes]));
+      harness.stop({r1: shape(r1), r2: shape(r2), r3: shape(r3), r4: shape(r4), more: shape(more), expanded: shape(expanded), whole: shape(whole), paths: shape(paths), phase: r1.instances["agent-1"].status.phase, denied, named: shape(named), text: t.text});
     })();
   }, []);
   return <text>{"overseeing"}</text>;
@@ -70,16 +70,16 @@ fn run(dir: &Path, restore: bool) -> affordance::runtime::Report {
     };
     if !restore {
         for id in ["agent-0", "agent-1", "agent-quiet", "other"] {
-            let mut s = AgentSpec::new(id, json!({"name": id}));
+            let mut s = InstanceSpec::new(id, json!({"name": id}));
             s.model = None;
             s.inspectable = id != "agent-quiet";
-            rt.add_agent(s).unwrap();
+            rt.add_instance(s).unwrap();
         }
-        let mut s = AgentSpec::new("overseer", json!({}));
+        let mut s = InstanceSpec::new("overseer", json!({}));
         s.model = None;
         s.app = Some(dir.join("overseer.tsx").display().to_string());
         s.inspect = vec!["agent-*".into()];
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     rt.run().unwrap()
 }
@@ -90,7 +90,7 @@ fn an_overseer_reads_what_changed_and_only_what_it_was_granted() {
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
     let report = run(&dir, false);
-    let o = report.agents.iter().find(|a| a.id == "overseer").unwrap();
+    let o = report.instances.iter().find(|a| a.id == "overseer").unwrap();
     assert!(o.error.is_none(), "{:?}", o.error);
     let s = o.stopped.clone().expect("the overseer stopped");
     let map =
@@ -152,7 +152,7 @@ fn an_overseer_reads_what_changed_and_only_what_it_was_granted() {
     );
     // The overseer replays its reads from its journal.
     let again = run(&dir, true);
-    let o2 = again.agents.iter().find(|a| a.id == "overseer").unwrap();
+    let o2 = again.instances.iter().find(|a| a.id == "overseer").unwrap();
     assert_eq!(o2.stopped, Some(s));
     assert_eq!(o2.diverged_at, None);
     std::fs::remove_dir_all(&dir).unwrap();
@@ -181,12 +181,12 @@ fn inspect_needs_an_explicit_grant() {
         Arc::new(FnModel(|_: &GenRequest| Ok(GenReply::default()))),
     );
     for id in ["reader", "b"] {
-        let mut s = AgentSpec::new(id, json!({"name": id}));
+        let mut s = InstanceSpec::new(id, json!({"name": id}));
         s.model = None;
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     let report = rt.run().unwrap();
-    let r = report.agents.iter().find(|a| a.id == "reader").unwrap();
+    let r = report.instances.iter().find(|a| a.id == "reader").unwrap();
     assert!(
         r.stopped
             .as_ref()
@@ -250,21 +250,21 @@ print(json.dumps({"ids": a.ids(), "count": z["count"], "items": [i["n"] for i in
         }),
     );
     for id in ["agent-0", "agent-1"] {
-        let mut s = AgentSpec::new(id, json!({}));
+        let mut s = InstanceSpec::new(id, json!({}));
         s.model = None;
         s.machines = Some(vec![]);
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
-    let mut s = AgentSpec::new(
+    let mut s = InstanceSpec::new(
         "overseer",
         json!({"lib": root().join("tests/support").display().to_string()}),
     );
     s.model = None;
     s.app = Some(dir.join("overseer.tsx").display().to_string());
     s.inspect = vec!["*".into()];
-    rt.add_agent(s).unwrap();
+    rt.add_instance(s).unwrap();
     let report = rt.run().unwrap();
-    let o = report.agents.iter().find(|a| a.id == "overseer").unwrap();
+    let o = report.instances.iter().find(|a| a.id == "overseer").unwrap();
     assert!(o.error.is_none(), "{:?}", o.error);
     // Mirrored after the third read: four bumps (the last two came after it).
     assert_eq!(

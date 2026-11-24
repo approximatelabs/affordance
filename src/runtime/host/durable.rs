@@ -607,7 +607,7 @@ fn instances(dir: &Path) -> Vec<(String, PathBuf)> {
 /// the run starts from. A file the cut does not name (or names for another incarnation) was
 /// created after the last commit: it is emptied. Bytes past the cut are kept aside in
 /// `uncommitted-journal-<offset>.bin` (or `-store-`). Without a commit log, nothing is truncated.
-/// An instance whose `agent.json` cannot be read is left as it is, and keeps its place in the cut:
+/// An instance whose `instance.json` cannot be read is left as it is, and keeps its place in the cut:
 /// its own restore fails, not the run.
 pub(super) fn recover(dir: &Path) -> Result<Cut, String> {
     // After a clean shutdown nothing is cut, but committed bytes must still be there.
@@ -617,13 +617,13 @@ pub(super) fn recover(dir: &Path) -> Result<Cut, String> {
     };
     let mut cut = Cut::default();
     for (id, path) in instances(dir) {
-        let saved = std::fs::read(path.join("agent.json"))
+        let saved = std::fs::read(path.join("instance.json"))
             .map_err(|e| e.to_string())
             .and_then(|b| serde_json::from_slice::<J>(&b).map_err(|e| e.to_string()));
         let incarnation = match saved {
             Ok(v) => v["incarnation"].as_u64().unwrap_or(0),
             Err(e) => {
-                eprintln!("{id}: agent.json is unreadable ({e}); its journal and store are left as they are");
+                eprintln!("{id}: instance.json is unreadable ({e}); its journal and store are left as they are");
                 for kind in [Kind::Journal, Kind::Store] {
                     if let Some(&at) = committed.as_ref().and_then(|c| c.of(kind).get(&id)) {
                         cut.of_mut(kind).insert(id.clone(), at);
@@ -740,7 +740,7 @@ mod tests {
         let d = at(root, id);
         std::fs::create_dir_all(&d).unwrap();
         std::fs::write(
-            d.join("agent.json"),
+            d.join("instance.json"),
             json!({"id": id, "incarnation": incarnation}).to_string(),
         )
         .unwrap();
@@ -848,14 +848,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
-    /// An instance whose `agent.json` cannot be read is not taken for incarnation 0 (and
+    /// An instance whose `instance.json` cannot be read is not taken for incarnation 0 (and
     /// emptied): its files are left as they are, and it keeps its place in the cut.
     #[test]
     fn an_unreadable_agent_json_leaves_its_instance_untouched() {
         let d = dir("unreadable");
         instance(&d, "a", 7, "1\n2\n3\n");
         instance(&d, "b", 9, "x\ny\n");
-        std::fs::write(at(&d, "a").join("agent.json"), "{\"id\":\"a\",\"incarn").unwrap();
+        std::fs::write(at(&d, "a").join("instance.json"), "{\"id\":\"a\",\"incarn").unwrap();
         std::fs::write(d.join(LOG), "{\"epoch\":0,\"journals\":{\"a\":[7,2],\"b\":[9,2]}}\n").unwrap();
         let cut = recover(&d).unwrap();
         assert_eq!(cut.journals, Files::from([("a".into(), (7, 2)), ("b".into(), (9, 2))]));

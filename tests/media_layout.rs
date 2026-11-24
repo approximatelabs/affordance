@@ -5,7 +5,7 @@
 use affordance::View;
 use affordance::effects::Outcome;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -66,7 +66,7 @@ export default function Main() {{
 
 /// The first model call an agent on `view` makes: its ids, its files and where its media are.
 fn first_call(view: &View, enc: &Encoder) -> (Vec<u32>, Vec<String>, Vec<(usize, usize, u32)>) {
-    let mut agent = Agent::new(AgentConfig {
+    let mut agent = Instance::new(InstanceConfig {
         context: Some(32_768),
         retry: Default::default(),
         template: None,

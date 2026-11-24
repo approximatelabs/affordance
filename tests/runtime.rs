@@ -1,10 +1,10 @@
-//! The agent runtime core (`runtime::agent`): a deterministic agent driven by a scripted GLM-5.3
+//! The agent runtime core (`runtime::instance`): a deterministic agent driven by a scripted GLM-5.3
 //! model in a single-threaded host loop. Checks the app contract end to end: exact appends,
 //! tool results as `action` records, hooks, primitives, messages, waits, and journal replay.
 use affordance::View;
 use affordance::effects::Outcome;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
@@ -21,8 +21,8 @@ fn view(enc: &Encoder) -> View {
 }
 const T0: i64 = 1_791_000_000_000;
 
-fn config(id: &str, task: &str) -> AgentConfig {
-    AgentConfig {
+fn config(id: &str, task: &str) -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -40,7 +40,7 @@ fn config(id: &str, task: &str) -> AgentConfig {
 }
 
 /// Apply an input to an agent and keep it in the test's journal (an agent keeps none of its own).
-fn apply(agent: &mut Agent, journal: &mut Vec<Input>, v: &View, enc: &Encoder, input: Input) -> Vec<Command> {
+fn apply(agent: &mut Instance, journal: &mut Vec<Input>, v: &View, enc: &Encoder, input: Input) -> Vec<Command> {
     journal.push(input.clone());
     agent.handle(v, enc, input).unwrap()
 }
@@ -57,7 +57,7 @@ fn reply(enc: &Encoder, text: &str, stop: &str) -> Vec<u32> {
 struct Host<'a> {
     enc: &'a Encoder,
     view: &'a View,
-    agents: BTreeMap<String, Agent>,
+    instances: BTreeMap<String, Instance>,
     queue: VecDeque<(String, Command)>,
     timers: Vec<(String, i64)>,
     clock: i64,
@@ -73,7 +73,7 @@ impl<'a> Host<'a> {
         Host {
             enc,
             view,
-            agents: BTreeMap::new(),
+            instances: BTreeMap::new(),
             queue: VecDeque::new(),
             timers: vec![],
             clock: T0,
@@ -83,18 +83,18 @@ impl<'a> Host<'a> {
             journals: BTreeMap::new(),
         }
     }
-    fn add(&mut self, cfg: AgentConfig) {
+    fn add(&mut self, cfg: InstanceConfig) {
         let id = cfg.id.clone();
-        let mut agent = Agent::new(cfg).unwrap();
+        let mut agent = Instance::new(cfg).unwrap();
         for c in agent.start(self.view, self.enc).unwrap() {
             self.queue.push_back((id.clone(), c));
         }
-        self.agents.insert(id, agent);
+        self.instances.insert(id, agent);
     }
     fn feed(&mut self, id: &str, input: Input) {
         self.journals.entry(id.to_string()).or_default().push(input.clone());
         let cmds = self
-            .agents
+            .instances
             .get_mut(id)
             .unwrap()
             .handle(self.view, self.enc, input)
@@ -209,7 +209,7 @@ fn a_bad_call_does_not_stop_a_good_call_to_the_same_tool() {
     });
     host.add(config("agent-0001", "Take notes."));
     host.run();
-    let agent = &host.agents["agent-0001"];
+    let agent = &host.instances["agent-0001"];
     let results: Vec<J> = affordance::scenario::log_records(&agent.state())
         .iter()
         .filter(|r| r["kind"] == "action")
@@ -242,7 +242,7 @@ fn one_agent_session_is_exact_and_replays() {
     host.add(config("agent-0001", "Keep /srv healthy."));
     host.run();
     if std::env::var("DBG").is_ok() {
-        let a = host.agents.get_mut("agent-0001").unwrap();
+        let a = host.instances.get_mut("agent-0001").unwrap();
         for r in affordance::scenario::log_records(&a.state()) {
             let mut r = r.clone();
             r.as_object_mut().unwrap().remove("ids");
@@ -253,7 +253,7 @@ fn one_agent_session_is_exact_and_replays() {
         }
         eprintln!("M {:?}", a.metrics);
     }
-    let agent = &host.agents["agent-0001"];
+    let agent = &host.instances["agent-0001"];
     assert_eq!(agent.stopped(), Some(&json!({"reason": "max_turns"})));
     // Every turn after the first is an exact append of the previous prompt + reply.
     for w in host.prompts.windows(2) {
@@ -313,7 +313,7 @@ fn one_agent_session_is_exact_and_replays() {
     );
     // Replaying the journal reproduces the agent exactly.
     let (replayed, outstanding) =
-        Agent::restore(agent.cfg.clone(), host.journals[agent.id()].clone(), &v, &enc).unwrap();
+        Instance::restore(agent.cfg.clone(), host.journals[agent.id()].clone(), &v, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&replayed.state()),
         affordance::scenario::log_records(&agent.state())
@@ -340,7 +340,7 @@ fn messages_arrive_with_the_next_turn_and_wake_waits() {
     host.add(a);
     host.add(b);
     host.run();
-    let t = affordance::scenario::log_records(&host.agents["agent-a"].state()).to_vec();
+    let t = affordance::scenario::log_records(&host.instances["agent-a"].state()).to_vec();
     // a's 600 s wait was woken by the message, long before its deadline.
     let woke = t
         .iter()
@@ -367,14 +367,14 @@ fn messages_arrive_with_the_next_turn_and_wake_waits() {
         .unwrap();
     assert!(screen.contains("unread: 1"), "{screen}");
     // Both agents stayed exact across the message.
-    for a in host.agents.values() {
+    for a in host.instances.values() {
         assert_eq!(a.metrics.rewrites, 0, "{}", a.id());
     }
 }
 
 // ---- the multi-agent runtime (threads, pools, journals) ----
 
-use affordance::runtime::{AgentSpec, Exec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+use affordance::runtime::{Exec, FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
 use std::sync::{Arc, Mutex};
 
 /// A scripted GLM-5.3 model: each agent's n-th reply comes from `script(agent, n)`.
@@ -461,11 +461,11 @@ fn fleet_runtime(
     );
     if !restore {
         for i in 0..6 {
-            let mut spec = AgentSpec::new(&format!("agent-{i}"), json!({"task": "Say hello to your neighbour."}));
+            let mut spec = InstanceSpec::new(&format!("agent-{i}"), json!({"task": "Say hello to your neighbour."}));
             spec.max_turns = Some(5);
             spec.max_new = 256;
             spec.machines = Some(vec!["home".into()]);
-            rt.add_agent(spec).unwrap();
+            rt.add_instance(spec).unwrap();
         }
     }
     rt.run().unwrap()
@@ -479,7 +479,7 @@ fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
     // A run interrupted mid-way (a crash, from the agents' point of view) ...
     let first = fleet_runtime(&dir, 40, Some(std::time::Duration::from_millis(300)), false);
     assert!(!first.complete);
-    let partial: Vec<u64> = first.agents.iter().map(|a| a.metrics.turns).collect();
+    let partial: Vec<u64> = first.instances.iter().map(|a| a.metrics.turns).collect();
     assert!(
         partial.iter().all(|&t| t < 5) && partial.iter().any(|&t| t > 0),
         "interrupted mid-run: {partial:?}"
@@ -490,13 +490,13 @@ fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
         report.complete,
         "{:?}",
         report
-            .agents
+            .instances
             .iter()
             .map(|a| (&a.id, &a.stopped, &a.error))
             .collect::<Vec<_>>()
     );
-    assert_eq!(report.agents.len(), 6);
-    for a in &report.agents {
+    assert_eq!(report.instances.len(), 6);
+    for a in &report.instances {
         assert!(a.error.is_none(), "{}: {:?}", a.id, a.error);
         assert_eq!(a.metrics.turns, 5, "{}", a.id);
         assert_eq!(
@@ -529,7 +529,7 @@ fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
         );
         // ... but the runtime never writes the secret to disk.
         let trace = std::fs::read_to_string(crate::shared::instance_dir(&dir, &a.id).join("trace.jsonl")).unwrap();
-        let spec = std::fs::read_to_string(crate::shared::instance_dir(&dir, &a.id).join("agent.json")).unwrap();
+        let spec = std::fs::read_to_string(crate::shared::instance_dir(&dir, &a.id).join("instance.json")).unwrap();
         assert!(!trace.contains("tok-5ecret-value") && !spec.contains("tok-5ecret-value"));
         assert!(trace.contains("\"t\":\"render\""));
     }
@@ -602,7 +602,7 @@ fn model_errors_retry_with_backoff_then_stop() {
     let v = view(&enc);
     let mut cfg = config("agent-0001", "Task.");
     cfg.retry.refused = 4;
-    let mut agent = Agent::new(cfg).unwrap();
+    let mut agent = Instance::new(cfg).unwrap();
     let cmds = agent.start(&v, &enc).unwrap();
     let Command::Generate { task, ids, .. } = cmds[0].clone() else {
         panic!()
@@ -669,7 +669,7 @@ fn inference_outage_preserves_agent_and_retry_across_restore() {
     let enc = encoder();
     let v = view(&enc);
     let cfg = config("agent-outage", "Task.");
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     let first = agent.start(&v, &enc).unwrap();
     let Command::Generate {
         mut task,
@@ -699,7 +699,7 @@ fn inference_outage_preserves_agent_and_retry_across_restore() {
             panic!("{out:?}")
         };
         assert!(*at_ms - clock <= 30000);
-        let (restored, pending) = Agent::restore(cfg.clone(), journal.clone(), &v, &enc).unwrap();
+        let (restored, pending) = Instance::restore(cfg.clone(), journal.clone(), &v, &enc).unwrap();
         assert!(restored.stopped().is_none());
         assert!(pending.iter().any(|c| matches!(c,Command::Timer{at_ms:t} if t==at_ms)));
         agent = restored;
@@ -720,7 +720,7 @@ fn inference_outage_preserves_agent_and_retry_across_restore() {
 fn cut_off_replies_are_classified_not_misread() {
     let enc = encoder();
     let v = view(&enc);
-    let mut agent = Agent::new(config("agent-0001", "Task.")).unwrap();
+    let mut agent = Instance::new(config("agent-0001", "Task.")).unwrap();
     let Command::Generate { task, .. } = agent.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
     };
@@ -847,7 +847,7 @@ fn runtime_shutdown_cancels_running_commands() {
     });
     let mut rt = Runtime::new(cfg, enc, model);
     rt.bind_machine("home", Arc::new(Exec::local()));
-    rt.add_agent(AgentSpec::new("agent-0", json!({"task": "Run it."})))
+    rt.add_instance(InstanceSpec::new("agent-0", json!({"task": "Run it."})))
         .unwrap();
     let report = rt.run().unwrap();
     assert!(!report.complete);
@@ -874,18 +874,18 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
     // covers starting up and its first turn).
     let make_model = || scripted(enc.clone(), 0, |_, _| glm_call("Waiting.", "wait", &[("seconds", "2")]));
     let mut first = Runtime::new(config(900), enc.clone(), make_model());
-    let mut spec = AgentSpec::new("agent-a", json!({"task":"Wait for an operator message."}));
+    let mut spec = InstanceSpec::new("agent-a", json!({"task":"Wait for an operator message."}));
     spec.max_turns = Some(2);
-    first.add_agent(spec).unwrap();
+    first.add_instance(spec).unwrap();
     let report = first.run().unwrap();
-    assert_eq!(report.agents[0].metrics.turns, 1);
+    assert_eq!(report.instances[0].metrics.turns, 1);
     std::thread::sleep(Duration::from_millis(1700));
     let report = Runtime::restore(config(400), enc.clone(), make_model())
         .unwrap()
         .run()
         .unwrap();
     assert_eq!(
-        report.agents[0].metrics.turns, 1,
+        report.instances[0].metrics.turns, 1,
         "suspended time must not expire the wait"
     );
     // A post with a key is answered once its line is committed; posted again (its answer lost,
@@ -895,12 +895,12 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
     let delivered = rt.control().post("agent-a", "message", mail.clone(), Some("abc123"));
     let report = rt.run().unwrap();
     assert_eq!(delivered.wait(), Ok(()));
-    assert_eq!(report.agents[0].metrics.turns, 2);
+    assert_eq!(report.instances[0].metrics.turns, 2);
     let mut rt = Runtime::restore(config(400), enc.clone(), make_model()).unwrap();
     let again = rt.control().post("agent-a", "message", mail, Some("abc123"));
     let report = rt.run().unwrap();
     assert_eq!(again.wait(), Ok(()));
-    assert_eq!(report.agents[0].metrics.turns, 2, "the same key is taken once");
+    assert_eq!(report.instances[0].metrics.turns, 2, "the same key is taken once");
     let journal = std::fs::read_to_string(crate::shared::inst(&dir, "agent-a/journal.jsonl")).unwrap();
     assert_eq!(
         journal.matches("\"id\":\".post:abc123\"").count(),
@@ -1038,7 +1038,7 @@ fn a_failing_overflow_handler_lets_the_turn_proceed() {
     let enc = encoder();
     let view = View::load(&root().join("views/demo/runtime/overflow_fails.tsx"), "Main", &enc).unwrap();
     let mut host = Host::new(&enc, &view, |_, _| glm_call("Go.", "nothing", &[]));
-    let unbound = || AgentConfig {
+    let unbound = || InstanceConfig {
         context: None,
         retry: Default::default(),
         machines: vec![],
@@ -1046,11 +1046,11 @@ fn a_failing_overflow_handler_lets_the_turn_proceed() {
     };
     host.add(unbound());
     host.run();
-    let a = &host.agents["a"];
+    let a = &host.instances["a"];
     // The app's fold fails (no machine); it catches that, and the step goes on.
     assert!(!host.prompts.is_empty(), "the turn proceeded after the fold failed");
     assert_eq!(a.stopped().unwrap()["reason"], "max_turns", "{:?}", a.stopped());
-    let (b, _) = Agent::restore(unbound(), host.journals["a"].clone(), &view, &enc).unwrap();
+    let (b, _) = Instance::restore(unbound(), host.journals["a"].clone(), &view, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&b.state()),
         affordance::scenario::log_records(&a.state())
@@ -1077,9 +1077,9 @@ fn pinned_run(
         Runtime::new(cfg, enc, model)
     };
     if !restore {
-        let mut spec = AgentSpec::new("agent-0", json!({"task": "Keep notes."}));
+        let mut spec = InstanceSpec::new("agent-0", json!({"task": "Keep notes."}));
         spec.max_turns = Some(3);
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     rt.run().unwrap()
 }
@@ -1091,15 +1091,15 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
     let _ = std::fs::remove_dir_all(&dir);
     let original = root().join("views/demo/runtime/agent.tsx");
     let first = pinned_run(&dir, &original, false, false);
-    assert_eq!(first.agents[0].metrics.turns, 3);
+    assert_eq!(first.instances[0].metrics.turns, 3);
     let pins: J =
-        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "agent-0/agent.json")).unwrap()).unwrap();
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "agent-0/instance.json")).unwrap()).unwrap();
     assert_eq!(pins["pins"]["contract"], affordance::runtime::host::CONTRACT_VERSION);
     assert_eq!(pins["pins"]["app"].as_str().unwrap().len(), 64);
     // The same app replays to the same prompts.
     let same = pinned_run(&dir, &original, true, false);
-    assert_eq!(same.agents[0].diverged_at, None);
-    assert_eq!(same.agents[0].state, first.agents[0].state);
+    assert_eq!(same.instances[0].diverged_at, None);
+    assert_eq!(same.instances[0].state, first.instances[0].state);
     // A changed status line: the first turn's prompt differs.
     let changed = root().join(format!("views/demo/runtime/.changed-{}.tsx", std::process::id()));
     std::fs::write(
@@ -1112,17 +1112,17 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
     let loose = pinned_run(&dir, &changed, true, false);
     let strict = pinned_run(&dir, &changed, true, true);
     std::fs::remove_file(&changed).unwrap();
-    assert_eq!(loose.agents[0].diverged_at, Some(1), "turns count from 1");
+    assert_eq!(loose.instances[0].diverged_at, Some(1), "turns count from 1");
     assert!(
-        strict.agents[0]
+        strict.instances[0]
             .error
             .as_deref()
             .is_some_and(|e| e.contains("replay diverged at turn 1")),
         "{:?}",
-        strict.agents[0].error
+        strict.instances[0].error
     );
     let after: J =
-        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "agent-0/agent.json")).unwrap()).unwrap();
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "agent-0/instance.json")).unwrap()).unwrap();
     assert_eq!(
         after["pins"], pins["pins"],
         "the journal keeps the pins it was written against"
@@ -1131,14 +1131,14 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
     let mut old = after.clone();
     old["pins"]["contract"] = json!(1);
     std::fs::write(
-        crate::shared::inst(&dir, "agent-0/agent.json"),
+        crate::shared::inst(&dir, "agent-0/instance.json"),
         serde_json::to_string(&old).unwrap(),
     )
     .unwrap();
     let refused = pinned_run(&dir, &original, true, false);
-    let err = refused.agents[0].error.clone().unwrap_or_default();
+    let err = refused.instances[0].error.clone().unwrap_or_default();
     assert!(err.contains("restore refused") && err.contains("contract 1"), "{err}");
-    assert_eq!(refused.agents[0].metrics.turns, 0);
+    assert_eq!(refused.instances[0].metrics.turns, 0);
 }
 
 #[test]
@@ -1162,13 +1162,13 @@ fn harness_render_runs_a_component_once_on_the_model_through_the_harness() {
         text.contains("Rewrite the user's text politely") && text.contains("hi all") && !text.contains("Greet."),
         "{text}"
     );
-    let a = &host.agents["a"];
+    let a = &host.instances["a"];
     let action = affordance::scenario::log_records(&a.state())
         .into_iter()
         .find(|r| r["kind"] == "action")
         .unwrap();
     assert_eq!(action["result"], "Hello, everyone!");
-    let (b, _) = Agent::restore(config("a", "Greet."), host.journals["a"].clone(), &view, &enc).unwrap();
+    let (b, _) = Instance::restore(config("a", "Greet."), host.journals["a"].clone(), &view, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&b.state()),
         affordance::scenario::log_records(&a.state())
@@ -1184,7 +1184,7 @@ fn a_render_rate_limited_is_retried_not_failed() {
     let enc = encoder();
     let v = View::load(&root().join("views/demo/runtime/render_once.tsx"), "Main", &enc).unwrap();
     let cfg = config("a", "Greet.");
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     let Command::Generate { task, ids: page, .. } = agent.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
     };
@@ -1231,7 +1231,7 @@ fn a_render_rate_limited_is_retried_not_failed() {
             panic!("{out:?}")
         };
         assert_eq!(*at_ms, clock + 1000 * (1_i64 << (failure - 1).min(5)).min(30));
-        let (restored, pending) = Agent::restore(cfg.clone(), journal.clone(), &v, &enc).unwrap();
+        let (restored, pending) = Instance::restore(cfg.clone(), journal.clone(), &v, &enc).unwrap();
         assert!(
             pending.contains(&Command::Timer { at_ms: *at_ms }),
             "a restore keeps the retry: {pending:?}"
@@ -1286,7 +1286,7 @@ fn a_render_has_its_own_options_and_respects_max_prompt() {
             "<|observation|>",
         )
     };
-    let mut a = Agent::new(config("a", "Greet.")).unwrap();
+    let mut a = Instance::new(config("a", "Greet.")).unwrap();
     let Command::Generate { task, .. } = a.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
     };
@@ -1320,11 +1320,11 @@ fn a_render_has_its_own_options_and_respects_max_prompt() {
         }
     );
     // A long text makes the render's prompt longer than the agent's first prompt.
-    let mut b = Agent::new(config("b", "Greet.")).unwrap();
+    let mut b = Instance::new(config("b", "Greet.")).unwrap();
     let Command::Generate { task, ids, .. } = b.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
     };
-    let mut b = Agent::new(AgentConfig {
+    let mut b = Instance::new(InstanceConfig {
         context: None,
         retry: Default::default(),
         max_prompt: Some(ids.len() + 20),
@@ -1543,10 +1543,10 @@ fn tree_run(dir: &std::path::Path, restore: bool) -> affordance::runtime::Report
         );
     }
     if !restore {
-        let mut spec = AgentSpec::new("root", json!({"names": ["alice", "bob"]}));
+        let mut spec = InstanceSpec::new("root", json!({"names": ["alice", "bob"]}));
         spec.model = None;
         spec.machines = Some(vec!["m0".into(), "m1".into()]);
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     rt.run().unwrap()
 }
@@ -1565,11 +1565,12 @@ fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_ca
         assert_eq!(mode & 0o077, 0, "the run directory's mode is {:o}", mode & 0o777);
     }
     let by = |id: &str| {
-        report
-            .agents
-            .iter()
-            .find(|a| a.id == id)
-            .unwrap_or_else(|| panic!("no {id}: {:?}", report.agents.iter().map(|a| &a.id).collect::<Vec<_>>()))
+        report.instances.iter().find(|a| a.id == id).unwrap_or_else(|| {
+            panic!(
+                "no {id}: {:?}",
+                report.instances.iter().map(|a| &a.id).collect::<Vec<_>>()
+            )
+        })
     };
     let (root_, alice, bob) = (by("root"), by("root/alice"), by("root/bob"));
     for a in [root_, alice, bob] {
@@ -1577,7 +1578,7 @@ fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_ca
     }
     assert_eq!(root_.metrics.turns, 0, "the root has no model");
     // Each child reached only the machine its parent handed it.
-    let host_of = |a: &affordance::runtime::AgentReport| {
+    let host_of = |a: &affordance::runtime::InstanceReport| {
         affordance::scenario::log_records(&a.state)
             .iter()
             .find(|r| r["name"] == "hostname")
@@ -1620,7 +1621,7 @@ fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_ca
     // The tree resumes from its journals: the root replays, then each child replays its own.
     let again = tree_run(&dir, true);
     for id in ["root", "root/alice", "root/bob"] {
-        let (a, b) = (by(id), again.agents.iter().find(|x| x.id == id).unwrap());
+        let (a, b) = (by(id), again.instances.iter().find(|x| x.id == id).unwrap());
         assert!(b.error.is_none() && b.diverged_at.is_none(), "{id}: {:?}", b.error);
         assert_eq!(b.state, a.state, "{id}");
     }
@@ -1710,25 +1711,25 @@ fn the_research_ladder_runs_its_policies_and_grades_answers() {
             }),
         );
     }
-    let mut spec = AgentSpec::new(
+    let mut spec = InstanceSpec::new(
         "root",
         json!({"questions": [{"question": "What is the default blob spill size?", "expect": ["64"]}], "policies": ["none", "compact"]}),
     );
     spec.model = None;
     spec.max_turns = Some(12);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    for a in &report.agents {
+    for a in &report.instances {
         assert!(a.error.is_none(), "{}: {:?}", a.id, a.error);
     }
-    let root_ = report.agents.iter().find(|a| a.id == "root").unwrap();
+    let root_ = report.instances.iter().find(|a| a.id == "root").unwrap();
     let results = &root_.state["__ui"]["@results"];
     for key in ["q0-none", "q0-compact"] {
         assert_eq!(results[key]["correct"], true, "{key}: {results}");
         assert_eq!(results[key]["exact"], "64 KiB");
     }
     // The compact run folded: its handoff summary is in its state, written by a render.
-    let compact = report.agents.iter().find(|a| a.id == "root/q0-compact").unwrap();
+    let compact = report.instances.iter().find(|a| a.id == "root/q0-compact").unwrap();
     let fold = &compact.state["__ui"]["@fold"];
     assert!(fold["summary"].as_str().unwrap().contains("spill size"), "{fold}");
     // Search ran on the machine: the first tool result lists docids.
@@ -1755,12 +1756,12 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
     });
     let mut rt = Runtime::new(cfg, enc.clone(), model);
     for id in ["a", "b"] {
-        let mut s = AgentSpec::new(id, json!({"task": "Talk."}));
+        let mut s = InstanceSpec::new(id, json!({"task": "Talk."}));
         s.max_turns = Some(3);
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     let report = rt.run().unwrap();
-    let a = report.agents.iter().find(|x| x.id == "a").unwrap();
+    let a = report.instances.iter().find(|x| x.id == "a").unwrap();
     let results: Vec<J> = affordance::scenario::log_records(&a.state)
         .iter()
         .filter(|r| r["kind"] == "action")
@@ -1823,7 +1824,7 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
     // The same message again (a resend after a crash) is journaled but not taken twice.
     let event: Input = serde_json::from_str(msg).unwrap();
     let v = View::load(&root().join("views/demo/runtime/messenger.tsx"), "Main", &enc).unwrap();
-    let mut b = Agent::new(config("b", "Talk.")).unwrap();
+    let mut b = Instance::new(config("b", "Talk.")).unwrap();
     b.start(&v, &enc).unwrap();
     b.handle(&v, &enc, event.clone()).unwrap();
     b.handle(&v, &enc, event).unwrap();
@@ -1855,7 +1856,7 @@ fn a_prompt_over_the_hard_ceiling_is_never_sent() {
     let enc = encoder();
     let v = view(&enc);
     let mut host = Host::new(&enc, &v, |_, _| glm_call("Go.", "wait", &[("seconds", "1")]));
-    host.add(AgentConfig {
+    host.add(InstanceConfig {
         context: None,
         retry: Default::default(),
         max_prompt: Some(50),
@@ -1863,7 +1864,7 @@ fn a_prompt_over_the_hard_ceiling_is_never_sent() {
     });
     host.run();
     assert!(host.prompts.is_empty());
-    assert_eq!(host.agents["a"].stopped().unwrap()["reason"], "prompt_over_limit");
+    assert_eq!(host.instances["a"].stopped().unwrap()["reason"], "prompt_over_limit");
 }
 
 #[test]
@@ -1991,15 +1992,15 @@ fn a_returned_branch_folds_to_its_call_and_summary() {
             max_capture: 1 << 20,
         }),
     );
-    let mut spec = AgentSpec::new(
+    let mut spec = InstanceSpec::new(
         "root",
         json!({"questions": [{"question": "What is the default blob spill size?", "expect": ["64"]}], "policies": ["fold"]}),
     );
     spec.model = None;
     spec.max_turns = Some(10);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    let root_ = report.agents.iter().find(|a| a.id == "root").unwrap();
+    let root_ = report.instances.iter().find(|a| a.id == "root").unwrap();
     assert_eq!(
         root_.state["__ui"]["@results"]["q0-fold"]["correct"], true,
         "{}",
@@ -2088,15 +2089,15 @@ fn a_memory_outlives_its_sessions_compresses_old_notes_and_recalls_them() {
         "Log observations of the build.",
         "What is the deploy key?",
     ];
-    let spec = AgentSpec::new("root", json!({"sessions": sessions, "wake_lines": 4}));
-    rt.add_agent(spec).unwrap();
+    let spec = InstanceSpec::new("root", json!({"sessions": sessions, "wake_lines": 4}));
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    for a in &report.agents {
+    for a in &report.instances {
         assert!(a.error.is_none(), "{}: {:?}", a.id, a.error);
     }
     let by = |id: &str| {
         report
-            .agents
+            .instances
             .iter()
             .find(|a| a.id == id)
             .unwrap_or_else(|| panic!("no {id}"))
@@ -2247,11 +2248,11 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
             max_capture: 1 << 20,
         }),
     );
-    let mut spec = AgentSpec::new("root", json!({"tasks": [task]}));
+    let mut spec = InstanceSpec::new("root", json!({"tasks": [task]}));
     spec.model = None;
     spec.max_turns = Some(6);
     spec.machines = Some(vec!["m0".into()]);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
     // The REPL daemon outlives the run (it belongs to the machine): stop it.
     for home in std::fs::read_dir(dir.join("homes")).unwrap().flatten() {
@@ -2260,11 +2261,15 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
             .env("HOME", home.path())
             .status();
     }
-    for a in &report.agents {
+    for a in &report.instances {
         assert!(a.error.is_none(), "{}: {:?}", a.id, a.error);
     }
     let id = task["id"].as_str().unwrap();
-    let rlm = report.agents.iter().find(|a| a.id == format!("root/{id}-rlm")).unwrap();
+    let rlm = report
+        .instances
+        .iter()
+        .find(|a| a.id == format!("root/{id}-rlm"))
+        .unwrap();
     // The first cell's output is what the model saw of the context: its type and size, not the text.
     let first = affordance::scenario::log_records(&rlm.state)
         .iter()
@@ -2278,7 +2283,7 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
         first.contains("[sub-LLM error: "),
         "a failed sub-LLM call is an error the code sees: {first}"
     );
-    let results = &report.agents.iter().find(|a| a.id == "root").unwrap().state["__ui"]["@results"];
+    let results = &report.instances.iter().find(|a| a.id == "root").unwrap().state["__ui"]["@results"];
     let r = &results[format!("{id}-rlm")];
     assert_eq!(r["correct"], true, "{results}");
     assert_eq!(
@@ -2343,16 +2348,16 @@ fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
             }),
         );
         if !restore {
-            let mut spec = AgentSpec::new("a", json!({"id": "a", "n_agents": 1, "task": "Keep the build green."}));
+            let mut spec = InstanceSpec::new("a", json!({"id": "a", "n_agents": 1, "task": "Keep the build green."}));
             spec.max_turns = Some(40);
-            rt.add_agent(spec).unwrap();
+            rt.add_instance(spec).unwrap();
         }
         rt.run().unwrap()
     }
     let base = std::env::temp_dir().join(format!("aff-resident-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let first = run(&base, false);
-    let p = &first.agents[0];
+    let p = &first.instances[0];
     assert!(p.error.is_none(), "{:?}", p.error);
     assert_eq!(p.metrics.turns, 40);
     // A clipped output read back is the output, word for word.
@@ -2365,8 +2370,8 @@ fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
     );
     // Resume streams the journal and rebuilds the same agent.
     let again = run(&base, true);
-    assert_eq!(affordance::scenario::log_records(&again.agents[0].state), records);
-    assert_eq!(again.agents[0].diverged_at, None);
+    assert_eq!(affordance::scenario::log_records(&again.instances[0].state), records);
+    assert_eq!(again.instances[0].diverged_at, None);
 }
 
 /// A machine that brings its own executor (`command`): the call's JSON goes in on stdin, its
@@ -2566,15 +2571,15 @@ fn capabilities_limit_the_platform_apis_an_agent_may_call() {
     });
     let mut rt = Runtime::new(cfg, enc, model);
     for id in ["a", "b"] {
-        let mut s = AgentSpec::new(id, json!({"task": "Talk."}));
+        let mut s = InstanceSpec::new(id, json!({"task": "Talk."}));
         s.max_turns = Some(2);
         if id == "a" {
             s.capabilities = Some(vec!["store.*".into()]);
         }
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     let report = rt.run().unwrap();
-    let a = report.agents.iter().find(|x| x.id == "a").unwrap();
+    let a = report.instances.iter().find(|x| x.id == "a").unwrap();
     let result = affordance::scenario::log_records(&a.state)
         .iter()
         .find(|r| r["kind"] == "action")
@@ -2608,7 +2613,7 @@ fn the_session_app_renders_for_each_template() {
         ("glm53", &glm, "<|assistant|>", json!({"reasoning_effort": "high"})),
     ] {
         let v = View::load(&root().join("views/agents/session.tsx"), "Main", enc).unwrap();
-        let mut a = Agent::new(AgentConfig {
+        let mut a = Instance::new(InstanceConfig {
             context: None,
             retry: Default::default(),
             template: Some(affordance::runtime::model::ModelTemplate::new(template, options).unwrap()),
@@ -2636,7 +2641,7 @@ fn the_session_app_renders_for_each_template() {
 fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
     let enc = encoder();
     let v = view(&enc);
-    let mut agent = Agent::new(config("agent-a", "Wait for b.")).unwrap();
+    let mut agent = Instance::new(config("agent-a", "Wait for b.")).unwrap();
     let mut journal = vec![];
     let Command::Generate { task, .. } = agent.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
@@ -2683,7 +2688,7 @@ fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
     assert!(t.iter().any(|r| r["content"] == "[message from agent-b] port is 48213"));
     assert!(out.iter().any(|c| matches!(c, Command::Generate { .. })));
     // Replay reaches the same agent.
-    let (b, _) = Agent::restore(config("agent-a", "Wait for b."), journal, &v, &enc).unwrap();
+    let (b, _) = Instance::restore(config("agent-a", "Wait for b."), journal, &v, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&b.state()),
         affordance::scenario::log_records(&agent.state())
@@ -2728,9 +2733,9 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
             Err(format!("cancelled: {}", ctx.cancel.reason()))
         }),
     );
-    let mut spec = AgentSpec::new("agent-a", json!({"task": "Build it."}));
+    let mut spec = InstanceSpec::new("agent-a", json!({"task": "Build it."}));
     spec.max_turns = Some(2);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let control = rt.control();
     let closer = std::thread::spawn(move || {
         while !started.load(std::sync::atomic::Ordering::SeqCst) {
@@ -2741,11 +2746,11 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
     let report = rt.run().unwrap();
     closer.join().unwrap();
     assert!(
-        !affordance::scenario::log_records(&report.agents[0].state)
+        !affordance::scenario::log_records(&report.instances[0].state)
             .iter()
             .any(|r| r["kind"] == "action"),
         "no tool result yet: {:?}",
-        affordance::scenario::log_records(&report.agents[0].state)
+        affordance::scenario::log_records(&report.instances[0].state)
     );
     let mut rt = Runtime::restore(config(), enc.clone(), model()).unwrap();
     rt.bind_machine(
@@ -2753,7 +2758,7 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
         Arc::new(|_: &affordance::runtime::CallContext, _: &J| Ok(json!({"output": "built ok", "exit": 0}))),
     );
     let report = rt.run().unwrap();
-    let results: Vec<_> = affordance::scenario::log_records(&report.agents[0].state)
+    let results: Vec<_> = affordance::scenario::log_records(&report.instances[0].state)
         .iter()
         .filter(|r| r["kind"] == "action")
         .map(|r| r["result"].clone())
@@ -2790,9 +2795,9 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
         Err(format!("cancelled: {}", req.cancel.reason()))
     }));
     let mut rt = Runtime::new(config(), enc.clone(), hanging);
-    let mut spec = AgentSpec::new("agent-a", json!({"task": "Build it."}));
+    let mut spec = InstanceSpec::new("agent-a", json!({"task": "Build it."}));
     spec.max_turns = Some(1);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let control = rt.control();
     let closer = std::thread::spawn(move || {
         while !started.load(std::sync::atomic::Ordering::SeqCst) {
@@ -2814,7 +2819,7 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
     )
     .unwrap();
     let report = rt.run().unwrap();
-    let a = &report.agents[0];
+    let a = &report.instances[0];
     assert!(a.error.is_none(), "{:?}", a.error);
     assert_eq!(
         a.metrics.turns, 1,
@@ -2851,15 +2856,15 @@ fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
     let model = || scripted(enc.clone(), 0, |_, _| "unused".into());
     // Batch: idle at once, so the run returns without the event.
     let mut rt = Runtime::new(config(false), enc.clone(), model());
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    rt.add_agent(spec.clone()).unwrap();
+    rt.add_instance(spec.clone()).unwrap();
     let report = rt.run().unwrap();
     assert!(!report.complete);
     // Kept running: the run waits; a posted `ping` stops the instance.
     let _ = std::fs::remove_dir_all(dir.join("run"));
     let mut rt = Runtime::new(config(true), enc.clone(), model());
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let started = Instant::now();
     let control = rt.control();
     let writer = std::thread::spawn(move || {
@@ -2873,7 +2878,7 @@ fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
         started.elapsed() >= Duration::from_millis(700),
         "it waited for the event"
     );
-    assert_eq!(report.agents[0].stopped, Some(json!({"heard": "hello"})));
+    assert_eq!(report.instances[0].stopped, Some(json!({"heard": "hello"})));
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
@@ -2899,15 +2904,15 @@ fn the_status_feed_counts_handler_errors() {
     let mut cfg = RuntimeConfig::new(&app);
     (cfg.dir, cfg.serve, cfg.max_wall) = (Some(dir.join("run")), true, Some(Duration::from_secs(30)));
     let mut rt = Runtime::new(cfg, enc.clone(), scripted(enc.clone(), 0, |_, _| "unused".into()));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let control = rt.control();
     let watcher = std::thread::spawn(move || {
         let started = Instant::now();
         let seen = loop {
             let observed = control.status();
-            let a = observed["agents"]
+            let a = observed["instances"]
                 .as_array()
                 .and_then(|a| a.iter().find(|a| a["id"] == "a").cloned());
             if let Some(a) = a.filter(|a| a["handler_errors"] == 1) {
@@ -2968,13 +2973,13 @@ fn mount_callbacks_and_handlers_cannot_be_forged() {
         Arc::new(FnModel(|_: &GenRequest| panic!("no model call"))),
     );
     for id in ["a", "b"] {
-        let mut s = AgentSpec::new(id, json!({}));
+        let mut s = InstanceSpec::new(id, json!({}));
         s.model = None;
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     let report = rt.run().unwrap();
     let stopped = report
-        .agents
+        .instances
         .iter()
         .find(|x| x.id == "a")
         .unwrap()
@@ -3002,7 +3007,7 @@ fn mount_callbacks_and_handlers_cannot_be_forged() {
 }
 
 /// A secret is redacted as a value, not as its JSON spelling: one holding newlines, quotes and
-/// backslashes (a PEM key, a service account's JSON) never reaches agent.json or the trace, and
+/// backslashes (a PEM key, a service account's JSON) never reaches instance.json or the trace, and
 /// the agent starts. A secret too short to redact is refused.
 #[test]
 #[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
@@ -3024,14 +3029,14 @@ fn secrets_with_newlines_and_quotes_are_redacted() {
             encoder(),
             Arc::new(FnModel(|_: &GenRequest| panic!("no model call"))),
         );
-        let mut spec = AgentSpec::new("a", json!({"note": format!("the key is {key}")}));
+        let mut spec = InstanceSpec::new("a", json!({"note": format!("the key is {key}")}));
         spec.model = None;
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
         rt.run().unwrap()
     };
     let report = run(key);
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    for file in ["agent.json", "trace.jsonl"] {
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    for file in ["instance.json", "trace.jsonl"] {
         let text = std::fs::read_to_string(crate::shared::instance_dir(&dir.join("run"), "a").join(file)).unwrap();
         let escaped = serde_json::to_string(key).unwrap();
         assert!(
@@ -3040,18 +3045,18 @@ fn secrets_with_newlines_and_quotes_are_redacted() {
         );
     }
     assert!(
-        std::fs::read_to_string(crate::shared::inst(&dir, "run/a/agent.json"))
+        std::fs::read_to_string(crate::shared::inst(&dir, "run/a/instance.json"))
             .unwrap()
             .contains("the key is [secret:KEY]")
     );
     let report = run("pin");
     assert!(
-        report.agents[0]
+        report.instances[0]
             .error
             .as_deref()
             .is_some_and(|e| e.contains("too short to redact")),
         "{:?}",
-        report.agents[0].error
+        report.instances[0].error
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -3116,12 +3121,12 @@ export default function Main({ order }) {
             Some(o) => json!({"order": o}),
             None => json!({}),
         };
-        rt.add_agent(AgentSpec::new("a", props)).unwrap();
+        rt.add_instance(InstanceSpec::new("a", props)).unwrap();
         let report = rt.run().unwrap();
-        assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
+        assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
         if std::env::var_os("DBG").is_some() {
-            eprintln!("stopped {:?}", report.agents[0].stopped);
-            for r in affordance::scenario::log_records(&report.agents[0].state) {
+            eprintln!("stopped {:?}", report.instances[0].stopped);
+            for r in affordance::scenario::log_records(&report.instances[0].state) {
                 let mut r = r.clone();
                 r.as_object_mut().unwrap().remove("ids");
                 eprintln!("R {r}");

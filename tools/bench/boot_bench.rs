@@ -1,11 +1,11 @@
 //! How long an agent takes to come up: `views/agents/session.tsx` on a template app, N agents
-//! created and started on one thread (`Agent::new` and `Agent::start`: the first render and its
+//! created and started on one thread (`Instance::new` and `Instance::start`: the first render and its
 //! effects), after the view is loaded once. `boot_bench [template] [agents] [threads]` (with
 //! threads, each loads its own view and boots its share, as the host's workers do);
 //! `AFFORDANCE_FLAMEGRAPH=out.svg` with `--features profile`.
 use affordance::View;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig};
+use affordance::runtime::{Instance, InstanceConfig};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -39,7 +39,7 @@ fn main() {
                     let mut agents = vec![];
                     for i in (w..n).step_by(threads) {
                         let id = format!("agent-{i:04}");
-                        let cfg = AgentConfig {
+                        let cfg = InstanceConfig {
                             context: None,
                             retry: Default::default(),
                             template: Some(
@@ -60,7 +60,7 @@ fn main() {
                             machines: vec!["home".into()],
                             model: Some("default".into()),
                         };
-                        let mut a = Agent::new(cfg).unwrap();
+                        let mut a = Instance::new(cfg).unwrap();
                         a.start(&view, &enc).unwrap();
                         agents.push(a);
                     }
@@ -96,7 +96,7 @@ fn main() {
     for i in 0..n {
         let id = format!("agent-{i:04}");
         let props = json!({"id": id, "n_agents": n, "task": "Keep the build green."});
-        let cfg = AgentConfig {
+        let cfg = InstanceConfig {
             context: None,
             retry: Default::default(),
             template: Some(
@@ -115,7 +115,7 @@ fn main() {
             model: Some("default".into()),
         };
         let t = Instant::now();
-        let mut a = Agent::new(cfg).unwrap();
+        let mut a = Instance::new(cfg).unwrap();
         let cmds = a.start(&view, &enc).unwrap();
         times.push(t.elapsed().as_secs_f64() * 1000.0);
         assert!(!cmds.is_empty());

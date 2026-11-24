@@ -975,7 +975,7 @@ mod tests {
     fn https_reaches_a_hosted_server() {
         let (status, body) = super::get_json(
             "https://api.github.com/",
-            &[("User-Agent", "affordance-test".into())],
+            &[("User-Instance", "affordance-test".into())],
             std::time::Duration::from_secs(20),
             &super::CancelToken::new(),
         )

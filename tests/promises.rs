@@ -4,7 +4,7 @@ use crate::tokenizer;
 use affordance::{
     View,
     effects::{Effect, Outcome, Request},
-    runtime::{Agent, AgentConfig, Command, Input},
+    runtime::{Command, Input, Instance, InstanceConfig},
 };
 use serde_json::{Value as J, json};
 use std::{collections::BTreeMap, path::PathBuf, process::Command as Process, rc::Rc};
@@ -103,8 +103,8 @@ const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     serde_json::from_slice(&out.stdout).unwrap()
 }
-fn config() -> AgentConfig {
-    AgentConfig {
+fn config() -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -121,7 +121,7 @@ fn config() -> AgentConfig {
     }
 }
 fn agent(view: &View, enc: &affordance::emit::Encoder) -> J {
-    let mut agent = Agent::new(config()).unwrap();
+    let mut agent = Instance::new(config()).unwrap();
     assert!(agent.start(view, enc).unwrap().is_empty());
     let mut journal = vec![Input::Event {
         name: "go".into(),
@@ -153,7 +153,7 @@ fn agent(view: &View, enc: &affordance::emit::Encoder) -> J {
     assert!(agent.quiescent(), "settled work must release its owner");
     let errors = agent.metrics.handler_errors;
     assert_eq!(errors, 0, "{:?}", agent.take_trace());
-    let (restored, _) = Agent::restore(config(), journal, view, enc).unwrap();
+    let (restored, _) = Instance::restore(config(), journal, view, enc).unwrap();
     assert_eq!(restored.metrics.handler_errors, 0);
     assert!(restored.quiescent(), "restored settled work must release its owner");
     assert_eq!(restored.state(), agent.state(), "restore must preserve observations");

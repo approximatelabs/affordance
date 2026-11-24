@@ -6,11 +6,11 @@
 //!   primitives (`exec`, `send`, `wait`, `store.*`), the app-scoped environ, journals and traces.
 //!
 //! See `docs/RUNTIME.md` for the app contract and the primitives.
-pub mod agent;
 pub mod blobs;
 pub mod cancel;
+pub mod instance;
 
-pub use agent::{Agent, AgentConfig, Command, GenOptions, Input, Metrics};
+pub use instance::{Command, GenOptions, Input, Instance, InstanceConfig, Metrics};
 pub mod exec;
 pub mod host;
 pub mod http;
@@ -22,7 +22,9 @@ pub mod store;
 
 pub use cancel::CancelToken;
 pub use exec::{CallContext, CommandMachine, Exec, Executor, Output, Target};
-pub use host::{AgentReport, AgentSpec, Control, Delivery, Ended, Observed, Observer, Report, Runtime, RuntimeConfig};
+pub use host::{
+    Control, Delivery, Ended, InstanceReport, InstanceSpec, Observed, Observer, Report, Runtime, RuntimeConfig,
+};
 pub use model::{
     Api, Chat, Completions, Credentials, Delta, FnModel, GenReply, GenRequest, Model, Sessions, Sglang, Window,
 };

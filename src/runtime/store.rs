@@ -355,7 +355,7 @@ mod tests {
             store.call("a", "store.put", &json!({"text":"saved"})).unwrap();
             let home = store.layout().unwrap().dir("a").unwrap();
             // In a run, every instance's directory has its record, which names it.
-            std::fs::write(home.join("agent.json"), json!({"id": "a"}).to_string()).unwrap();
+            std::fs::write(home.join("instance.json"), json!({"id": "a"}).to_string()).unwrap();
             let path = home.join("store.jsonl");
             let prefix = std::fs::read(&path).unwrap();
             let mut file = std::fs::OpenOptions::new().append(true).open(&path).unwrap();

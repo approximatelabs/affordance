@@ -35,7 +35,7 @@ pub(crate) use images::{clip_source, image_source, of_kind};
 pub use outstanding::OutstandingSummary;
 use outstanding::*;
 
-#[path = "agent_checkpoint.rs"]
+#[path = "instance_checkpoint.rs"]
 pub(crate) mod recovery;
 
 pub(crate) fn valid_instance_name(name: &str) -> bool {
@@ -253,7 +253,7 @@ pub enum Command {
 
 /// Fixed per-agent configuration (not journaled: supplied again on restore).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentConfig {
+pub struct InstanceConfig {
     /// The agent's id: its name in events, traces and its directory.
     pub id: String,
     /// The app's root props (its starting state).
@@ -522,13 +522,13 @@ pub(crate) struct Retry {
     since: i64,
 }
 
-pub struct Agent {
+pub struct Instance {
     realm: crate::microtasks::Realm,
     /// The handlers run since the last round of jobs ended, as a trace names them: where an
     /// unhandled rejection is reported from, also after its handler has finished.
     ran: HashMap<u64, String>,
     /// Its configuration.
-    pub cfg: AgentConfig,
+    pub cfg: InstanceConfig,
     /// The app's state: its props and, under `__ui`, its hooks, kept as language values (shared,
     /// never converted to JSON on the way to a render or a task).
     state: Rc<Map>,
@@ -691,9 +691,9 @@ fn result_value(v: &J) -> J {
     }
 }
 
-impl Agent {
+impl Instance {
     /// An agent for `cfg`, not yet started (`start`).
-    pub fn new(cfg: AgentConfig) -> Result<Agent, String> {
+    pub fn new(cfg: InstanceConfig) -> Result<Instance, String> {
         if !cfg.props.is_object() {
             return Err("agent props must be an object".into());
         }
@@ -702,7 +702,7 @@ impl Agent {
         }
         date(cfg.start_ms)?;
         let env_v = Value::from_json(&serde_json::to_value(&cfg.env).map_err(|e| e.to_string())?);
-        Ok(Agent {
+        Ok(Instance {
             state: Rc::new(Map::default()),
             env_v,
             clock_ms: cfg.start_ms,
@@ -755,24 +755,24 @@ impl Agent {
     /// Returns the agent and the commands still outstanding (the host submits them again;
     /// durable external work must be deduplicated by agent and task id).
     pub fn restore(
-        cfg: AgentConfig,
+        cfg: InstanceConfig,
         journal: impl IntoIterator<Item = Input>,
         view: &View,
         enc: &Encoder,
-    ) -> Result<(Agent, Vec<Command>), String> {
-        Agent::restore_with(cfg, journal, view, enc, |_| {})
+    ) -> Result<(Instance, Vec<Command>), String> {
+        Instance::restore_with(cfg, journal, view, enc, |_| {})
     }
 
     /// `restore`, with `setup` configuring the new agent before its journal is applied (blobs the
     /// journal refers to, strict replay). The journal is streamed: it is never all in memory.
     pub fn restore_with(
-        cfg: AgentConfig,
+        cfg: InstanceConfig,
         journal: impl IntoIterator<Item = Input>,
         view: &View,
         enc: &Encoder,
-        setup: impl FnOnce(&mut Agent),
-    ) -> Result<(Agent, Vec<Command>), String> {
-        let mut agent = Agent::new(cfg)?;
+        setup: impl FnOnce(&mut Instance),
+    ) -> Result<(Instance, Vec<Command>), String> {
+        let mut agent = Instance::new(cfg)?;
         setup(&mut agent);
         agent.start(view, enc)?;
         agent.trace.clear();
@@ -1509,7 +1509,7 @@ impl Agent {
         let mut put = |k: &str, v: Value| {
             m.insert(std::rc::Rc::from(k), v);
         };
-        put("agent", Value::str(&self.cfg.id));
+        put("instance", Value::str(&self.cfg.id));
         put("turn", Value::Int(self.metrics.turns as i64));
         put("clock_ms", Value::Int(self.clock_ms));
         put("env", self.env_v.clone());

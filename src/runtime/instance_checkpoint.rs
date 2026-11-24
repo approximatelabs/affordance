@@ -18,7 +18,7 @@ enum Node {
 struct Data {
     nodes: Vec<Node>,
     state: J,
-    /// The state the input's change notes compare against (`Agent::noted`).
+    /// The state the input's change notes compare against (`Instance::noted`).
     noted: J,
     env: J,
     deps: Vec<(String, J)>,
@@ -277,12 +277,12 @@ impl Image {
     }
     pub(crate) fn restore(
         self,
-        cfg: AgentConfig,
+        cfg: InstanceConfig,
         view: &View,
-        setup: impl FnOnce(&mut Agent),
-    ) -> Result<Agent, String> {
+        setup: impl FnOnce(&mut Instance),
+    ) -> Result<Instance, String> {
         date(self.clock_ms)?;
-        let mut a = Agent::new(cfg)?;
+        let mut a = Instance::new(cfg)?;
         setup(&mut a);
         let (tok, _) = view.checkpoint_context();
         let heap = a.heap.scope();
@@ -323,7 +323,7 @@ impl Image {
         Ok(a)
     }
 }
-impl Agent {
+impl Instance {
     pub(crate) fn trace_checkpoint_restore(&mut self, from: usize, replayed: usize) {
         self.note(json!({"t":"checkpoint_restore","from_input":from,"replayed_inputs":replayed}));
     }
@@ -573,8 +573,8 @@ mod tests {
     fn encoder() -> Encoder {
         Encoder::from_file(crate::test_support::path().to_str().unwrap()).unwrap()
     }
-    fn config() -> AgentConfig {
-        AgentConfig {
+    fn config() -> InstanceConfig {
+        InstanceConfig {
             context: None,
             retry: Default::default(),
             template: None,
@@ -644,7 +644,7 @@ export default function Main(){
         let mut cfg = config();
         cfg.props = json!({"payload":{"n":0}});
         let blobs = Arc::new(Blobs::new(app.0.join("blobs"), 64).unwrap());
-        let mut original = Agent::new(cfg.clone()).unwrap();
+        let mut original = Instance::new(cfg.clone()).unwrap();
         original.set_blobs(blobs.clone());
         original.start(&view, &enc).unwrap();
         let mut journal = vec![];
@@ -667,11 +667,12 @@ export default function Main(){
             .expect("completed chatbot is checkpointable");
         let bytes = serde_json::to_vec(&image).unwrap();
         let fresh = app.view(&enc);
-        let mut restored: Agent = serde_json::from_slice::<Image>(&bytes)
+        let mut restored: Instance = serde_json::from_slice::<Image>(&bytes)
             .unwrap()
             .restore(cfg.clone(), &fresh, |a| a.set_blobs(blobs.clone()))
             .unwrap();
-        let (mut replay, _) = Agent::restore_with(cfg, journal, &fresh, &enc, |a| a.set_blobs(blobs.clone())).unwrap();
+        let (mut replay, _) =
+            Instance::restore_with(cfg, journal, &fresh, &enc, |a| a.set_blobs(blobs.clone())).unwrap();
         assert_eq!(restored.state(), replay.state());
         for input in [
             event("choose", "b2", 104),
@@ -739,7 +740,7 @@ export default function Main(){const log=useLog();useConversation(log);
         let enc = encoder();
         let view = app.view(&enc);
         let cfg = config();
-        let mut a = Agent::new(cfg.clone()).unwrap();
+        let mut a = Instance::new(cfg.clone()).unwrap();
         a.start(&view, &enc).unwrap();
         let input = Input::Event {
             name: "message".into(),
@@ -755,7 +756,7 @@ export default function Main(){const log=useLog();useConversation(log);
             .expect("ordinary conversation library can checkpoint");
         let fresh = app.view(&enc);
         let mut cached = image.restore(cfg.clone(), &fresh, |_| {}).unwrap();
-        let (mut full, _) = Agent::restore(cfg, [input, reply], &fresh, &enc).unwrap();
+        let (mut full, _) = Instance::restore(cfg, [input, reply], &fresh, &enc).unwrap();
         let next = Input::Event {
             name: "message".into(),
             payload: json!({"text":"again"}),
@@ -788,7 +789,7 @@ export default function Main(){const log=useLog();useConversation(log);
         let enc = encoder();
         let view = app.view(&enc);
         let cfg = config();
-        let mut a = Agent::new(cfg.clone()).unwrap();
+        let mut a = Instance::new(cfg.clone()).unwrap();
         let mut commands = a.start(&view, &enc).unwrap();
         let payload = "word ".repeat(52_429);
         let mut journal = vec![];
@@ -841,7 +842,7 @@ export default function Main(){const log=useLog();useConversation(log);
             payload.len()
         );
         let mut cached = image.restore(cfg.clone(), &view, |_| {}).unwrap();
-        let (mut replayed, _) = Agent::restore(cfg, journal, &view, &enc).unwrap();
+        let (mut replayed, _) = Instance::restore(cfg, journal, &view, &enc).unwrap();
         let first = *a.kept.keys().next().unwrap();
         for restored in [&mut cached, &mut replayed] {
             assert_eq!(restored.state(), a.state());
@@ -857,7 +858,7 @@ export default function Main(){const log=useLog();useConversation(log);
         let app = App::new("export default function Main(){return 'idle';}");
         let enc = encoder();
         let view = app.view(&enc);
-        let mut a = Agent::new(config()).unwrap();
+        let mut a = Instance::new(config()).unwrap();
         a.start(&view, &enc).unwrap();
         let dir = app.0.join("a");
         std::fs::create_dir(&dir).unwrap();
@@ -905,7 +906,7 @@ export default function Main(){const log=useLog();useConversation(log);
         );
         let enc = encoder();
         let view = app.view(&enc);
-        let mut a = Agent::new(config()).unwrap();
+        let mut a = Instance::new(config()).unwrap();
         a.start(&view, &enc).unwrap();
         let dir = app.0.join("a");
         std::fs::create_dir(&dir).unwrap();
@@ -965,7 +966,7 @@ export default function Main(){const log=useLog();useConversation(log);
         ] {
             let app = App::new(&format!("export default function Main(){{{body}return 'waiting';}}"));
             let view = app.view(&enc);
-            let mut a = Agent::new(config()).unwrap();
+            let mut a = Instance::new(config()).unwrap();
             a.start(&view, &enc).unwrap();
             assert!(a.checkpoint_image(&view).is_err(), "{body}");
         }
@@ -996,10 +997,10 @@ export default function Main(){
         let enc = encoder();
         let view = app.view(&enc);
         let cfg = config();
-        let mut original = Agent::new(cfg.clone()).unwrap();
+        let mut original = Instance::new(cfg.clone()).unwrap();
         let mut commands = original.start(&view, &enc).unwrap();
         let mut journal: Vec<Input> = vec![];
-        let mut restored: Vec<(usize, Agent)> = vec![];
+        let mut restored: Vec<(usize, Instance)> = vec![];
         let fresh = app.view(&enc);
         let mut boundaries = 0;
         for i in 0..14 {
@@ -1079,7 +1080,7 @@ export default function Main(){
         }
         assert!(boundaries >= 8, "every step ends at a boundary: {boundaries}");
         assert!(original.state()["__ui"]["@n"].as_i64().unwrap() >= 4);
-        let (full, _) = Agent::restore(cfg, journal, &fresh, &enc).unwrap();
+        let (full, _) = Instance::restore(cfg, journal, &fresh, &enc).unwrap();
         assert_eq!(full.state(), original.state());
         assert_eq!(full.outstanding(), original.outstanding());
     }
@@ -1097,7 +1098,7 @@ export default function Main(){
                 "export default function Main(){{{body}const [n,setN]=useState(0,'n');useEvent('bump',()=>setN(x=>x+1));return String(n);}}"
             ));
             let (view, fresh) = (app.view(&enc), app.view(&enc));
-            let mut a = Agent::new(config()).unwrap();
+            let mut a = Instance::new(config()).unwrap();
             a.start(&view, &enc).unwrap();
             if let Err(why) = a.checkpoint_image(&view) {
                 panic!("idle: {body}: {why}")
@@ -1136,7 +1137,7 @@ export default function Main(){
             "export default function Main(){const r=memoScan([1,2],0,(s,x)=>[s+x,{x}],[]);const [n]=useState(r.state,'n');return `${n} ${r.outs.length}`;}",
         );
         let view = app.view(&enc);
-        let mut a = Agent::new(config()).unwrap();
+        let mut a = Instance::new(config()).unwrap();
         a.start(&view, &enc).unwrap();
         assert!(a.checkpoint_image(&view).is_ok());
     }

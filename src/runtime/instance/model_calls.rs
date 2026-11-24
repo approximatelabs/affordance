@@ -1,7 +1,7 @@
 //! Model calls (`model()`, `model(<View/>)`) and dispatching an output's calls.
 use super::*;
 
-impl Agent {
+impl Instance {
     /// `model(opts)`: the page's own view, rendered and laid out once, now, from live state, goes
     /// to the instance's model (the browser's `fetch`, with the page as its request). Its handlers
     /// are kept for `dispatch(output)`.

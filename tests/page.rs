@@ -6,7 +6,7 @@
 use affordance::View;
 use affordance::effects::Outcome;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -53,7 +53,7 @@ export default function Main() {
 struct Rig {
     enc: Encoder,
     view: View,
-    agent: Agent,
+    agent: Instance,
     clock: i64,
 }
 
@@ -61,7 +61,7 @@ impl Rig {
     fn new(body: &str, name: &str) -> (Rig, Vec<Command>) {
         let enc = encoder();
         let view = app(&enc, name, body);
-        let mut agent = Agent::new(AgentConfig {
+        let mut agent = Instance::new(InstanceConfig {
             context: None,
             retry: Default::default(),
             template: None,
@@ -323,7 +323,7 @@ fn the_chat_replays_from_its_journal() {
             aborted: false,
         },
     );
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -338,7 +338,7 @@ fn the_chat_replays_from_its_journal() {
         machines: vec!["home".into()],
         model: Some("default".into()),
     };
-    let (b, outstanding) = Agent::restore(cfg, journal, &rig.view, &rig.enc).unwrap();
+    let (b, outstanding) = Instance::restore(cfg, journal, &rig.view, &rig.enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&b.state()),
         affordance::scenario::log_records(&rig.agent.state())
@@ -504,7 +504,7 @@ export default function Main() {
 }"#;
     let enc = encoder();
     let view = app(&enc, "ref_read", BAD);
-    let mut agent = Agent::new(AgentConfig {
+    let mut agent = Instance::new(InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,

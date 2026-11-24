@@ -1,6 +1,6 @@
 use affordance::{
     emit::Encoder,
-    runtime::{AgentSpec, CallContext, FnModel, GenRequest, Runtime, RuntimeConfig},
+    runtime::{CallContext, FnModel, GenRequest, InstanceSpec, Runtime, RuntimeConfig},
 };
 use serde_json::{Value as J, json};
 use std::{
@@ -74,12 +74,12 @@ fn runtime(app: &Path) -> Runtime {
     )
 }
 fn run(mut runtime: Runtime) -> J {
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    report.agents[0].stopped.clone().expect("app did not stop")
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    report.instances[0].stopped.clone().expect("app did not stop")
 }
 
 #[test]

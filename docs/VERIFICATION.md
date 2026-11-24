@@ -91,7 +91,7 @@ its limit), the claim is proved without the exception, and the case is a regress
 - *The prompt as a whole.* Layout does not bound the whole prompt; boxes do, where a sheet puts
   them. What the runtime guarantees instead is a check, not a layout property: a prompt that
   with its reply's room is over the model's context is never sent, and the call fails with a
-  `ContextError` naming the largest boxes (`Agent::over_context` in `src/runtime/agent.rs`).
+  `ContextError` naming the largest boxes (`Instance::over_context` in `src/runtime/instance.rs`).
   That check is one comparison and is not verified here. With no stated context there is no
   check.
 - *A hosted (Messages) history.* `history { max-tokens: ... }` on a hosted binding drops whole

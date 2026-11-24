@@ -3,7 +3,9 @@ use crate::tokenizer;
 use affordance::{
     View,
     emit::{Encoder, RunCache},
-    runtime::{Agent, AgentConfig, CallContext, CancelToken, Completions, Exec, Executor, GenRequest, Model, Target},
+    runtime::{
+        CallContext, CancelToken, Completions, Exec, Executor, GenRequest, Instance, InstanceConfig, Model, Target,
+    },
     value::{Coll, Obj, Value},
 };
 use serde_json::{Value as J, json};
@@ -46,8 +48,8 @@ fn enc() -> &'static Encoder {
     static E: OnceLock<Encoder> = OnceLock::new();
     E.get_or_init(tokenizer::encoder)
 }
-fn cfg() -> AgentConfig {
-    AgentConfig {
+fn cfg() -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -298,7 +300,7 @@ fn lazy_hook_initializers_run_only_when_the_hook_mounts() {
     let view = f.app("export default function Main(){const [x,setX]=useState(()=>{if(fail)throw new Error('initializer repeated');return 42;},'x');return String(x);}");
     let mut config = cfg();
     config.props = json!({"fail": false});
-    let mut agent = Agent::new(config).unwrap();
+    let mut agent = Instance::new(config).unwrap();
     agent.start(&view, enc()).unwrap();
     assert_eq!(agent.kept_state()["__ui"].to_wire()["@x"], json!(42));
     agent
@@ -395,7 +397,7 @@ fn cyclic_collections_and_deep_source_return_errors_without_aborting() {
     assert!(affordance::runtime::inspect::encode(&v, false).is_err());
     let view =
         f.app("export default function Main(){const m=new Map();m.set('self',m);useState(m,'cycle');return 'ok';}");
-    let mut agent = Agent::new(cfg()).unwrap();
+    let mut agent = Instance::new(cfg()).unwrap();
     assert!(agent.start(&view, enc()).is_err());
     assert!(c.write().is_err());
 }
@@ -569,7 +571,7 @@ fn deep_and_cyclic_values_are_errors_not_stack_overflows() {
 fn native_functions_are_state_updaters_and_private_methods_survive_snapshots() {
     let f = Files::new();
     let view=f.app("class Box{#x=9;read(){return this.#x;}write(v){this.#x=v;}}export default function Main(){const [count,setCount]=useState('7','count');const [box]=useState(new Box(),'box');const [out,setOut]=useState('','out');useEvent('update',()=>{setCount(Number);try{box.write(11);}catch(e){setOut(`${box.read()}:${e.name}`);}});return String(count);}");
-    let mut a = Agent::new(cfg()).unwrap();
+    let mut a = Instance::new(cfg()).unwrap();
     a.start(&view, enc()).unwrap();
     a.handle(
         &view,

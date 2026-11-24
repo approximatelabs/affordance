@@ -261,7 +261,7 @@ pub struct GenRequest {
     pub sampling: J,
     /// Recorded in the request's capture (`harness.render`'s `tag`).
     pub tag: Option<String>,
-    /// The prompt's images (data URLs, `agent::image_source`), one per placeholder, in order.
+    /// The prompt's images (data URLs, `instance::image_source`), one per placeholder, in order.
     pub images: Vec<String>,
     /// Where each media element's tokens are in `ids`, and its placeholder: (start, count,
     /// placeholder).
@@ -1135,7 +1135,7 @@ impl Sglang {
             ("audio", "audio_data"),
             ("video", "video_data"),
         ] {
-            let sources = super::agent::of_kind(&req.images, kind);
+            let sources = super::instance::of_kind(&req.images, kind);
             if !sources.is_empty() {
                 rest[field] = json!(sources);
             }

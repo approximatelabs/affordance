@@ -1,7 +1,7 @@
 //! Optional, verified recovery images. The complete input journal stays authoritative.
 use super::{
-    agent::{Agent, recovery::Image},
     blobs::Blobs,
+    instance::{Instance, recovery::Image},
 };
 use crate::View;
 use serde::{
@@ -256,7 +256,7 @@ impl Checkpoint {
         }
     }
     /// After an input: if the agent kept a step boundary in it, that is where the journal ends now.
-    pub fn handled(&mut self, agent: &Agent) {
+    pub fn handled(&mut self, agent: &Instance) {
         if let Some(n) = agent.boundary_inputs().filter(|n| *n == agent.journal_len())
             && self.boundary.map(|b| b.0) != Some(n)
         {
@@ -270,7 +270,7 @@ impl Checkpoint {
     /// Returns why the agent could not be imaged, the first time since its last image it could not.
     pub fn save(
         &mut self,
-        agent: &Agent,
+        agent: &Instance,
         view: &View,
         force: bool,
         before_write: &dyn Fn() -> Result<(), String>,
@@ -293,7 +293,7 @@ impl Checkpoint {
     /// The image that is due, ready to write, without writing it: a caller with several
     /// instances to image (a worker that is stopping) writes them all at once. The blobs it may
     /// name are synced before it is written.
-    pub fn prepare(&mut self, agent: &Agent, view: &View, force: bool) -> Result<Due, String> {
+    pub fn prepare(&mut self, agent: &Instance, view: &View, force: bool) -> Result<Due, String> {
         let count = agent.journal_len();
         let since = self.saved.max(self.refused).unwrap_or(0);
         if self.saved == Some(count)

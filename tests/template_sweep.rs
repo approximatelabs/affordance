@@ -7,7 +7,7 @@
 //! prefix cache holds).
 use crate::each;
 use affordance::emit::{Encoder, RunCache};
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use affordance::{View, state_from_json};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
@@ -264,7 +264,7 @@ fn run_loop(
     )
     .unwrap();
     let app = View::load(&path, "Main", &enc)?;
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -279,7 +279,7 @@ fn run_loop(
         machines: vec![],
         model: Some("default".into()),
     };
-    let mut agent = Agent::new(cfg)?;
+    let mut agent = Instance::new(cfg)?;
     let mut queue: Vec<Command> = agent.start(&app, &enc)?;
     let mut clock = 1_791_000_000_000;
     let mut prompts: Vec<Vec<u32>> = vec![];

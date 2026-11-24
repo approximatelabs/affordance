@@ -4,7 +4,7 @@ use crate::http_fixture as fixture;
 use affordance::{
     connectors::http::{Http, HttpConfig},
     emit::Encoder,
-    runtime::{AgentSpec, CallContext, Executor, FnModel, GenRequest, Runtime, RuntimeConfig},
+    runtime::{CallContext, Executor, FnModel, GenRequest, InstanceSpec, Runtime, RuntimeConfig},
 };
 use fixture::{Response, Server};
 use serde_json::{Value as J, json};
@@ -90,12 +90,12 @@ fn model() -> Arc<dyn affordance::runtime::Model> {
 fn run(app: &Path, url: &str) -> J {
     let mut runtime = Runtime::new(config(app), encoder(), model());
     runtime.bind_machine("http", Arc::new(transport(url)));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    report.agents[0].stopped.clone().expect("app did not stop")
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    report.instances[0].stopped.clone().expect("app did not stop")
 }
 fn tool(name: &str) -> J {
     json!({"name": name, "description": "fixture tool", "inputSchema": {"type": "object", "properties": {
@@ -209,12 +209,12 @@ harness.stop({info, listed, results, required, continued});
     config.dir = Some(dir.0.join("run"));
     let mut runtime = Runtime::new(config.clone(), encoder(), model());
     runtime.bind_machine("http", executor.clone());
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    let stopped = report.agents[0].stopped.as_ref().expect("did not stop");
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    let stopped = report.instances[0].stopped.as_ref().expect("did not stop");
     assert!(stopped.get("caught").is_none(), "{stopped}");
     assert_eq!(stopped["listed"]["tools"].as_array().unwrap().len(), 4);
     assert_eq!(stopped["listed"]["rejected"][0]["name"], "bad");
@@ -246,8 +246,8 @@ harness.stop({info, listed, results, required, continued});
     let mut restored = Runtime::restore(config, encoder(), model()).unwrap();
     restored.bind_machine("http", executor);
     let replay = restored.run().unwrap();
-    assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
-    assert_eq!(replay.agents[0].stopped.as_ref(), Some(stopped));
+    assert!(replay.instances[0].error.is_none(), "{:?}", replay.instances[0].error);
+    assert_eq!(replay.instances[0].stopped.as_ref(), Some(stopped));
     assert_eq!(
         count.load(Ordering::SeqCst),
         calls,
@@ -330,13 +330,13 @@ fn network_authority_is_still_an_instance_binding() {
     let server = fixture();
     let mut runtime = Runtime::new(config(&app), encoder(), model());
     runtime.bind_machine("http", Arc::new(transport(&server.url)));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
     spec.machines = Some(vec![]);
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
     assert!(
-        report.agents[0].stopped.as_ref().unwrap()["caught"]["message"]
+        report.instances[0].stopped.as_ref().unwrap()["caught"]["message"]
             .as_str()
             .unwrap()
             .contains("no machine http")
@@ -360,12 +360,12 @@ harness.stop(await client.listTools());
     );
     // No network binding: the injected function is ordinary app code.
     let mut runtime = Runtime::new(config(&app), encoder(), model());
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    assert_eq!(report.agents[0].stopped, Some(json!({"tools": [], "rejected": []})));
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    assert_eq!(report.instances[0].stopped, Some(json!({"tools": [], "rejected": []})));
 }
 
 #[test]
@@ -408,16 +408,16 @@ fn example_exposes_only_app_selected_tools_and_dispatches_the_alias() {
     let server = fixture();
     let mut runtime = Runtime::new(config(&app), enc, model);
     runtime.bind_machine("http", Arc::new(transport(&server.url)));
-    let mut spec = AgentSpec::new(
+    let mut spec = InstanceSpec::new(
         "a",
         json!({"task": "Try the remote tool.", "expose": {"echo": "remote_echo"}}),
     );
     spec.max_turns = Some(4);
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
     assert_eq!(calls.load(Ordering::SeqCst), 2, "{report:?}");
-    let state = &report.agents[0].state;
+    let state = &report.instances[0].state;
     let actions: Vec<&J> = state["__ui"]["@log"]["records"]
         .as_array()
         .unwrap()

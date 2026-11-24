@@ -6,7 +6,7 @@
 //! is (`{"$": "map", ...}`), so a `Map` does not arrive as `{}`. With a cursor from an earlier read
 //! (`since`), an unchanged target with every selection covered answers `changed: false`; a hook that has not
 //! changed is left out, and a list selected with `{key, path?, tail?}` sends only what it gained.
-use super::agent::Agent;
+use super::instance::Instance;
 use crate::value::{Map, Text, Value};
 use serde_json::{Value as J, json};
 
@@ -79,14 +79,14 @@ pub fn parse_select(j: &J) -> Result<Vec<Sel>, String> {
 
 /// The copy of one agent: `({version, changed, changes?}, its next cursor)`. `text`: blob
 /// references become their text (the copy leaves the runtime as one string).
-pub fn part(agent: &Agent, select: &[Sel], cursor: &J, text: bool) -> (J, J) {
+pub fn part(agent: &Instance, select: &[Sel], cursor: &J, text: bool) -> (J, J) {
     match part_checked(agent, select, cursor, text) {
         Ok(part) => part,
         Err(error) => (json!({"version": agent.journal_len(), "error": error}), cursor.clone()),
     }
 }
 
-fn part_checked(agent: &Agent, select: &[Sel], cursor: &J, text: bool) -> Result<(J, J), String> {
+fn part_checked(agent: &Instance, select: &[Sel], cursor: &J, text: bool) -> Result<(J, J), String> {
     let version = agent.journal_len();
     let since = cursor["v"].as_u64().map(|v| v as usize);
     let state = agent.kept_state();

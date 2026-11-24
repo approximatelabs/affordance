@@ -3,7 +3,7 @@
 //! trace entry naming the cause, instead of an app silently getting slower with every input.
 use affordance::View;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Input};
+use affordance::runtime::{Input, Instance, InstanceConfig};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -39,7 +39,7 @@ export default function Main() {{
     )
     .unwrap();
     let view = View::load(&dir.join("app.tsx"), "Main", &enc).unwrap();
-    let mut a = Agent::new(AgentConfig {
+    let mut a = Instance::new(InstanceConfig {
         context: None,
         retry: Default::default(),
         id: "a".into(),

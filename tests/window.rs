@@ -6,7 +6,7 @@
 //! with a ContextError naming the boxes.
 use affordance::View;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -46,10 +46,10 @@ export default function Main() {{
 }
 
 /// Run a chat of `turns` exchanges; returns every prompt sent and the agent's last error, if any.
-fn run(tss: &str, name: &str, turns: usize) -> (Vec<Vec<u32>>, Encoder, Agent) {
+fn run(tss: &str, name: &str, turns: usize) -> (Vec<Vec<u32>>, Encoder, Instance) {
     let enc = Encoder::from_file(root().join("ref/tokenizers/zai-org__GLM-5.3.json").to_str().unwrap()).unwrap();
     let view = chat(&enc, name, tss);
-    let mut agent = Agent::new(AgentConfig {
+    let mut agent = Instance::new(InstanceConfig {
         context: Some(CONTEXT),
         retry: Default::default(),
         template: None,

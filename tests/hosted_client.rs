@@ -674,7 +674,7 @@ fn app_session(f: &Fixture, mut client: Chat, system: &str) -> (J, Vec<J>) {
         }
     }
     let usages = Arc::new(std::sync::Mutex::new(vec![]));
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     let dir = f.key.with_extension("session");
     std::fs::create_dir_all(&dir).unwrap();
     let app = dir.join("app.tsx");
@@ -714,11 +714,11 @@ fn app_session(f: &Fixture, mut client: Chat, system: &str) -> (J, Vec<J>) {
         usages: usages.clone(),
     });
     let mut runtime = Runtime::new(cfg.clone(), f.enc.clone(), model.clone());
-    let mut spec = AgentSpec::new("a", json!({"system":system}));
+    let mut spec = InstanceSpec::new("a", json!({"system":system}));
     spec.max_new = 4096;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let first = runtime.run().unwrap();
-    let report = &first.agents[0];
+    let report = &first.instances[0];
     assert!(report.error.is_none(), "{:?}", report.error);
     assert_eq!(report.stopped, Some(json!({"done":true})), "{:?}", report.stopped);
     assert_eq!(report.state["__ui"]["@n"], 3);
@@ -727,11 +727,11 @@ fn app_session(f: &Fixture, mut client: Chat, system: &str) -> (J, Vec<J>) {
         .unwrap()
         .run()
         .unwrap();
-    assert_eq!(restored.agents[0].state, state);
+    assert_eq!(restored.instances[0].state, state);
     std::fs::remove_file(crate::shared::inst(&dir, "run/a/checkpoint.json")).unwrap();
     let replay = Runtime::restore(cfg, f.enc.clone(), model).unwrap().run().unwrap();
-    assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
-    assert_eq!(replay.agents[0].state, state);
+    assert!(replay.instances[0].error.is_none(), "{:?}", replay.instances[0].error);
+    assert_eq!(replay.instances[0].state, state);
     std::fs::remove_dir_all(dir).unwrap();
     let recorded = usages.lock().unwrap().clone();
     assert_eq!(recorded.len(), 3, "replay must not reissue HTTP requests");
@@ -943,7 +943,7 @@ fn lossy_tokenizers_cannot_corrupt_native_provider_state() {
 
 #[test]
 fn summary_renders_disable_hosted_calls_without_changing_descriptions_or_active_requests() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     for kind in ["chat", "anthropic", "responses"] {
         for per_call in [false, true] {
             let f = Fixture::new();
@@ -1045,13 +1045,13 @@ fn summary_renders_disable_hosted_calls_without_changing_descriptions_or_active_
             let client: Arc<dyn Model> = Arc::new(client);
             let mut runtime = Runtime::new(cfg.clone(), f.enc.clone(), client.clone());
             runtime
-                .add_agent(AgentSpec::new(
+                .add_instance(InstanceSpec::new(
                     "a",
                     json!({"sampling":if per_call {json!({"tool_choice":forced})}else{json!({})}}),
                 ))
                 .unwrap();
             let first = runtime.run().unwrap();
-            let report = &first.agents[0];
+            let report = &first.instances[0];
             assert!(report.error.is_none(), "{:?}", report.error);
             let stop = report.stopped.as_ref().unwrap();
             assert_eq!(stop["summary"], "summary", "{kind}: {stop}");
@@ -1065,11 +1065,11 @@ fn summary_renders_disable_hosted_calls_without_changing_descriptions_or_active_
                 .unwrap()
                 .run()
                 .unwrap();
-            assert_eq!(recovered.agents[0].stopped, report.stopped);
+            assert_eq!(recovered.instances[0].stopped, report.stopped);
             std::fs::remove_file(crate::shared::inst(&dir, "run/a/checkpoint.json")).unwrap();
             let replay = Runtime::restore(cfg, f.enc.clone(), client).unwrap().run().unwrap();
-            assert_eq!(replay.agents[0].stopped, report.stopped);
-            assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
+            assert_eq!(replay.instances[0].stopped, report.stopped);
+            assert!(replay.instances[0].error.is_none(), "{:?}", replay.instances[0].error);
             let seen = peer.join().unwrap();
             assert_eq!(seen.len(), 3);
             let none = if kind == "anthropic" {

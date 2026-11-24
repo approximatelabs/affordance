@@ -4,7 +4,7 @@ use affordance::{
     View,
     effects::Outcome,
     emit::{Encoder, RunCache},
-    runtime::{Agent, AgentConfig, Command, Input},
+    runtime::{Command, Input, Instance, InstanceConfig},
 };
 use serde_json::json;
 use std::{
@@ -309,7 +309,7 @@ fn imported_async_closures_keep_their_scope_across_effect_replay() {
     f.write("lib.tsx", "const label='library'; function helper(){return label;} export function make(){return async()=>{const first=await harness.machine.call({cmd:helper()}); return helper()+':'+first.output;};}");
     f.write("app.tsx", "import {make} from './lib.tsx'; function helper(){return 'app';} export default function Main(){useEffect(()=>{(async()=>{harness.stop(await make()());})();},[]);return 'waiting';}");
     let view = f.load().unwrap();
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -324,7 +324,7 @@ fn imported_async_closures_keep_their_scope_across_effect_replay() {
         machines: vec!["local".into()],
         model: None,
     };
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     let commands = agent.start(&view, encoder()).unwrap();
     let task = match commands.iter().find(|c| matches!(c, Command::Call { .. })).unwrap() {
         Command::Call { task, args, .. } => {
@@ -341,7 +341,7 @@ fn imported_async_closures_keep_their_scope_across_effect_replay() {
     agent.handle(&view, encoder(), input.clone()).unwrap();
     assert_eq!(agent.stopped().unwrap(), "library:result");
     let restored_view = f.load().unwrap();
-    let mut replay = Agent::new(cfg).unwrap();
+    let mut replay = Instance::new(cfg).unwrap();
     replay.start(&restored_view, encoder()).unwrap();
     replay.handle(&restored_view, encoder(), input).unwrap();
     assert_eq!(replay.stopped(), agent.stopped());
@@ -459,7 +459,7 @@ export default function Panel(){{return helper();}}
         )
     };
     let view = f.load().unwrap();
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -474,10 +474,10 @@ export default function Panel(){{return helper();}}
         machines: vec!["local".into()],
         model: None,
     };
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     agent.start(&view, encoder()).unwrap();
     let mut journal = vec![];
-    let mut input = |agent: &mut Agent, value: Input| {
+    let mut input = |agent: &mut Instance, value: Input| {
         journal.push(value.clone());
         agent.handle(&view, encoder(), value).unwrap()
     };
@@ -537,7 +537,7 @@ export default function Panel(){{return helper();}}
             clock_ms: 5,
         },
     );
-    let render = |view: &View, agent: &Agent| {
+    let render = |view: &View, agent: &Instance| {
         let r = view
             .render_with_harness(
                 encoder(),
@@ -553,7 +553,7 @@ export default function Panel(){{return helper();}}
     let trace = agent.take_trace();
     assert_eq!(agent.metrics.handler_errors, 0, "{trace:?}");
     let fresh = f.load().unwrap();
-    let (restored, _) = Agent::restore(cfg, journal, &fresh, encoder()).unwrap();
+    let (restored, _) = Instance::restore(cfg, journal, &fresh, encoder()).unwrap();
     assert_eq!(render(&fresh, &restored), render(&view, &agent));
     assert_eq!(restored.metrics.handler_errors, 0);
 }

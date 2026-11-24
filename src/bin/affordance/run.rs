@@ -5,7 +5,7 @@
 #[cfg(feature = "http")]
 use affordance::connectors::http::{Http, HttpConfig};
 use affordance::emit::Encoder;
-use affordance::runtime::{AgentSpec, CommandMachine, Exec, Executor, Model, Runtime, RuntimeConfig, Target};
+use affordance::runtime::{CommandMachine, Exec, Executor, InstanceSpec, Model, Runtime, RuntimeConfig, Target};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -419,7 +419,7 @@ pub fn run(
         named_models.push((name.clone(), enc, client));
     }
 
-    let mut specs: Vec<AgentSpec> = vec![];
+    let mut specs: Vec<InstanceSpec> = vec![];
     for (n, entry) in listed.iter().enumerate() {
         crate::format::check(entry, crate::format::INSTANCE, &[], &format!("instance {n}"))?;
         let id = entry["id"]
@@ -447,10 +447,10 @@ pub fn run(
         Runtime::new(rc, enc, model)
     };
     if restore {
-        rt.membership(specs)?;
+        rt.set_instances(specs)?;
     } else {
         for spec in specs {
-            rt.add_agent(spec)?;
+            rt.add_instance(spec)?;
         }
     }
     for (name, enc, client) in named_models {
@@ -488,18 +488,18 @@ pub fn run(
     drop(socket);
     let report = report?;
     let total =
-        |f: &dyn Fn(&affordance::runtime::Metrics) -> u64| report.agents.iter().map(|a| f(&a.metrics)).sum::<u64>();
+        |f: &dyn Fn(&affordance::runtime::Metrics) -> u64| report.instances.iter().map(|a| f(&a.metrics)).sum::<u64>();
     let prompt = total(&|m| m.prompt_tokens);
     let summary = serde_json::to_string_pretty(&json!({
-        "complete": report.complete, "ended": report.ended, "wall_s": report.wall_s, "agents": report.agents.len(),
+        "complete": report.complete, "ended": report.ended, "wall_s": report.wall_s, "instances": report.instances.len(),
         "turns": total(&|m| m.turns), "exact_appends": total(&|m| m.exact_appends), "rewrites": total(&|m| m.rewrites),
         "prompt_tokens": prompt, "uncached_tokens": total(&|m| m.uncached_tokens), "generated_tokens": total(&|m| m.generated_tokens),
         "prefix_reuse": if prompt > 0 { 1.0 - total(&|m| m.uncached_tokens) as f64 / prompt as f64 } else { 0.0 },
         "handler_errors": total(&|m| m.handler_errors), "model_errors": total(&|m| m.model_errors),
         "capture_errors": report.capture_errors,
         "token_mismatches": report.token_mismatches,
-        "render_stats": {"evaluations": report.agents.iter().map(|a| a.render_stats.evaluations).sum::<u64>(), "reused": report.agents.iter().map(|a| a.render_stats.reused).sum::<u64>()},
-        "per_agent": report.agents.iter().map(|a| json!({"id": a.id, "worker":a.worker, "turns": a.metrics.turns, "stopped": a.stopped, "error": a.error})).collect::<Vec<_>>(),
+        "render_stats": {"evaluations": report.instances.iter().map(|a| a.render_stats.evaluations).sum::<u64>(), "reused": report.instances.iter().map(|a| a.render_stats.reused).sum::<u64>()},
+        "per_instance": report.instances.iter().map(|a| json!({"id": a.id, "worker":a.worker, "turns": a.metrics.turns, "stopped": a.stopped, "error": a.error})).collect::<Vec<_>>(),
     })).unwrap();
     if summary_on_stdout {
         println!("{summary}");
@@ -510,7 +510,7 @@ pub fn run(
     // So does one whose app stopped it on an error (`useLoop` stops with `loop_error` when its
     // model call fails for good): a script running the command must be able to tell.
     let failed: Vec<String> = report
-        .agents
+        .instances
         .iter()
         .filter_map(|a| {
             let stopped_on_error = a.stopped.as_ref().and_then(|s| {
@@ -525,9 +525,9 @@ pub fn run(
         .collect();
     if !failed.is_empty() {
         return Err(format!(
-            "{} of {} agents failed:\n  {}",
+            "{} of {} instances failed:\n  {}",
             failed.len(),
-            report.agents.len(),
+            report.instances.len(),
             failed.join("\n  ")
         ));
     }

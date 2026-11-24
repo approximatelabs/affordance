@@ -227,14 +227,14 @@ IDs are overwritten. Held inputs receive IDs only when committed after the turn'
 | `harness.send(to, payload, {event?})` | `{to, delivered}` | Event `message` (or `event`) to instance `to`, with `from` set by the harness (an operator's message has no `from`, so an app trusts control fields only without one). Completes when the receiver has journaled it. `mount:*` events are reserved (a `<Mount>`'s callbacks). |
 | `harness.send(ids, payload, {event?})` | `{delivered, failed, undelivered}` | Array of target IDs, deduplicated in input order. One result after all recipient acknowledgements; counts plus unconfirmed IDs in target order. Empty arrays succeed with zero counts. Self/missing/failed targets fail as for a single send. |
 | `harness.wait({ms?, events?})` | `{woke: "timeout"}` or `{woke: "event", event, payload}` | Parks the task. Without `ms`, waits only for an event. It wakes at once on a matching event journaled after the render its task runs from (one the model had not seen). |
-| `harness.inspect(targets, {select?, since?, as?})` | `{since, agents: {[id]: {version, changed, changes?, status}}}`, or with `as: "text"` `{since, text}` | A read-only copy of other instances' committed state (`targets`: an id, a list, or `"*"`), made on their workers between inputs; nothing is written to their journals. `select`: named hooks and `"props"` (whole, `{key, set}`), or `{key, path?, tail?}` (a followed list: `{key, path, from, items, length}`). `since`: an earlier read's opaque cursor; only changes to selections covered by that cursor are omitted. New/reselected paths, whole/follow modes and tail windows receive their initial copy even at the same journal position. The next cursor covers this call's selections. Values are JSON tagged where JSON has no word (`{"$": "map", entries}`). Needs the spec's `inspect` grant (§5). |
+| `harness.inspect(targets, {select?, since?, as?})` | `{since, instances: {[id]: {version, changed, changes?, status}}}`, or with `as: "text"` `{since, text}` | A read-only copy of other instances' committed state (`targets`: an id, a list, or `"*"`), made on their workers between inputs; nothing is written to their journals. `select`: named hooks and `"props"` (whole, `{key, set}`), or `{key, path?, tail?}` (a followed list: `{key, path, from, items, length}`). `since`: an earlier read's opaque cursor; only changes to selections covered by that cursor are omitted. New/reselected paths, whole/follow modes and tail windows receive their initial copy even at the same journal position. The next cursor covers this call's selections. Values are JSON tagged where JSON has no word (`{"$": "map", entries}`). Needs the spec's `inspect` grant (§5). |
 | `harness.store.put / get / search / list(args)` | `{key}`, `{text, offset, total}`, `{hits}`, `{keys}` | Per-instance storage. |
 | `harness.now()`, `harness.random()` | number | Logged values: replay sees the same. |
 | `harness.stop(value)` | nothing | Stops the instance. |
 | `Promise.all / race / any / allSettled` | as in JavaScript | Reactions run through the instance FIFO queue; `race` does not cancel other inputs. |
 
 **Data in a render:**
-- `harness.agent` (the instance id), `turn` (page calls so far), `clock_ms`, `env`, `prompt_tokens` (the last page prompt's length);
+- `harness.instance` (the instance id), `turn` (page calls so far), `clock_ms`, `env`, `prompt_tokens` (the last page prompt's length);
 - `machines` (the bound roles);
 - `owner`.
 
@@ -313,7 +313,7 @@ render from fields instead of JSON reply IDs. A passive (`callable:false`) rende
 definitions but disables provider calls in all hosted adapters, after merging request settings.
 Provider call responses violate this restriction and fail explicitly, including partial calls. Explicit template imports remain available.
 Template selection/options are part of configured binding identity; imported template sources
-are part of the app source pin. Direct `Agent` users supply resolved `AgentConfig.template`.
+are part of the app source pin. Direct `Instance` users supply resolved `InstanceConfig.template`.
 
 The stock CLI and `runtime::model::from_config` use one strict configuration contract.
 Unknown keys, wrong types, adapter-inapplicable settings and protected-field conflicts fail
@@ -489,7 +489,7 @@ work. A clean shutdown commits everything and closes the log; a restore after it
 directory without a commit log) truncates nothing, so the journals stand as they are. Only the
 log's final line may be torn (an interrupted commit); a bad line before it is an error naming
 its byte offset, and recovery truncates nothing. Each truncation is reported on stderr with the
-instance id and byte counts. An instance whose `agent.json` cannot be read is left as it is and
+instance id and byte counts. An instance whose `instance.json` cannot be read is left as it is and
 is not restored; a journal whose last record cannot be read fails that instance's restore alone.
 
 A runtime owns its run directory: before recovery it takes an exclusive lock on
@@ -536,7 +536,7 @@ The host writes an image after 256 additional inputs (of the agent if idle, else
 step boundary), and at shutdown and stop, so a close images every agent that reached a step
 boundary and its restore replays at most the current step's inputs. Instances with configured
 secret environment values do not use recovery caches. Checkpoints require the same app source,
-entry, tokenizer, contract, complete AgentConfig, replay mode, spill threshold and model
+entry, tokenizer, contract, complete InstanceConfig, replay mode, spill threshold and model
 template; a model server's address, credentials, ranks and sampling are not part of the
 identity. The cache validates its checksum, the journal's last 64 KiB before the image's
 offset (so an image belongs to its journal) and the existence of every blob the journal refers
@@ -547,7 +547,7 @@ journal. Cache-write failure leaves the durable journal authoritative. Checkpoin
 migrate older formats nor serialize suspended stacks or host resources.
 `snapshot.json` remains diagnostic.
 
-**Pins.** `agent.json` records `pins: {contract, app, tokenizer}` from the first start. Each
+**Pins.** `instance.json` records `pins: {contract, app, tokenizer}` from the first start. Each
 journaled reply carries the hash of the prompt it answered. On restore, the first turn whose prompt
 the current app no longer renders is reported (`diverged_at`). With `replay: "strict"` the restore
 is refused. A journal pinned to another `contract` is always refused: its inputs mean something
@@ -599,13 +599,13 @@ acknowledgements. Journals are synced together by commits (§7), across instance
 With `dir`, the run directory holds the run's durable state (a controller uses `Control`, not
 these files). An instance's name is a label and never becomes a path: each instance, a child
 included, lives in `instances/<id>/` under an id the runtime assigned when it was first created
-(a UUIDv7), and its `agent.json` records its name. The run's own files sit beside `instances/`,
+(a UUIDv7), and its `instance.json` records its name. The run's own files sit beside `instances/`,
 where no name reaches them.
 
 | Path | Meaning |
 |---|---|
 | `run.json` | The run's own record: the directory holds a run. |
-| `instances/<id>/agent.json` | The instance's name, spec and pins. Secrets are removed. |
+| `instances/<id>/instance.json` | The instance's name, spec and pins. Secrets are removed. |
 | `instances/<id>/journal.jsonl` | Its inputs. **Sensitive:** tool outputs and messages are stored as they were. |
 | `commit.jsonl` | The journals' commits: each journal's committed length, by instance (§7). A restore truncates journals to the last one. |
 | `runtime.lock` | Locked by the runtime that owns the directory (§7). |

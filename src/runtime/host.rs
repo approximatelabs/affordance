@@ -10,12 +10,12 @@
 //!   its capabilities.
 //! - The environ is app-scoped: deployment layer, then per-agent. Values of `secrets` keys are
 //!   redacted in traces; apps may read them (like a page reading its cookies).
-//! - With `dir`, each agent has `agent.json`, `journal.jsonl` (its inputs: the agent can be
+//! - With `dir`, each agent has `instance.json`, `journal.jsonl` (its inputs: the agent can be
 //!   rebuilt from it), `trace.jsonl` (renders, model calls, effects, timings) and `store.jsonl`.
-use super::agent::{Agent, AgentConfig, Command, Input, Metrics};
 use super::blobs::Blobs;
 use super::cancel::CancelToken;
 use super::exec::{CallContext, Executor};
+use super::instance::{Command, Input, Instance, InstanceConfig, Metrics};
 use super::model::{GenRequest, Model};
 use super::store::Store;
 use crate::View;
@@ -41,7 +41,7 @@ mod pipe;
 mod status;
 use alloc::*;
 pub use alloc::{pad_heaps, tune_allocator};
-pub use config::{AgentSpec, Observed, Observer, RuntimeConfig};
+pub use config::{InstanceSpec, Observed, Observer, RuntimeConfig};
 use durable::{Durable, Journal, Ready};
 use model_gate::*;
 use pipe::Pipe;
@@ -57,7 +57,7 @@ fn fresh_incarnation() -> u64 {
 
 /// One agent at the end of a run.
 #[derive(Debug, Clone, Serialize)]
-pub struct AgentReport {
+pub struct InstanceReport {
     /// The agent's id.
     pub id: String,
     /// The render worker it ran on.
@@ -67,7 +67,7 @@ pub struct AgentReport {
     /// Its counters (turns, tokens, appends, errors), as replay recomputes them.
     pub metrics: Metrics,
     /// Render work done in this process, including replay.
-    pub render_stats: super::agent::RenderStats,
+    pub render_stats: super::instance::RenderStats,
     /// The value it stopped with (`harness.stop`), if it stopped.
     pub stopped: Option<J>,
     /// Its final state.
@@ -81,8 +81,8 @@ pub struct AgentReport {
 /// The end of a run.
 #[derive(Debug, Clone, Serialize)]
 pub struct Report {
-    /// Every agent, in the order they were added.
-    pub agents: Vec<AgentReport>,
+    /// Every instance, in the order they were added.
+    pub instances: Vec<InstanceReport>,
     /// Wall-clock seconds the run took.
     pub wall_s: f64,
     /// Every agent stopped.
@@ -197,7 +197,7 @@ fn answer_inspect(shared: &Shared, g: &Gather) {
         }
         json!({"since": since, "text": text})
     } else {
-        json!({"since": since, "agents": parts.into_iter().map(|(id, (p, _))| (id, p)).collect::<serde_json::Map<_, _>>()})
+        json!({"since": since, "instances": parts.into_iter().map(|(id, (p, _))| (id, p)).collect::<serde_json::Map<_, _>>()})
     };
     shared.post(
         g.worker,
@@ -363,7 +363,7 @@ struct Shared {
     damaged: BTreeMap<String, String>,
     /// Instances no worker holds: unmounted ones as they were when they left, and lost ones
     /// (`lost`). The run's report includes them.
-    retired: Mutex<BTreeMap<String, AgentReport>>,
+    retired: Mutex<BTreeMap<String, InstanceReport>>,
     /// Group commit of the journals.
     durable: Arc<Durable>,
     /// Restores in progress, at most `restore_concurrency`.
@@ -548,7 +548,7 @@ pub struct Runtime {
     cfg: RuntimeConfig,
     models: BTreeMap<String, ModelBinding>,
     machines: BTreeMap<String, Arc<dyn Executor>>,
-    specs: Vec<AgentSpec>,
+    specs: Vec<InstanceSpec>,
     /// The agents `restore` found journals for, with each journal's last clock (journals are
     /// streamed from disk when the agents start, never held here).
     journals: HashMap<String, i64>,
@@ -693,7 +693,7 @@ impl Runtime {
             .clone()
     }
 
-    /// Bind another model by name: an instance (`AgentSpec.model`, `<Mount model>`) or a render
+    /// Bind another model by name: an instance (`InstanceSpec.model`, `<Mount model>`) or a render
     /// names the model it runs on; its prompts are rendered with `enc`.
     pub fn bind_model(&mut self, name: &str, enc: Arc<Encoder>, model: Arc<dyn Model>) -> &mut Self {
         self.models.insert(name.into(), (enc, model));
@@ -709,31 +709,31 @@ impl Runtime {
     }
 
     /// Add a root agent; ids are unique.
-    pub fn add_agent(&mut self, spec: AgentSpec) -> Result<&mut Self, String> {
+    pub fn add_instance(&mut self, spec: InstanceSpec) -> Result<&mut Self, String> {
         if self.specs.iter().any(|s| s.id == spec.id) {
             return Err(format!("duplicate agent {}", spec.id));
         }
-        if !super::agent::valid_instance_name(&spec.id) {
+        if !super::instance::valid_instance_name(&spec.id) {
             return Err(format!("bad agent id {:?}", spec.id));
         }
         self.specs.push(spec);
         Ok(self)
     }
 
-    /// The agents to run (after `add_agent`, or as read back by `restore`).
-    pub fn specs(&self) -> &[AgentSpec] {
+    /// The agents to run (after `add_instance`, or as read back by `restore`).
+    pub fn specs(&self) -> &[InstanceSpec] {
         &self.specs
     }
 
     /// Membership supplied by the controller on restart. Existing journals retain their
     /// original app props for deterministic replay; only fresh identities use new props.
-    pub fn membership(&mut self, wanted: Vec<AgentSpec>) -> Result<(), String> {
+    pub fn set_instances(&mut self, wanted: Vec<InstanceSpec>) -> Result<(), String> {
         let ids: BTreeSet<_> = wanted.iter().map(|s| s.id.clone()).collect();
         self.specs.retain(|s| ids.contains(&s.id));
         self.journals.retain(|id, _| ids.contains(id));
         for spec in wanted {
             if let Some(old) = self.specs.iter_mut().find(|old| old.id == spec.id) {
-                // Secret values are never saved (`agent.json` leaves them out): they come from the
+                // Secret values are never saved (`instance.json` leaves them out): they come from the
                 // deployment again, as the deployment-wide ones do.
                 for (k, v) in &spec.env {
                     if self.cfg.secrets.contains(k) {
@@ -746,7 +746,7 @@ impl Runtime {
                 old.inspectable = spec.inspectable;
                 old.rank = spec.rank;
             } else {
-                self.add_agent(spec)?;
+                self.add_instance(spec)?;
             }
         }
         Ok(())
@@ -767,19 +767,19 @@ impl Runtime {
             .flatten()
             .flatten()
             .map(|e| e.path())
-            .filter(|p| p.join("agent.json").exists())
+            .filter(|p| p.join("instance.json").exists())
             .collect();
         entries.sort();
         for path in entries {
             // One agent's damage is its own: an unreadable spec leaves it not restored (its files as
             // they are), and an unreadable journal fails its own restore.
-            let spec = std::fs::read(path.join("agent.json"))
+            let spec = std::fs::read(path.join("instance.json"))
                 .map_err(|e| e.to_string())
-                .and_then(|b| serde_json::from_slice::<AgentSpec>(&b).map_err(|e| e.to_string()));
+                .and_then(|b| serde_json::from_slice::<InstanceSpec>(&b).map_err(|e| e.to_string()));
             let spec = match spec {
                 Ok(spec) => spec,
                 Err(e) => {
-                    eprintln!("{}: not restored: agent.json: {e}", path.display());
+                    eprintln!("{}: not restored: instance.json: {e}", path.display());
                     continue;
                 }
             };
@@ -787,7 +787,7 @@ impl Runtime {
             if spec.id.contains('/') {
                 continue;
             }
-            if !super::agent::valid_instance_name(&spec.id) {
+            if !super::instance::valid_instance_name(&spec.id) {
                 return Err(format!(
                     "{}: saved agent id {:?} is not a name",
                     path.display(),
@@ -809,7 +809,7 @@ impl Runtime {
 
     /// Run every agent until all have stopped, nothing can make progress, or `max_wall` passes.
     pub fn run(mut self) -> Result<Report, String> {
-        if !(1..=super::agent::MAX_INPUT_BATCH).contains(&self.cfg.input_batch) {
+        if !(1..=super::instance::MAX_INPUT_BATCH).contains(&self.cfg.input_batch) {
             return Err("input_batch must be an integer from 1 to 64".into());
         }
         for (name, (_, model)) in &self.models {
@@ -848,7 +848,7 @@ impl Runtime {
         let shared_workers = self.cfg.workers.max(1).min(self.specs.len() - dedicated);
         let n_workers = (shared_workers + dedicated).max(1);
         let mut route = HashMap::new();
-        let mut per_worker: Vec<Vec<AgentSpec>> = vec![vec![]; n_workers];
+        let mut per_worker: Vec<Vec<InstanceSpec>> = vec![vec![]; n_workers];
         let (mut shared_next, mut dedicated_next) = (0, shared_workers);
         for spec in &self.specs {
             let worker = if spec.dedicated_worker {
@@ -1143,7 +1143,7 @@ impl Runtime {
         }
         agents.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(Report {
-            agents,
+            instances: agents,
             wall_s: started.elapsed().as_secs_f64(),
             complete: ended == Ended::Stopped,
             ended,
@@ -1169,7 +1169,7 @@ fn status_value(shared: &Shared, state: &str, windows: &serde_json::Map<String, 
     let agents: Vec<J> = statuses.iter().map(|(id,s)| json!({"id":id,"state":if s.failed {"failed"} else if s.stopped {"stopped"} else if s.last_activity_ms == 0 {"starting"} else if s.retrying.is_some() {"retrying"} else {s.phase}, "healthy":!s.failed && !s.stopped && s.last_activity_ms > 0,
         "retrying":s.retrying.map(|(failures, error)| json!({"failures":failures,"error":error})),"turns":s.turns,"generated_tokens":s.generated_tokens,"handler_errors":s.handler_errors,"last_activity_ms":s.last_activity_ms,"outstanding":s.outstanding})).collect();
     let (model_active, model_queued) = shared.model_gate.counts();
-    json!({"state": state, "clock_ms": shared.clock_ms(), "wall_ms": now_ms(), "agents": agents, "models": windows,
+    json!({"state": state, "clock_ms": shared.clock_ms(), "wall_ms": now_ms(), "instances": agents, "models": windows,
         "model_active": model_active, "model_queued": model_queued, "capture_errors": shared.diagnostics.capture_errors()})
 }
 
@@ -1233,8 +1233,8 @@ const MIN_SECRET: usize = 4;
 
 struct Slot {
     incarnation: u64,
-    agent: Agent,
-    spec: AgentSpec,
+    agent: Instance,
+    spec: InstanceSpec,
     app: PathBuf,
     secrets: Vec<(String, String)>,
     journal: Option<Journal>,
@@ -1362,7 +1362,7 @@ fn lost(shared: &Shared, w: usize, id: &str, error: String) {
     );
     shared.retired.lock().unwrap().insert(
         id.to_string(),
-        AgentReport {
+        InstanceReport {
             id: id.to_string(),
             worker: w,
             diverged_at: None,
@@ -1380,7 +1380,7 @@ fn lost(shared: &Shared, w: usize, id: &str, error: String) {
 /// replays. Only that: an operational setting (workers, thread pools, `model_inflight`,
 /// `restore_concurrency`, timeouts, machines' commands, where the app is installed) changes
 /// none of it, and an image kept across a change of one saves its agent a full replay.
-fn checkpoint_identity(shared: &Shared, cfg: &AgentConfig, view: &View, enc: &Encoder) -> String {
+fn checkpoint_identity(shared: &Shared, cfg: &InstanceConfig, view: &View, enc: &Encoder) -> String {
     // Which model answers and how prompts are laid out (`replay_identity`), not how it is
     // reached: moving a server or changing a timeout keeps images.
     let model = cfg
@@ -1404,14 +1404,14 @@ fn checkpoint_identity(shared: &Shared, cfg: &AgentConfig, view: &View, enc: &En
 /// Returns where the journal stands, and the image's input count (`saved`) if one was used.
 fn restore_instance(
     shared: &Shared,
-    cfg: AgentConfig,
+    cfg: InstanceConfig,
     view: &View,
     enc: &Encoder,
     dir: &std::path::Path,
     allow_cache: bool,
-) -> Result<(Agent, Vec<Command>, super::checkpoint::Seed), String> {
+) -> Result<(Instance, Vec<Command>, super::checkpoint::Seed), String> {
     let key = checkpoint_identity(shared, &cfg, view, enc);
-    let setup = |a: &mut Agent| {
+    let setup = |a: &mut Instance| {
         if let Some(b) = shared.store.blobs() {
             a.set_blobs(b.clone());
         }
@@ -1502,7 +1502,7 @@ fn restore_instance(
         let ends = std::cell::RefCell::new(std::collections::HashMap::new());
         let count = std::cell::Cell::new(0usize);
         let full = Instant::now();
-        let (agent, commands) = Agent::restore_with(
+        let (agent, commands) = Instance::restore_with(
             cfg,
             journal.map_while(Result::ok).map(|row| {
                 count.set(
@@ -1606,7 +1606,7 @@ fn start_instance(
     w: usize,
     views: &mut Views,
     slots: &mut BTreeMap<String, Slot>,
-    spec: AgentSpec,
+    spec: InstanceSpec,
     app: PathBuf,
     env: BTreeMap<String, String>,
     restored: bool,
@@ -1623,7 +1623,7 @@ fn start_instance(
         .machines
         .clone()
         .unwrap_or_else(|| shared.machines.keys().cloned().collect());
-    let mut cfg = AgentConfig {
+    let mut cfg = InstanceConfig {
         id: spec.id.clone(),
         props: spec.props.clone(),
         env,
@@ -1653,8 +1653,8 @@ fn start_instance(
     };
     shared.route.write().unwrap().insert(spec.id.clone(), w);
     let fail = |slots: &mut BTreeMap<String, Slot>,
-                cfg: AgentConfig,
-                spec: AgentSpec,
+                cfg: InstanceConfig,
+                spec: InstanceSpec,
                 app: PathBuf,
                 e: String|
      -> Result<(), String> {
@@ -1662,7 +1662,7 @@ fn start_instance(
         let id = spec.id.clone();
         let mut slot = Slot {
             incarnation,
-            agent: Agent::new(cfg)?,
+            agent: Instance::new(cfg)?,
             spec,
             app,
             secrets: vec![],
@@ -1715,7 +1715,7 @@ fn start_instance(
             stored.env.remove(k);
         }
         let before = restored
-            .then(|| std::fs::read(d.join("agent.json")).ok())
+            .then(|| std::fs::read(d.join("instance.json")).ok())
             .flatten()
             .and_then(|b| serde_json::from_slice::<J>(&b).ok());
         let start = before.as_ref().and_then(|v| v["start_ms"].as_i64());
@@ -1766,7 +1766,7 @@ fn start_instance(
         // the journal did not take.
         if restored && let Some(old) = &before {
             let was: super::model::RetryPolicy =
-                serde_json::from_value(old["retry"].clone()).map_err(|e| format!("agent.json retry: {e}"))?;
+                serde_json::from_value(old["retry"].clone()).map_err(|e| format!("instance.json retry: {e}"))?;
             if was != cfg.retry {
                 eprintln!(
                     "{}: model calls keep the retry policy this run was started with; a fresh run takes the new one",
@@ -1796,7 +1796,7 @@ fn start_instance(
         }
         .into();
         let clean = redact(stored_json, &secrets);
-        atomic_value(&d.join("agent.json"), &clean)?;
+        atomic_value(&d.join("instance.json"), &clean)?;
         let open = |name: &str| {
             std::fs::OpenOptions::new()
                 .create(true)
@@ -1813,12 +1813,12 @@ fn start_instance(
     let dir = inst.clone().filter(|_| restored);
     let (agent, commands, error, restored_from) = match &dir {
         Some(d) => {
-            let start = std::fs::read(d.join("agent.json"))
+            let start = std::fs::read(d.join("instance.json"))
                 .ok()
                 .and_then(|b| serde_json::from_slice::<J>(&b).ok())
                 .and_then(|v| v["start_ms"].as_i64())
                 .unwrap_or(cfg.start_ms);
-            let replay_cfg = AgentConfig {
+            let replay_cfg = InstanceConfig {
                 start_ms: start,
                 ..cfg.clone()
             };
@@ -1836,12 +1836,12 @@ fn start_instance(
                 Ok((a, cmds, seed)) => (a, cmds, None, Some(seed)),
                 Err(e) => {
                     eprintln!("{}: restore failed: {e}", spec.id);
-                    (Agent::new(cfg)?, vec![], Some(format!("restore failed: {e}")), None)
+                    (Instance::new(cfg)?, vec![], Some(format!("restore failed: {e}")), None)
                 }
             }
         }
         None => {
-            let mut a = Agent::new(cfg)?;
+            let mut a = Instance::new(cfg)?;
             if let Some(b) = shared.store.blobs() {
                 a.set_blobs(b.clone());
             }
@@ -1872,7 +1872,7 @@ fn start_instance(
     };
     let incarnation = if restored {
         inst.as_ref()
-            .and_then(|d| std::fs::read(d.join("agent.json")).ok())
+            .and_then(|d| std::fs::read(d.join("instance.json")).ok())
             .and_then(|b| serde_json::from_slice::<J>(&b).ok())
             .and_then(|v| v["incarnation"].as_u64())
             .unwrap_or(0)
@@ -1956,10 +1956,10 @@ fn push_local(shared: &Shared, local: &mut VecDeque<Msg>, item: (String, InputKi
 fn worker(
     w: usize,
     shared: Arc<Shared>,
-    specs: Vec<AgentSpec>,
+    specs: Vec<InstanceSpec>,
     restored: HashSet<String>,
     rx: Receiver<Msg>,
-) -> Result<Vec<AgentReport>, String> {
+) -> Result<Vec<InstanceReport>, String> {
     let mut views = Views { loaded: HashMap::new() };
     let mut slots: BTreeMap<String, Slot> = BTreeMap::new();
     let mut timers = Timers::default();
@@ -2154,8 +2154,8 @@ fn worker(
     Ok(slots.values().map(|s| report_of(&shared, s)).collect())
 }
 
-fn report_of(shared: &Shared, s: &Slot) -> AgentReport {
-    AgentReport {
+fn report_of(shared: &Shared, s: &Slot) -> InstanceReport {
+    InstanceReport {
         id: s.spec.id.clone(),
         worker: shared.route.read().unwrap().get(&s.spec.id).copied().unwrap_or(0),
         diverged_at: s.agent.diverged_at(),
@@ -2209,7 +2209,7 @@ fn feed(
             shared.retired.lock().unwrap().remove(id);
             // The child's bindings come from its parent: machines a subset, the model one that exists.
             let base = PathBuf::from(&app);
-            let mut spec = AgentSpec::new(id, props);
+            let mut spec = InstanceSpec::new(id, props);
             spec.max_new = p.spec.max_new;
             // Each child its own random sequence: from its parent's seed and its own id.
             spec.seed = p.spec.seed.wrapping_mul(31).wrapping_add(stable_hash(id));
@@ -2238,7 +2238,7 @@ fn feed(
             if restored
                 && let Some(first) = shared
                     .instance_dir(id)
-                    .and_then(|d| std::fs::read(d.join("agent.json")).ok())
+                    .and_then(|d| std::fs::read(d.join("instance.json")).ok())
                     .and_then(|b| serde_json::from_slice::<J>(&b).ok())
                     .map(|v| v["props"].clone())
             {
@@ -2675,7 +2675,7 @@ fn dispatch(
                     cut_off: false,
                     aborted: true,
                     stats: json!({"t": "generate", "task": task, "tokens": 0, "aborted": true}),
-                    prompt: prompt_hash.unwrap_or_else(|| super::agent::prompt_hash(&ids)),
+                    prompt: prompt_hash.unwrap_or_else(|| super::instance::prompt_hash(&ids)),
                 };
                 return push_local(shared, local, (slot.spec.id.clone(), reply));
             }
@@ -2927,7 +2927,7 @@ fn dispatch_now(
                                 cut_off: r.cut_off,
                                 aborted,
                                 stats,
-                                prompt: prompt_hash.unwrap_or_else(|| super::agent::prompt_hash(&req.ids)),
+                                prompt: prompt_hash.unwrap_or_else(|| super::instance::prompt_hash(&req.ids)),
                             }
                         }
                         // A reply partly written to a pipe cannot be started again: whoever reads
@@ -3206,13 +3206,13 @@ export default function Main({panics}) {
     fn model() -> Arc<dyn Model> {
         Arc::new(FnModel(|_: &GenRequest| Ok(GenReply::default())))
     }
-    fn spec(id: &str, props: J) -> AgentSpec {
-        let mut s = AgentSpec::new(id, props);
+    fn spec(id: &str, props: J) -> InstanceSpec {
+        let mut s = InstanceSpec::new(id, props);
         s.model = None;
         s
     }
-    fn agent<'a>(report: &'a Report, id: &str) -> &'a AgentReport {
-        report.agents.iter().find(|a| a.id == id).unwrap()
+    fn agent<'a>(report: &'a Report, id: &str) -> &'a InstanceReport {
+        report.instances.iter().find(|a| a.id == id).unwrap()
     }
 
     /// A render that panics on a timer's input fails its agent alone: the worker it shares with
@@ -3225,9 +3225,9 @@ export default function Main({panics}) {
         let scratch = Scratch::new("handle");
         let cfg = scratch.config(1);
         let mut rt = Runtime::new(cfg.clone(), encoder(), model());
-        rt.add_agent(spec("crash", json!({"panics": true})))
+        rt.add_instance(spec("crash", json!({"panics": true})))
             .unwrap()
-            .add_agent(spec("healthy", json!({"panics": false})))
+            .add_instance(spec("healthy", json!({"panics": false})))
             .unwrap();
         let started = Instant::now();
         let report = rt.run().unwrap();
@@ -3258,11 +3258,11 @@ export default function Main({panics}) {
     fn an_agent_that_cannot_start_fails_alone() {
         let scratch = Scratch::new("boot");
         let mut rt = Runtime::new(scratch.config(1), encoder(), model());
-        rt.add_agent(spec("bad", json!("not an object")))
+        rt.add_instance(spec("bad", json!("not an object")))
             .unwrap()
-            .add_agent(spec("crash", json!({"panics": "start"})))
+            .add_instance(spec("crash", json!({"panics": "start"})))
             .unwrap()
-            .add_agent(spec("healthy", json!({"panics": false})))
+            .add_instance(spec("healthy", json!({"panics": false})))
             .unwrap();
         let started = Instant::now();
         let report = rt.run().unwrap();
@@ -3287,7 +3287,7 @@ export default function Main({panics}) {
             ),
             (None, Some(json!({"n": 1})))
         );
-        assert_eq!(report.agents.len(), 3);
+        assert_eq!(report.instances.len(), 3);
     }
 
     /// A worker that dies outside its agents' code (here a model binding that panics while an
@@ -3308,9 +3308,9 @@ export default function Main({panics}) {
         rt.bind_model("broken", encoder(), Arc::new(Broken));
         let mut dies = spec("dies", json!({"panics": false}));
         dies.model = Some("broken".into());
-        rt.add_agent(dies)
+        rt.add_instance(dies)
             .unwrap()
-            .add_agent(spec("healthy", json!({"panics": false})))
+            .add_instance(spec("healthy", json!({"panics": false})))
             .unwrap();
         let started = Instant::now();
         let report = rt.run().unwrap();

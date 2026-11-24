@@ -2,7 +2,7 @@
 //! agents keep working: the clock record is written off the control loop, so a slow disk delays
 //! neither closing nor the workers (the slow-disk case itself is `host.rs`'s `status_writer_tests`).
 use crate::shared;
-use affordance::runtime::{AgentSpec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+use affordance::runtime::{FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
 use serde_json::json;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ fn a_close_is_answered_while_status_is_published() {
     std::fs::write(dir.join("app.tsx"), r#"export default function Main() {
   const [n, setN] = useState(0, "n");
   useEvent("tick", () => setN(x => x + 1));
-  useEffect(() => { (async () => { for (;;) { await harness.wait({ms: 5}); await harness.send(harness.agent == "a" ? "b" : "a", {}, {event: "tick"}); } })(); }, []);
+  useEffect(() => { (async () => { for (;;) { await harness.wait({ms: 5}); await harness.send(harness.instance == "a" ? "b" : "a", {}, {event: "tick"}); } })(); }, []);
   return <text>{`n=${n}`}</text>;
 }"#).unwrap();
     let enc = shared::tokenizer(&root.join("ref/tokenizers/Qwen__Qwen3-8B.json"));
@@ -29,9 +29,9 @@ fn a_close_is_answered_while_status_is_published() {
     cfg.max_wall = Some(Duration::from_secs(60));
     let mut rt = Runtime::new(cfg, enc, Arc::new(FnModel(|_: &GenRequest| Ok(GenReply::default()))));
     for id in ["a", "b"] {
-        let mut s = AgentSpec::new(id, json!({}));
+        let mut s = InstanceSpec::new(id, json!({}));
         s.model = None;
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     let control = rt.control();
     let asked = Arc::new(std::sync::Mutex::new(None));
@@ -81,8 +81,8 @@ fn close_behind_a_backlog(batch: usize) {
             r#"export default function Main() {{
   const [n, setN] = useState(0, "n");
   useEvent("m", () => {{ let x = 0; for (let i = 0; i < 20000; i++) x += i; setN(k => k + 1); }});
-  useEffect(() => {{ if (harness.agent == "r" && n >= {total}) harness.stop({{n}}); }}, [n]);
-  useEffect(() => {{ if (harness.agent != "r") (async () => {{
+  useEffect(() => {{ if (harness.instance == "r" && n >= {total}) harness.stop({{n}}); }}, [n]);
+  useEffect(() => {{ if (harness.instance != "r") (async () => {{
     const sent = await Promise.all(Array.from({{length: {EACH}}}, (_, i) => harness.send("r", {{i}}, {{event: "m"}})));
     harness.stop({{delivered: sent.filter(s => s.delivered === true).length}});
   }})(); }}, []);
@@ -102,14 +102,14 @@ fn close_behind_a_backlog(batch: usize) {
     };
     let model = || Arc::new(FnModel(|_: &GenRequest| Ok(GenReply::default())));
     let add = |rt: &mut Runtime| {
-        let mut r = AgentSpec::new("r", json!({}));
+        let mut r = InstanceSpec::new("r", json!({}));
         r.model = None;
         r.dedicated_worker = true;
-        rt.add_agent(r).unwrap();
+        rt.add_instance(r).unwrap();
         for i in 0..SENDERS {
-            let mut s = AgentSpec::new(&format!("s{i}"), json!({}));
+            let mut s = InstanceSpec::new(&format!("s{i}"), json!({}));
             s.model = None;
-            rt.add_agent(s).unwrap();
+            rt.add_instance(s).unwrap();
         }
     };
     let journal = |id: &str| {
@@ -179,7 +179,7 @@ fn close_behind_a_backlog(batch: usize) {
     unique.dedup();
     assert_eq!(unique.len(), total, "every message reached the receiver");
     assert_eq!(after.len(), total, "each message was journaled once");
-    for agent in &report.agents {
+    for agent in &report.instances {
         if agent.id == "r" {
             assert_eq!(agent.stopped, Some(json!({"n": total})));
         } else {

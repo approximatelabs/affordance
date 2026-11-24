@@ -5,7 +5,7 @@ use crate::each;
 use affordance::View;
 use affordance::emit::{Encoder, RunCache};
 use affordance::runtime::blobs::Blobs;
-use affordance::runtime::{AgentSpec, Exec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+use affordance::runtime::{Exec, FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
 use affordance::value::with_host_text;
 use serde_json::{Value as J, json};
 use std::path::{Path, PathBuf};
@@ -209,10 +209,10 @@ fn session(dir: &Path, restore: bool) -> affordance::runtime::Report {
     };
     rt.bind_machine("home", Arc::new(Exec::local()));
     if !restore {
-        let mut spec = AgentSpec::new("agent-0", json!({"id": "agent-0", "task": "Migrate the build."}));
+        let mut spec = InstanceSpec::new("agent-0", json!({"id": "agent-0", "task": "Migrate the build."}));
         spec.max_turns = Some(4);
         spec.max_new = 256;
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     rt.run().unwrap()
 }
@@ -226,7 +226,7 @@ fn size(p: &Path) -> u64 {
 fn a_twelve_megabyte_tool_output_is_one_blob_and_reads_back_exactly() {
     let dir = tmp("session");
     let report = session(&dir, false);
-    let a = &report.agents[0];
+    let a = &report.instances[0];
     assert!(a.error.is_none(), "{:?}", a.error);
     assert_eq!(a.metrics.turns, 4);
     // One blob: exec's output, shared by the journal and the app's log record.
@@ -264,7 +264,7 @@ fn a_twelve_megabyte_tool_output_is_one_blob_and_reads_back_exactly() {
 
     // Resume replays the journal against the same blobs and reaches the same state.
     let again = session(&dir, true);
-    let b = &again.agents[0];
+    let b = &again.instances[0];
     assert!(b.error.is_none(), "{:?}", b.error);
     assert_eq!(b.state, a.state);
     assert_eq!(
@@ -356,6 +356,6 @@ fn a_journal_whose_blob_is_missing_fails_to_resume_by_name() {
         std::fs::remove_file(e.unwrap().path()).unwrap();
     }
     let again = session(&dir, true);
-    let e = again.agents[0].error.as_deref().unwrap_or("");
+    let e = again.instances[0].error.as_deref().unwrap_or("");
     assert!(e.contains("missing blob") && e.contains("blob:"), "{e}");
 }

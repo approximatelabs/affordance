@@ -427,12 +427,12 @@ Direct constructors remain available: `Sglang::new`, `Completions::new`, `Chat::
 `model::with_template(client, ModelTemplate::new("glm53", options)?)` attaches presentation
 to any client while delegating its inference, streaming, cancellation and rank behavior.
 `Chat::new` advertises `messages` by default. Low-level `Agent` callers set
-`AgentConfig.template` to the same resolved `ModelTemplate` on fresh execution and restore;
+`InstanceConfig.template` to the same resolved `ModelTemplate` on fresh execution and restore;
 `Runtime` does this automatically for each binding, including mounted children.
 Wrapping a custom client preserves its identity opt-in: template metadata does not establish
 the identity of an otherwise unidentified inference implementation. Such clients must supply
 `Model::binding_identity` to receive strict binding-configuration checks. Checkpoint cache
-identity still includes the resolved `AgentConfig.template`.
+identity still includes the resolved `InstanceConfig.template`.
 Native clients expose `auth: Option<Credentials>` and all stock clients expose `provider_options`.
 `Model::validate` runs before runtime workers start and before stock generation; mutating public
 client settings does not bypass validation. Custom adapters can implement `binding_identity`

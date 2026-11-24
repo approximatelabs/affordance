@@ -4,7 +4,7 @@ use crate::tokenizer;
 use affordance::{
     View,
     effects::Outcome,
-    runtime::{Agent, AgentConfig, Command, Input},
+    runtime::{Command, Input, Instance, InstanceConfig},
 };
 use serde_json::{Value as J, json};
 use std::{
@@ -62,8 +62,8 @@ export default function Main(){
 }"#;
 
 struct Rig {
-    config: AgentConfig,
-    agent: Agent,
+    config: InstanceConfig,
+    agent: Instance,
     view: View,
     enc: affordance::emit::Encoder,
     clock: i64,
@@ -84,7 +84,7 @@ impl Rig {
         let enc = tokenizer::encoder();
         let view = View::load(&path, "Main", &enc).unwrap();
         let _ = std::fs::remove_dir_all(&dir);
-        let config = AgentConfig {
+        let config = InstanceConfig {
             context: None,
             retry: Default::default(),
             template: None,
@@ -99,7 +99,7 @@ impl Rig {
             machines: vec!["http".into()],
             model: Some("default".into()),
         };
-        let mut agent = Agent::new(config.clone()).unwrap();
+        let mut agent = Instance::new(config.clone()).unwrap();
         // The page's own first turn is not this test's: the app has no loop.
         agent.start(&view, &enc).unwrap();
         Self {
@@ -148,8 +148,8 @@ impl Rig {
     fn out(&self) -> J {
         self.agent.state()["__ui"]["@out"].clone()
     }
-    fn restored(&self) -> (Agent, Vec<Command>) {
-        Agent::restore(self.config.clone(), self.journal.clone(), &self.view, &self.enc).unwrap()
+    fn restored(&self) -> (Instance, Vec<Command>) {
+        Instance::restore(self.config.clone(), self.journal.clone(), &self.view, &self.enc).unwrap()
     }
 }
 
@@ -348,7 +348,7 @@ impl affordance::runtime::Model for Streaming {
 
 #[test]
 fn escape_stops_a_streaming_reply_and_the_journal_keeps_it() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     use std::sync::Arc;
     let dir = std::env::temp_dir().join(format!("aff-abort-run-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -370,11 +370,11 @@ fn escape_stops_a_streaming_reply_and_the_journal_keeps_it() {
     let control = rt.control();
     *model.control.lock().unwrap() = Some(control.clone());
     drop(control.post("a", "ask", json!({}), None));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.machines = Some(vec![]);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    let a = &report.agents[0];
+    let a = &report.instances[0];
     assert_eq!(a.error, None);
     let out = &a.state["__ui"]["@out"];
     assert_eq!(out["aborted"], true, "{out}");
@@ -424,7 +424,7 @@ impl affordance::runtime::Model for QuickIds {
 /// resolves reaches the sink after every piece.
 #[test]
 fn a_native_reply_is_piped_without_waiting_on_a_slow_sink() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     use std::sync::{Arc, Mutex};
     let dir = std::env::temp_dir().join(format!("aff-pipe-native-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -459,11 +459,11 @@ fn a_native_reply_is_piped_without_waiting_on_a_slow_sink() {
         }),
     );
     drop(rt.control().post("a", "piped", json!({}), None));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.machines = Some(vec!["sink".into()]);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    assert_eq!(report.agents[0].error, None);
+    assert_eq!(report.instances[0].error, None);
     let took = model.took.lock().unwrap().unwrap();
     assert!(
         took < std::time::Duration::from_millis(300),

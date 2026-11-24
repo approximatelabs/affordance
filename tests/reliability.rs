@@ -3,7 +3,7 @@ use crate::tokenizer;
 use affordance::{
     View,
     emit::{Encoder, RunCache},
-    runtime::{AgentSpec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig, store::Store},
+    runtime::{FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig, store::Store},
 };
 use serde_json::{Value as J, json};
 use std::{
@@ -111,7 +111,7 @@ export default function Main({{denied,reverse,name}}){{
                 ("named", false, false),
                 ("denied", true, false),
             ] {
-                let mut spec = AgentSpec::new(
+                let mut spec = InstanceSpec::new(
                     id,
                     json!({"denied":denied,"reverse":reverse,"name":if id=="named" {"archive"} else {"log"}}),
                 );
@@ -119,13 +119,13 @@ export default function Main({{denied,reverse,name}}){{
                 if denied {
                     spec.capabilities = Some(vec![]);
                 }
-                rt.add_agent(spec).unwrap();
+                rt.add_instance(spec).unwrap();
             }
         }
         rt.run().unwrap()
     };
     let report = run(false);
-    for agent in &report.agents {
+    for agent in &report.instances {
         assert!(agent.error.is_none(), "{:?}", agent.error);
         let denied = agent.id == "denied";
         let records = if denied {
@@ -145,7 +145,7 @@ export default function Main({{denied,reverse,name}}){{
             std::fs::remove_file(crate::shared::instance_dir(&dir.0.join("run"), &agent.id).join("checkpoint.json"));
     }
     let restored = run(true);
-    for (before, after) in report.agents.iter().zip(&restored.agents) {
+    for (before, after) in report.instances.iter().zip(&restored.instances) {
         assert!(after.error.is_none(), "{:?}", after.error);
         assert_eq!(after.stopped, before.stopped);
         assert_eq!(after.state, before.state);
@@ -191,13 +191,13 @@ fn busy_local_calls_allow_timers_inspection_close_and_shutdown() {
 export default function Main(){
   const [n,setN]=useState(0,'n');
   useEffect(()=>{(async()=>{
-    if(harness.agent==='busy'){
+    if(harness.instance==='busy'){
       for(;;){await harness.store.put({key:'same',text:'value'});setN(x=>x+1);}
     }else{
       await harness.wait({ms:0});
       const seen=await harness.inspect('busy',{select:['n']});
       await harness.machine.call({});
-      harness.stop(seen.agents.busy.version);
+      harness.stop(seen.instances.busy.version);
     }
   })();},[]);
   return String(n);
@@ -218,20 +218,20 @@ export default function Main(){
             }),
         );
         for id in ["busy", "watcher"] {
-            let mut spec = AgentSpec::new(id, json!({}));
+            let mut spec = InstanceSpec::new(id, json!({}));
             spec.model = None;
             if id == "watcher" {
                 spec.inspect = vec!["busy".into()];
             }
-            rt.add_agent(spec).unwrap();
+            rt.add_instance(spec).unwrap();
         }
         let report = rt.run().unwrap();
         assert!(!report.complete);
-        let watcher = report.agents.iter().find(|a| a.id == "watcher").unwrap();
+        let watcher = report.instances.iter().find(|a| a.id == "watcher").unwrap();
         assert!(watcher.error.is_none(), "{:?}", watcher.error);
         assert!(watcher.stopped.as_ref().and_then(J::as_u64).is_some_and(|n| n > 0));
         if close {
-            let before = report.agents.iter().find(|a| a.id == "busy").unwrap();
+            let before = report.instances.iter().find(|a| a.id == "busy").unwrap();
             // The restored run ends as soon as the busy agent's journal has grown (a close from
             // the controller); the wall limit only bounds a failure, so a slow restore under load
             // cannot end the run before the held work continues.
@@ -260,7 +260,7 @@ export default function Main(){
             let restored = rt.run().unwrap();
             done.store(true, Ordering::SeqCst);
             watch.join().unwrap();
-            let after = restored.agents.iter().find(|a| a.id == "busy").unwrap();
+            let after = restored.instances.iter().find(|a| a.id == "busy").unwrap();
             assert!(after.error.is_none(), "{:?}", after.error);
             assert!(
                 after.journal_len > before.journal_len,
@@ -278,14 +278,14 @@ fn child_keys_cannot_alias_persisted_instance_paths() {
         let mut cfg = config(&app);
         cfg.dir = Some(dir.0.join("run"));
         let mut rt = Runtime::new(cfg, encoder(), model());
-        rt.add_agent(AgentSpec::new("parent", json!({}))).unwrap();
+        rt.add_instance(InstanceSpec::new("parent", json!({}))).unwrap();
         let report = rt.run().unwrap();
-        assert!(report.agents[0].error.as_deref().unwrap().contains("key"));
+        assert!(report.instances[0].error.as_deref().unwrap().contains("key"));
         let saved: J =
-            serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir.0, "run/parent/agent.json")).unwrap())
+            serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir.0, "run/parent/instance.json")).unwrap())
                 .unwrap();
         assert_eq!(saved["id"], "parent");
-        assert_eq!(report.agents.len(), 1);
+        assert_eq!(report.instances.len(), 1);
     }
 }
 
@@ -304,12 +304,12 @@ export default function Main() { const [phase,setPhase]=useState(0,'phase'); use
     cfg.dir = Some(dir.0.join("run"));
     let enc = encoder();
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     for report in [
         rt.run().unwrap(),
         Runtime::restore(cfg, enc, model()).unwrap().run().unwrap(),
     ] {
-        let kid = report.agents.iter().find(|a| a.id == "a/kid").unwrap();
+        let kid = report.instances.iter().find(|a| a.id == "a/kid").unwrap();
         assert!(kid.error.is_none(), "{:?}", kid.error);
         assert_eq!(kid.state["__ui"]["@n"], 101);
     }
@@ -347,9 +347,9 @@ export default function Main(){const [phase,setPhase]=useState(0,'phase');useEff
     let mut cfg = config(&app);
     cfg.model_threads = 2;
     let mut rt = Runtime::new(cfg, enc, model);
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let report = rt.run().unwrap();
-    let kid = report.agents.iter().find(|a| a.id == "a/kid").unwrap();
+    let kid = report.instances.iter().find(|a| a.id == "a/kid").unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     assert_eq!(kid.state["__ui"]["@value"], "new");
 }
@@ -366,9 +366,9 @@ export default function Main(){const [o,setO]=useState({a:1,b:2},'o');const [v,s
 "#,
     );
     let mut rt = Runtime::new(config(&app), encoder(), model());
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let report = rt.run().unwrap();
-    let state = &report.agents[0].state["__ui"];
+    let state = &report.instances[0].state["__ui"];
     assert_eq!(
         state["@o"]
             .as_object()
@@ -477,9 +477,9 @@ export default function Main(){
     cfg.env.insert("DEMO".into(), "left".into());
     let enc = encoder();
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let first = rt.run().unwrap();
-    assert!(first.agents.iter().all(|a| a.error.is_none()));
+    assert!(first.instances.iter().all(|a| a.error.is_none()));
     let read = |path: &std::path::Path| -> J { serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap() };
     let append = |id: &str, name: &str, payload: J, clock: i64| {
         let input = affordance::runtime::Input::Event {
@@ -508,9 +508,9 @@ export default function Main(){
         .unwrap()
         .run()
         .unwrap();
-    assert!(second.agents.iter().all(|a| a.error.is_none()), "{second:?}");
+    assert!(second.instances.iter().all(|a| a.error.is_none()), "{second:?}");
     assert_eq!(
-        second.agents.iter().find(|a| a.id == "a/kid").unwrap().state["__ui"]["@n"],
+        second.instances.iter().find(|a| a.id == "a/kid").unwrap().state["__ui"]["@n"],
         12
     );
     let saved = read(&checkpoint);
@@ -535,9 +535,9 @@ export default function Main(){
         .unwrap()
         .run()
         .unwrap();
-    assert!(third.agents.iter().all(|a| a.error.is_none()), "{third:?}");
-    let parent = third.agents.iter().find(|a| a.id == "a").unwrap();
-    let child = third.agents.iter().find(|a| a.id == "a/kid").unwrap();
+    assert!(third.instances.iter().all(|a| a.error.is_none()), "{third:?}");
+    let parent = third.instances.iter().find(|a| a.id == "a").unwrap();
+    let child = third.instances.iter().find(|a| a.id == "a/kid").unwrap();
     assert_eq!(parent.state["__ui"]["@label"], "third");
     assert_eq!(parent.state["__ui"]["@runs"], 1);
     assert_eq!(child.state["__ui"]["@n"], 13);
@@ -573,7 +573,7 @@ export default function Main(){
         .unwrap()
         .run()
         .unwrap();
-    let expected = edited.agents.iter().find(|a| a.id == "a").unwrap().state.clone();
+    let expected = edited.instances.iter().find(|a| a.id == "a").unwrap().state.clone();
     assert_eq!(expected["__ui"]["@label"], "other");
     // A broken cache is disposable; recovery still has the entire original journal.
     std::fs::write(&checkpoint, b"{broken checkpoint").unwrap();
@@ -581,13 +581,13 @@ export default function Main(){
         .unwrap()
         .run()
         .unwrap();
-    assert_eq!(restored.agents.iter().find(|a| a.id == "a").unwrap().state, expected);
+    assert_eq!(restored.instances.iter().find(|a| a.id == "a").unwrap().state, expected);
     // Configuration changes must rerun initialization under the requested environment.
     cfg.env.insert("DEMO".into(), "right".into());
     let changed = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
-    assert!(changed.agents.iter().all(|a| a.error.is_none()), "{changed:?}");
+    assert!(changed.instances.iter().all(|a| a.error.is_none()), "{changed:?}");
     assert_eq!(
-        changed.agents.iter().find(|a| a.id == "a").unwrap().state["__ui"]["@initial"],
+        changed.instances.iter().find(|a| a.id == "a").unwrap().state["__ui"]["@initial"],
         "right"
     );
 }
@@ -624,8 +624,8 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
         .unwrap()
     };
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), template(json!({"reasoning_effort":"high"})));
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
-    assert!(rt.run().unwrap().agents[0].error.is_none());
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
+    assert!(rt.run().unwrap().instances[0].error.is_none());
     assert!(crate::shared::inst(&run, "a/checkpoint.json").exists());
     let restores = || {
         std::fs::read_to_string(crate::shared::inst(&run, "a/trace.jsonl"))
@@ -661,9 +661,9 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
             .unwrap()
             .run()
             .unwrap();
-        assert!(report.agents[0].error.is_none(), "{report:?}");
-        assert_eq!(report.agents[0].state["__ui"]["@n"], bumps);
-        report.agents[0].state["__ui"]["@env"].clone()
+        assert!(report.instances[0].error.is_none(), "{report:?}");
+        assert_eq!(report.instances[0].state["__ui"]["@n"], bumps);
+        report.instances[0].state["__ui"]["@env"].clone()
     };
     let before = restores();
     // The release switch (the same files under another real path) and every operational knob.
@@ -719,13 +719,13 @@ fn recovery_caches_skip_secret_environments_and_live_source_values() {
         }
         let enc = encoder();
         let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
-        rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+        rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
         let first = rt.run().unwrap();
-        assert!(first.agents[0].error.is_none());
+        assert!(first.instances[0].error.is_none());
         assert!(!crate::shared::inst(&run, "a/checkpoint.json").exists());
         let second = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
-        assert!(second.agents[0].error.is_none());
-        assert_eq!(first.agents[0].state, second.agents[0].state);
+        assert!(second.instances[0].error.is_none());
+        assert_eq!(first.instances[0].state, second.instances[0].state);
     }
 }
 
@@ -740,7 +740,7 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
     let fresh = |cfg: RuntimeConfig| {
         let mut rt = Runtime::new(cfg, enc.clone(), model());
         for id in ["a", "b"] {
-            rt.add_agent(AgentSpec::new(id, json!({}))).unwrap();
+            rt.add_instance(InstanceSpec::new(id, json!({}))).unwrap();
         }
         rt.run().unwrap()
     };
@@ -753,7 +753,7 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
         .unwrap();
     assert!(
         restored
-            .agents
+            .instances
             .iter()
             .find(|a| a.id == "a")
             .unwrap()
@@ -762,12 +762,12 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
             .unwrap()
             .contains("store recovery failed")
     );
-    let b = restored.agents.iter().find(|a| a.id == "b").unwrap();
+    let b = restored.instances.iter().find(|a| a.id == "b").unwrap();
     assert!(b.error.is_none());
     assert_eq!(b.state["__ui"]["@n"], 1);
     assert_eq!(std::fs::read(&path).unwrap(), b"{broken record}\n");
     let restarted = fresh(cfg);
-    assert!(restarted.agents.iter().all(|a| a.error.is_none()));
+    assert!(restarted.instances.iter().all(|a| a.error.is_none()));
     assert!(!path.exists());
     assert!(run.join("retired").is_dir());
 }
@@ -803,13 +803,13 @@ export function Sender(){const [seen,setSeen]=useState([],'seen');
         }),
     );
     for (id, entry) in [("halt", "Halt"), ("sender", "Sender")] {
-        let mut spec = AgentSpec::new(id, json!({}));
+        let mut spec = InstanceSpec::new(id, json!({}));
         spec.entry = Some(entry.into());
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     let report = rt.run().unwrap();
-    assert!(report.agents.iter().all(|a| a.error.is_none()), "{report:?}");
-    let sender = report.agents.iter().find(|a| a.id == "sender").unwrap();
+    assert!(report.instances.iter().all(|a| a.error.is_none()), "{report:?}");
+    let sender = report.instances.iter().find(|a| a.id == "sender").unwrap();
     assert_eq!(sender.state["__ui"]["@seen"], json!([0, 0, 0]));
     assert_eq!(sender.metrics.handler_errors, 0);
     let saved: J = serde_json::from_slice(
@@ -829,15 +829,15 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
     cfg.max_wall = Some(Duration::from_millis(100));
     let enc = encoder();
     let mut first = Runtime::new(cfg.clone(), enc.clone(), model());
-    first.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    first.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let first_report = first.run().unwrap();
     assert!(
-        first_report.agents.iter().all(|a| a.error.is_none()),
+        first_report.instances.iter().all(|a| a.error.is_none()),
         "{first_report:?}"
     );
     let child = crate::shared::inst(cfg.dir.as_ref().unwrap(), "a/child/journal.jsonl");
     let root = crate::shared::inst(cfg.dir.as_ref().unwrap(), "a/journal.jsonl");
-    let mut last = first_report.agents.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
+    let mut last = first_report.instances.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
         .as_u64()
         .unwrap();
     for attempt in 0..3 {
@@ -858,8 +858,8 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
             .unwrap()
             .run()
             .unwrap();
-        assert!(report.agents.iter().all(|a| a.error.is_none()), "{report:?}");
-        let n = report.agents.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
+        assert!(report.instances.iter().all(|a| a.error.is_none()), "{report:?}");
+        let n = report.instances.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
             .as_u64()
             .unwrap();
         assert!(
@@ -880,7 +880,7 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
     std::fs::write(&root, &bytes).unwrap();
     // A bad record is not torn: the agent's own restore refuses it, and its journal is kept.
     let report = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
-    let a = report.agents.iter().find(|a| a.id == "a").unwrap();
+    let a = report.instances.iter().find(|a| a.id == "a").unwrap();
     assert!(
         a.error.as_deref().is_some_and(|e| e.contains("restore failed")),
         "{report:?}"
@@ -902,9 +902,9 @@ fn one_unreadable_journal_does_not_stop_the_fleet() {
     let enc = encoder();
     let mut first = Runtime::new(cfg.clone(), enc.clone(), model());
     for id in ["a", "b", "c"] {
-        first.add_agent(AgentSpec::new(id, json!({}))).unwrap();
+        first.add_instance(InstanceSpec::new(id, json!({}))).unwrap();
     }
-    assert!(first.run().unwrap().agents.iter().all(|a| a.error.is_none()));
+    assert!(first.run().unwrap().instances.iter().all(|a| a.error.is_none()));
     let journal = crate::shared::inst(&dir.0, "run/b/journal.jsonl");
     std::fs::OpenOptions::new()
         .append(true)
@@ -914,7 +914,7 @@ fn one_unreadable_journal_does_not_stop_the_fleet() {
         .unwrap();
     let bytes = std::fs::read(&journal).unwrap();
     let report = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
-    for agent in &report.agents {
+    for agent in &report.instances {
         if agent.id == "b" {
             assert!(
                 agent.error.as_deref().is_some_and(|e| e.contains("restore failed")),
@@ -939,7 +939,7 @@ fn a_second_runtime_cannot_take_a_live_run_directory() {
     cfg.max_wall = Some(Duration::from_millis(600));
     let enc = encoder();
     let mut first = Runtime::new(cfg.clone(), enc.clone(), model());
-    first.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    first.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let running = std::thread::spawn(move || first.run());
     let journal = || crate::shared::find_instance(&dir.0.join("run"), "a").map(|d| d.join("journal.jsonl"));
     while journal().is_none_or(|j| std::fs::metadata(j).map_or(true, |m| m.len() == 0)) {
@@ -953,7 +953,7 @@ fn a_second_runtime_cannot_take_a_live_run_directory() {
         "{err}"
     );
     let mut fresh = Runtime::new(cfg.clone(), enc.clone(), model());
-    fresh.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    fresh.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     assert!(
         fresh
             .run()
@@ -961,11 +961,11 @@ fn a_second_runtime_cannot_take_a_live_run_directory() {
             .is_some_and(|e| e.contains("in use by another runtime"))
     );
     let report = running.join().unwrap().unwrap();
-    assert!(report.agents.iter().all(|a| a.error.is_none()), "{report:?}");
-    let n = report.agents[0].state["__ui"]["@n"].as_u64().unwrap();
+    assert!(report.instances.iter().all(|a| a.error.is_none()), "{report:?}");
+    let n = report.instances[0].state["__ui"]["@n"].as_u64().unwrap();
     let restored = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
     assert!(
-        restored.agents[0].error.is_none() && restored.agents[0].state["__ui"]["@n"].as_u64().unwrap() > n,
+        restored.instances[0].error.is_none() && restored.instances[0].state["__ui"]["@n"].as_u64().unwrap() > n,
         "{restored:?}"
     );
 }
@@ -975,11 +975,11 @@ fn inspection_grants_are_independent_of_other_api_capabilities() {
     let dir = Scratch::new();
     let app=dir.app("export default function Main(){useEffect(()=>{(async()=>{try{await harness.inspect('*');harness.stop('allowed');}catch(e){harness.stop(e.message);}})()},[]);return 'reader';}");
     let mut rt = Runtime::new(config(&app), encoder(), model());
-    let mut spec = AgentSpec::new("reader", json!({}));
+    let mut spec = InstanceSpec::new("reader", json!({}));
     spec.inspect = vec!["*".into()];
     spec.capabilities = Some(vec!["store.*".into()]);
-    rt.add_agent(spec).unwrap();
-    assert_eq!(rt.run().unwrap().agents[0].stopped, Some(json!("allowed")));
+    rt.add_instance(spec).unwrap();
+    assert_eq!(rt.run().unwrap().instances[0].stopped, Some(json!("allowed")));
 }
 
 // Counts this process's threads in `/proc`.
@@ -1013,7 +1013,7 @@ fn completed_runtimes_release_their_background_threads() {
             cfg.max_wall = Some(Duration::from_millis(30));
         }
         let mut rt = Runtime::new(cfg, enc.clone(), model());
-        rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+        rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
         rt.run().unwrap();
     }
     for _ in 0..100 {
@@ -1036,9 +1036,9 @@ fn restore_refuses_a_saved_name_that_is_not_a_name() {
     cfg.dir = Some(dir.0.join("run"));
     let enc = encoder();
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     rt.run().unwrap();
-    let path = crate::shared::inst(&dir.0, "run/a/agent.json");
+    let path = crate::shared::inst(&dir.0, "run/a/instance.json");
     let mut saved: J = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
     saved["id"] = json!("..");
     std::fs::write(&path, saved.to_string()).unwrap();
@@ -1066,7 +1066,7 @@ export default function Main() {
  useEffect(()=>{(async()=>{
   await harness.wait({ms:30}); const first=await harness.inspect('a/kid',{select:['n']});
   setPhase(1); await harness.wait({ms:30}); setPhase(2); await harness.wait({ms:30});
-  const second=await harness.inspect('a/kid',{select:['n'],since:first.since}); setSeen(second.agents['a/kid']);
+  const second=await harness.inspect('a/kid',{select:['n'],since:first.since}); setSeen(second.instances['a/kid']);
  })()},[]);
  return phase===1?'off':<Mount key="kid"><Kid initial={phase===0?1:2}/></Mount>;
 }
@@ -1075,11 +1075,11 @@ export default function Main() {
     let mut cfg = config(&app);
     cfg.dir = Some(dir.0.join("run"));
     let mut rt = Runtime::new(cfg, encoder(), model());
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.inspect = vec!["a/kid".into()];
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    let parent = report.agents.iter().find(|a| a.id == "a").unwrap();
+    let parent = report.instances.iter().find(|a| a.id == "a").unwrap();
     let seen = &parent.state["__ui"]["@seen"];
     assert_eq!(seen["version"], 0, "both incarnations have empty journals");
     assert_eq!(seen["changed"], true);

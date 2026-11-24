@@ -269,7 +269,7 @@ fn generic_runtime_binary_runs_an_app_from_config() {
     assert_eq!(report["complete"], true, "{report}");
     assert_eq!(
         (
-            report["agents"].as_u64(),
+            report["instances"].as_u64(),
             report["turns"].as_u64(),
             report["rewrites"].as_u64()
         ),
@@ -310,7 +310,7 @@ fn the_binary_runs_a_root_app_that_mounts_a_fleet_on_a_machine_pool() {
         .unwrap();
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let report: J = serde_json::from_slice(&out.stdout).unwrap();
-    let ids: Vec<&str> = report["per_agent"]
+    let ids: Vec<&str> = report["per_instance"]
         .as_array()
         .unwrap()
         .iter()
@@ -325,7 +325,7 @@ fn the_binary_runs_a_root_app_that_mounts_a_fleet_on_a_machine_pool() {
     // Each agent ran its shell on the machine the root handed it (one of the pool).
     for n in 0..3 {
         let spec: J = serde_json::from_slice(
-            &std::fs::read(crate::shared::inst(&dir, &format!("root/agent-{n}/agent.json"))).unwrap(),
+            &std::fs::read(crate::shared::inst(&dir, &format!("root/agent-{n}/instance.json"))).unwrap(),
         )
         .unwrap();
         assert_eq!(spec["machines"], json!([format!("vm-{n:02}")]));
@@ -427,11 +427,11 @@ fn help_and_a_failed_agent_fail_the_run() {
         .unwrap();
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        !out.status.success() && stderr.contains("1 of 1 agents failed") && stderr.contains("a: "),
+        !out.status.success() && stderr.contains("1 of 1 instances failed") && stderr.contains("a: "),
         "{stderr}"
     );
     let report: J = serde_json::from_slice(&out.stdout).unwrap();
-    assert!(report["per_agent"][0]["error"].is_string(), "{report}");
+    assert!(report["per_instance"][0]["error"].is_string(), "{report}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
