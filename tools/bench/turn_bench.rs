@@ -12,7 +12,7 @@
 //! model call is out, and each row also reports the agent's time for it (`event_ms_median`).
 use affordance::View;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::json;
 use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
@@ -46,7 +46,7 @@ fn main() {
         (10_000_000, 5_000_000)
     };
     let props = json!({"id": "agent-0001", "n_agents": 1, "task": "Keep the build green.", "c_hi": c_hi, "c_lo": c_lo});
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: Some(
@@ -63,7 +63,7 @@ fn main() {
         machines: vec!["home".into()],
         model: Some("default".into()),
     };
-    let mut agent = Agent::new(cfg).unwrap();
+    let mut agent = Instance::new(cfg).unwrap();
     let eos = enc
         .token_id("<｜end▁of▁sentence｜>")
         .or_else(|| enc.token_id("<|observation|>"))
@@ -129,7 +129,7 @@ fn main() {
     while let Some(cmd) = queue.pop_front() {
         clock += 10;
         if let (true, Command::Generate { ids, .. }) = (dump, &cmd) {
-            println!("prompt {}", affordance::runtime::agent::prompt_hash(ids));
+            println!("prompt {}", affordance::runtime::instance::prompt_hash(ids));
         }
         let input = match cmd {
             // A summary render (the fold): answered with a short summary, not counted as a turn.
@@ -229,7 +229,7 @@ fn main() {
                             Input::Event {
                                 name: "message".into(),
                                 payload: json!({"from": "agent-0002", "text": format!("status {turn}?")}),
-                                op: None,
+                                id: None,
                                 clock_ms: clock,
                             },
                         )

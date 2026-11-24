@@ -634,6 +634,9 @@ impl<'p> Interp<'p> {
                         // laid out at a guess: `Err` says why, and its alt text stands in.
                         // A video laid out by its frames is not a run of one token: its ids.
                         let mut video_ids: Option<Vec<u32>> = None;
+                        // A bug in a size rule or its tokens (not a file that is missing or too big
+                        // for its max-tokens) fails the render: alt text would hide it.
+                        let mut broken: Option<String> = None;
                         let placed: Result<usize, String> = if let Some(n) = style.tok_size {
                             Ok(n)
                         } else {
@@ -750,9 +753,16 @@ impl<'p> Interp<'p> {
                                 }
                                 (Some(rule @ crate::media::Metrics::Named { .. }), Some(src)) if &**tag == "img" => {
                                     crate::media::natural_size(src).and_then(|natural| {
-                                        let pieces = crate::media::named_layout(&rule, natural, cap)?
+                                        let mut fail = |why: String| {
+                                            broken = Some(why.clone());
+                                            why
+                                        };
+                                        let pieces = crate::media::named_layout(&rule, natural, cap)
+                                            .map_err(&mut fail)?
                                             .ok_or_else(|| "it does not fit its max-tokens".to_string())?;
-                                        let enc = self.encoder.ok_or("a picture is laid out with its model's tokenizer")?;
+                                        let enc = self
+                                            .encoder
+                                            .ok_or_else(|| fail("a picture is laid out with its model's tokenizer".into()))?;
                                         let mut ids = vec![];
                                         for piece in &pieces {
                                             match piece {
@@ -761,11 +771,14 @@ impl<'p> Interp<'p> {
                                                     let n = crate::media::piece_tokens(piece);
                                                     if let Some(text) = name.strip_prefix("text:") {
                                                         for _ in 0..n {
-                                                            let encoded = enc.tok.encode(text, false).map_err(|e| e.to_string())?;
+                                                            let encoded = enc.tok.encode(text, false).map_err(|e| fail(e.to_string()))?;
                                                             ids.extend_from_slice(encoded.get_ids());
                                                         }
                                                     } else {
-                                                        let token = self.special_id(name)?;
+                                                        // An added token, or one of the vocabulary's own (a line end, `Ċ`).
+                                                        let token = self.special_id(name).ok().or_else(|| enc.token_id(name)).ok_or_else(|| {
+                                                            fail(format!("the picture's marker {name:?} is not a token of this model"))
+                                                        })?;
                                                         ids.extend(std::iter::repeat_n(token, n));
                                                     }
                                                 }
@@ -779,6 +792,9 @@ impl<'p> Interp<'p> {
                                 (Some(_), Some(_)) => Err(format!("this model's size rule is not one for {what}")),
                             }
                         };
+                        if let Some(why) = broken {
+                            return err(format!("<{tag}>: {why}"));
+                        }
                         match placed {
                             Ok(n) => {
                                 let ids = video_ids.unwrap_or_else(|| vec![id; n]);

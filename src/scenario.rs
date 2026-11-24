@@ -38,7 +38,7 @@
 use crate::View;
 use crate::effects::Outcome;
 use crate::emit::Encoder;
-use crate::runtime::{Agent, AgentConfig, Command, Input};
+use crate::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -58,7 +58,7 @@ pub struct Report {
 struct Run<'a> {
     view: &'a View,
     enc: &'a Encoder,
-    agent: Agent,
+    agent: Instance,
     clock: i64,
     syntax: String,
     /// Open model calls: (task, prompt ids, stop ids).
@@ -276,7 +276,7 @@ impl<'a> Run<'a> {
             return self.feed(Input::Event {
                 name: name.into(),
                 payload,
-                op: None,
+                id: None,
                 clock_ms: clock,
             });
         }
@@ -431,7 +431,7 @@ pub fn run(app: &Path, entry: &str, enc: &Encoder, scenario: &J) -> Result<Repor
     let library = crate::library::for_app(app)?;
     let templates: Vec<String> = scenario["template"].as_str().map(str::to_string).into_iter().collect();
     let view = View::load_for(app, entry, enc, &[library], &templates)?;
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         // `"template": "messages"`: the app runs as on a hosted chat binding (what `affordance
@@ -455,7 +455,7 @@ pub fn run(app: &Path, entry: &str, enc: &Encoder, scenario: &J) -> Result<Repor
         machines: vec!["home".into()],
         model: Some("default".into()),
     };
-    let mut agent = Agent::new(cfg)?;
+    let mut agent = Instance::new(cfg)?;
     let start = agent.start(&view, enc)?;
     let mut r = Run {
         view: &view,

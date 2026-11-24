@@ -19,12 +19,11 @@ const fn path(name: &'static str) -> Field {
 
 /// The top level of a deployment.
 pub const TOP: &[Field] = &[
-    f("root"),
     f("app"),
+    f("instances"),
     f("model"),
     f("models"),
     f("machines"),
-    f("agents"),
     path("dir"),
     f("workers"),
     f("input_batch"),
@@ -43,8 +42,8 @@ pub const TOP: &[Field] = &[
     path("library"),
 ];
 
-/// One agent (an entry of `agents`, or `root`). `agents` as a table also takes `count`.
-pub const AGENT: &[Field] = &[
+/// One instance (an entry of `instances`; `count` makes copies of it).
+pub const INSTANCE: &[Field] = &[
     f("id"),
     f("props"),
     f("env"),
@@ -57,7 +56,7 @@ pub const AGENT: &[Field] = &[
     f("max_prompt"),
     f("rank"),
     f("seed"),
-    f("index"),
+    f("count"),
     path("app"),
     f("entry"),
     f("model"),
@@ -71,7 +70,7 @@ pub const MODEL_PATHS: &[&str] = &["tokenizer", "key_file"];
 /// `serve`.
 pub const SERVE: &[Field] = &[f("listen"), f("max_body_bytes"), f("timeout_s")];
 
-const LOCAL: &[Field] = &[f("kind"), path("home"), f("timeout_s"), f("count")];
+const LOCAL: &[Field] = &[f("kind"), path("home"), f("per_instance"), f("timeout_s"), f("count")];
 const SSH: &[Field] = &[
     f("kind"),
     f("target"),
@@ -82,7 +81,15 @@ const SSH: &[Field] = &[
     f("count"),
 ];
 const DOCKER: &[Field] = &[f("kind"), f("image"), f("name"), f("timeout_s"), f("count")];
-const BWRAP: &[Field] = &[f("kind"), path("home"), f("network"), f("timeout_s"), f("count")];
+const BWRAP: &[Field] = &[
+    f("kind"),
+    path("home"),
+    f("per_instance"),
+    f("network"),
+    f("read"),
+    f("timeout_s"),
+    f("count"),
+];
 const COMMAND: &[Field] = &[f("kind"), f("argv"), f("max_reply_bytes")];
 
 /// A machine of `kind`. An `http` machine's fields are its own type's (`HttpConfig`); an unknown
@@ -113,17 +120,14 @@ pub fn check(value: &J, fields: &[Field], also: &[&str], what: &str) -> Result<(
 /// Every level of a deployment names only fields that exist. Run by `config` and by `run`.
 pub fn validate(config: &J) -> Result<(), String> {
     check(config, TOP, &[], "deployment")?;
-    if !config["root"].is_null() {
-        check(&config["root"], AGENT, &[], "root")?;
-    }
-    match &config["agents"] {
+    match &config["instances"] {
         J::Null => {}
         J::Array(list) => {
-            for (n, agent) in list.iter().enumerate() {
-                check(agent, AGENT, &[], &format!("agent {n}"))?;
+            for (n, instance) in list.iter().enumerate() {
+                check(instance, INSTANCE, &[], &format!("instance {n}"))?;
             }
         }
-        table => check(table, AGENT, &["count"], "agents")?,
+        _ => return Err("instances must be a list of instances".into()),
     }
     for (role, spec) in config["machines"].as_object().into_iter().flatten() {
         let kind = spec["kind"].as_str().unwrap_or("");

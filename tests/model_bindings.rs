@@ -415,14 +415,14 @@ fn a_failed_attempt_is_aborted_with_the_key_and_the_next_keeps_the_provider_opti
     assert_ne!(generations[0].body["rid"], generations[1].body["rid"]);
 }
 
-fn cli(config: &J, file: &std::path::Path, capture: &std::path::Path, resume: bool) -> std::process::Output {
+fn cli(config: &J, file: &std::path::Path, capture: &std::path::Path, restore: bool) -> std::process::Output {
     // The apps are written to a scratch directory and import the repository's views.
     let mut config = config.clone();
     config["library"] = json!(env!("CARGO_MANIFEST_DIR"));
     std::fs::write(file, config.to_string()).unwrap();
     let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_affordance"));
     command.arg("run").arg(file).env("AFFORDANCE_CAPTURE_DIR", capture);
-    command.arg(if resume { "--resume" } else { "--fresh" });
+    command.arg(if restore { "--restore" } else { "--fresh" });
     command.output().unwrap()
 }
 fn texts(path: &std::path::Path) -> String {
@@ -456,14 +456,14 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let run = files.0.join("run");
     let capture = files.0.join("capture");
     let path = files.0.join("deployment.json");
-    let mut config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},"model":a,"models":{"A":a,"B":b,"C":c},"agents":[{"id":"one","model":"A"},{"id":"two","model":"B"},{"id":"three","model":"C"}],"dir":run,"replay":"strict","max_wall_s":5});
+    let mut config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},"model":a,"models":{"A":a,"B":b,"C":c},"instances":[{"id":"one","model":"A"},{"id":"two","model":"B"},{"id":"three","model":"C"}],"dir":run,"replay":"strict","max_wall_s":5});
     let first = cli(&config, &path, &capture, false);
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
     let report: J = serde_json::from_slice(&first.stdout).unwrap();
     assert_eq!(report["turns"], 3);
     assert_eq!(report["model_errors"], 0);
     assert!(
-        report["per_agent"]
+        report["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -490,7 +490,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     assert!(restored.status.success());
     let restored: J = serde_json::from_slice(&restored.stdout).unwrap();
     assert!(
-        restored["per_agent"]
+        restored["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -502,7 +502,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     config["models"]["A"]["provider_options"]["lora_path"] = json!("changed");
     let changed = cli(&config, &path, &capture, true);
     let changed: J = serde_json::from_slice(&changed.stdout).unwrap();
-    let one = changed["per_agent"]
+    let one = changed["per_instance"]
         .as_array()
         .unwrap()
         .iter()
@@ -517,7 +517,8 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let stored = texts(&run) + &texts(&capture) + &String::from_utf8(first.stdout).unwrap();
     assert!(!stored.contains("fixture-secret-"));
     assert!(texts(&capture).contains("[redacted]"));
-    let pins: J = serde_json::from_slice(&std::fs::read(run.join("one/agent.json")).unwrap()).unwrap();
+    let pins: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&run, "one/instance.json")).unwrap()).unwrap();
     assert_eq!(pins["pins"]["model"].as_str().unwrap().len(), 64);
     // The digest does not depend on credential contents; rotation keeps completed recovery valid.
     config["models"]["A"]["provider_options"]["lora_path"] = json!("variant-a");
@@ -525,7 +526,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let rotated = cli(&config, &path, &capture, true);
     let rotated: J = serde_json::from_slice(&rotated.stdout).unwrap();
     assert!(
-        rotated["per_agent"]
+        rotated["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -534,13 +535,13 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     );
     assert_eq!(native.requests().len(), 2);
     // How a server is reached is not which model answers: other timeouts, retries and sampling
-    // resume strictly (an operational change must not make a fleet unresumable).
+    // restore strictly (an operational change must not make a fleet unrestorable).
     let mut moved = config.clone();
     moved["models"]["A"]["request_timeout_s"] = json!(77);
     moved["models"]["A"]["sampling"]["temperature"] = json!(0.3);
     let moved: J = serde_json::from_slice(&cli(&moved, &path, &capture, true).stdout).unwrap();
     assert!(
-        moved["per_agent"]
+        moved["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -549,18 +550,35 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     );
     assert_eq!(native.requests().len(), 2);
     // A crash before the first reply leaves only that agent's generation outstanding.
-    let journal = run.join("one/journal.jsonl");
+    let journal = crate::shared::inst(&run, "one/journal.jsonl");
     let recorded = std::fs::read_to_string(&journal).unwrap();
     let prefix = recorded
         .lines()
         .take_while(|line| serde_json::from_str::<J>(line).unwrap()["input"] != "reply")
         .collect::<Vec<_>>()
         .join("\n");
-    std::fs::write(&journal, if prefix.is_empty() { prefix } else { prefix + "\n" }).unwrap();
+    let prefix = if prefix.is_empty() { prefix } else { prefix + "\n" };
+    std::fs::write(&journal, &prefix).unwrap();
+    // The commit log such a crash leaves: the last commit made, with this agent's journal at its
+    // prefix and every other file as it is.
+    let mut journals = serde_json::Map::new();
+    for id in ["one", "two", "three"] {
+        let saved: J = serde_json::from_slice(
+            &std::fs::read(crate::shared::instance_dir(&run, id).join("instance.json")).unwrap(),
+        )
+        .unwrap();
+        let len = std::fs::metadata(crate::shared::instance_dir(&run, id).join("journal.jsonl")).map_or(0, |m| m.len());
+        journals.insert(id.into(), json!([saved["incarnation"], len]));
+    }
+    std::fs::write(
+        run.join("commit.jsonl"),
+        format!("{}\n", json!({"epoch": 1, "journals": journals, "stores": {}})),
+    )
+    .unwrap();
     let outstanding = cli(&config, &path, &capture, true);
     let outstanding: J = serde_json::from_slice(&outstanding.stdout).unwrap();
     assert!(
-        outstanding["per_agent"]
+        outstanding["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -573,7 +591,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     assert!(last.headers.contains("Bearer rotated-fixture-secret"));
     assert_eq!(last.body["lora_path"], "variant-a");
     // Warning recovery of an unpinned journal cannot manufacture a strict identity pin.
-    let saved = run.join("one/agent.json");
+    let saved = crate::shared::inst(&run, "one/instance.json");
     let mut legacy: J = serde_json::from_slice(&std::fs::read(&saved).unwrap()).unwrap();
     legacy.as_object_mut().unwrap().remove("pins");
     std::fs::write(&saved, legacy.to_string()).unwrap();
@@ -586,7 +604,7 @@ fn cli_named_bindings_recover_without_reissuing_replies_and_pin_identity() {
     let strict = cli(&config, &path, &capture, true);
     let strict: J = serde_json::from_slice(&strict.stdout).unwrap();
     assert!(
-        strict["per_agent"]
+        strict["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -883,17 +901,18 @@ fn one_retry_policy_is_stated_in_the_deployment_or_on_the_call() {
         });
         let config = json!({"app":{"view":write(name, call),"tokenizer":tokenizer::path()},
           "model":{"kind":"completions","url":peer.url,"name":"test","stream":false,"retry":binding},
-          "agents":[{"id":"a"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":20,"replay":"strict"});
+          "instances":[{"id":"a"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":20,"replay":"strict"});
         let path = files.0.join(format!("{name}.json"));
         let output = cli(&config, &path, &files.0.join(format!("capture-{name}")), false);
         let report: J = serde_json::from_slice(&output.stdout)
             .unwrap_or_else(|_| panic!("{name}: {}", String::from_utf8_lossy(&output.stderr)));
-        let reason = &report["per_agent"][0]["stopped"];
+        let reason = &report["per_instance"][0]["stopped"];
         assert_eq!(reason.get("reason").unwrap_or(reason), stopped, "{name}: {report}");
         let calls = peer.requests().iter().filter(|w| w.path == "/v1/completions").count();
         assert_eq!(calls, requests, "{name}");
-        // Each failure is in the trace with its kind, and a resumed run makes no new request.
-        let trace = std::fs::read_to_string(files.0.join(format!("run-{name}/a/trace.jsonl"))).unwrap();
+        // Each failure is in the trace with its kind, and a restored run makes no new request.
+        let trace =
+            std::fs::read_to_string(crate::shared::inst(&files.0, &format!("run-{name}/a/trace.jsonl"))).unwrap();
         assert_eq!(
             trace.matches(r#""kind":"busy""#).count(),
             requests.min(2),
@@ -901,13 +920,13 @@ fn one_retry_policy_is_stated_in_the_deployment_or_on_the_call() {
         );
         cli(&config, &path, &files.0.join(format!("capture-{name}")), true);
         let calls = peer.requests().iter().filter(|w| w.path == "/v1/completions").count();
-        assert_eq!(calls, requests, "{name}: a resumed run replays its journaled failures");
+        assert_eq!(calls, requests, "{name}: a restored run replays its journaled failures");
     }
     // A policy that cannot be read is refused when the deployment is loaded.
     let peer = Peer::stock();
     let config = json!({"app":{"view":write("bad", "{}"),"tokenizer":tokenizer::path()},
       "model":{"kind":"completions","url":peer.url,"name":"test","retry":{"on":["sometimes"]}},
-      "agents":[{"id":"a"}],"dir":files.0.join("run-bad")});
+      "instances":[{"id":"a"}],"dir":files.0.join("run-bad")});
     let output = cli(&config, &files.0.join("bad.json"), &files.0.join("capture-bad"), false);
     assert!(!output.status.success());
     assert!(
@@ -946,7 +965,7 @@ fn a_token_id_servers_retry_after_is_the_least_the_next_attempt_waits() {
         });
         let config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},
           "model":{"kind":"completions","url":peer.url,"name":"test","stream":streaming,"retry":{"wait_s":[0.02,0.05]}},
-          "agents":[{"id":"a"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":20,"replay":"strict"});
+          "instances":[{"id":"a"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":20,"replay":"strict"});
         let output = cli(
             &config,
             &files.0.join(format!("{name}.json")),
@@ -958,7 +977,8 @@ fn a_token_id_servers_retry_after_is_the_least_the_next_attempt_waits() {
             "{name}: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        let trace = std::fs::read_to_string(files.0.join(format!("run-{name}/a/trace.jsonl"))).unwrap();
+        let trace =
+            std::fs::read_to_string(crate::shared::inst(&files.0, &format!("run-{name}/a/trace.jsonl"))).unwrap();
         assert!(trace.contains(r#""retry_in_ms":1000"#), "{name}: {trace}");
     }
 }
@@ -990,14 +1010,14 @@ fn completions_capture_each_attempt_and_stream_event_without_credentials() {
         let config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},
           "model":{"kind":"completions","url":peer.url,"name":"test","stream":streaming,"retry":{"wait_s":[0.05,1]},
             "key_file":files.credentials(name),"key_name":"KEY"},
-          "agents":[{"id":"native-agent"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":5,"replay":"strict"});
+          "instances":[{"id":"native-agent"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":5,"replay":"strict"});
         let path = files.0.join(format!("{name}.json"));
         let output = cli(&config, &path, &capture, false);
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         let report: J = serde_json::from_slice(&output.stdout).unwrap();
-        assert_eq!(report["per_agent"][0]["stopped"], "done", "{report}");
+        assert_eq!(report["per_instance"][0]["stopped"], "done", "{report}");
         let mut attempts = std::collections::BTreeMap::<String, std::collections::BTreeMap<String, J>>::new();
-        for entry in std::fs::read_dir(capture.join("native-agent")).unwrap() {
+        for entry in std::fs::read_dir(capture.join("i-native-agent")).unwrap() {
             let path = entry.unwrap().path();
             assert_eq!(path.extension().unwrap(), "json", "no temporary capture remains");
             let record: J = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
@@ -1069,18 +1089,18 @@ fn chat_captures_requests_responses_and_usage_without_credentials() {
     let config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},
       "model":{"kind":"chat","context":200000,"url":peer.url,"model":"test","key_file":files.credentials("chat-capture"),"key_name":"KEY",
         "headers":{"HTTP-Referer":"https://example.test/","X-Title":"Affordance"}},
-      "agents":[{"id":"chat-agent"}],"dir":run,"max_wall_s":5,"replay":"strict"});
+      "instances":[{"id":"chat-agent"}],"dir":run,"max_wall_s":5,"replay":"strict"});
     let path = files.0.join("deployment.json");
     let output = cli(&config, &path, &capture, false);
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
     let report: J = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["model_errors"], 0, "{report}");
     assert!(
-        capture.join("chat-agent/child").is_dir(),
+        capture.join("i-chat-agent_2fchild").is_dir(),
         "model call did not capture: {report}; {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let paths: Vec<_> = std::fs::read_dir(capture.join("chat-agent/child"))
+    let paths: Vec<_> = std::fs::read_dir(capture.join("i-chat-agent_2fchild"))
         .unwrap()
         .map(|e| e.unwrap().path())
         .collect();
@@ -1134,7 +1154,7 @@ export default function Main(){{return <><Mount key='native' model='native'><Chi
     let native =
         json!({"kind":"sglang","url":peer.url,"tokenizer":tokenizer::path(),"stream":false,"template":"glm53"});
     let hosted = json!({"kind":"chat","context":200000,"url":peer.url,"tokenizer":tokenizer::path(),"model":"test","key_file":files.credentials("presentation"),"key_name":"KEY"});
-    let mut config = json!({"root":{"app":app},"model":native,"models":{"native":native,"hosted":hosted},
+    let mut config = json!({"instances":[{"id":"root","app":app}],"model":native,"models":{"native":native,"hosted":hosted},
         "dir":files.0.join("run"),"max_wall_s":5,"replay":"strict"});
     let path = files.0.join("deployment.json");
     let capture = files.0.join("capture");
@@ -1142,7 +1162,7 @@ export default function Main(){{return <><Mount key='native' model='native'><Chi
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
     let report: J = serde_json::from_slice(&first.stdout).unwrap();
     for (child, template) in [("native", "glm53"), ("hosted", "messages")] {
-        let agent = report["per_agent"]
+        let agent = report["per_instance"]
             .as_array()
             .unwrap()
             .iter()
@@ -1217,12 +1237,12 @@ export default function Main(){{
     let mut config = json!({"app":{"view":app,"tokenizer":tokenizer::path()},
       "model":{"kind":"anthropic","context":200000,"url":peer.url,"model":"claude-test","key_file":files.credentials("claude"),"key_name":"KEY",
         "headers":{"anthropic-beta":"thinking-binding-controls-2026-08-01"}},
-      "agents":[{"id":"claude"}],"dir":files.0.join("run"),"max_wall_s":5,"replay":"strict"});
+      "instances":[{"id":"claude"}],"dir":files.0.join("run"),"max_wall_s":5,"replay":"strict"});
     let path = files.0.join("deployment.json");
     let first = cli(&config, &path, &capture, false);
     assert!(first.status.success(), "{}", String::from_utf8_lossy(&first.stderr));
     let report: J = serde_json::from_slice(&first.stdout).unwrap();
-    let agent = &report["per_agent"][0];
+    let agent = &report["per_instance"][0];
     assert_eq!(agent["error"], J::Null, "{report}");
     assert_eq!(agent["stopped"]["binding"]["template"], "messages");
     assert_eq!(
@@ -1256,7 +1276,7 @@ export default function Main(){{
     assert!(stored.contains("credential_diagnostic") && stored.contains(r#"["x-api-key","[redacted]"]"#));
     assert!(cli(&config, &path, &capture, true).status.success());
     assert_eq!(peer.requests().len(), 2, "replay must not make provider calls");
-    // How the provider is reached (here its cache TTL) is not the model: a strict resume goes on.
+    // How the provider is reached (here its cache TTL) is not the model: a strict restore goes on.
     config["model"]["cache_ttl"] = json!("1h");
     assert!(cli(&config, &path, &capture, true).status.success());
     // Another model is: refused.
@@ -1311,7 +1331,7 @@ fn captures_are_best_effort_and_streams_capture_their_response() {
             json!({"kind":"sglang","url":peer.url,"stream":streaming})
         };
         let config = json!({"app":{"view":if kind == "chat" {&chat} else {&native},"tokenizer":tokenizer::path()},"model":model,
-          "agents":[{"id":"agent"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":5,"replay":"strict"});
+          "instances":[{"id":"agent"}],"dir":files.0.join(format!("run-{name}")),"max_wall_s":5,"replay":"strict"});
         let capture = if name == "captured" {
             files.0.join("captures")
         } else {
@@ -1321,7 +1341,7 @@ fn captures_are_best_effort_and_streams_capture_their_response() {
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         let report: J = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(
-            (&report["per_agent"][0]["stopped"], &report["model_errors"]),
+            (&report["per_instance"][0]["stopped"], &report["model_errors"]),
             (&json!("done"), &json!(0)),
             "{name}: {report}"
         );
@@ -1329,7 +1349,7 @@ fn captures_are_best_effort_and_streams_capture_their_response() {
         assert_eq!(paths.len(), 1, "{name}: one request, no resend or abort: {paths:?}");
         if name == "captured" {
             assert_eq!(report["capture_errors"], 0);
-            let mut kinds: Vec<_> = std::fs::read_dir(capture.join("agent"))
+            let mut kinds: Vec<_> = std::fs::read_dir(capture.join("i-agent"))
                 .unwrap()
                 .map(|e| {
                     e.unwrap()
@@ -1365,7 +1385,7 @@ fn hosted_captures_do_not_name_the_server() {
     let port = 9;
     let config = json!({"app":{"view":chat_app(&files),"tokenizer":tokenizer::path()},
       "model":{"kind":"chat","context":200000,"url":format!("http://127.0.0.1:{port}"),"model":"test","key_file":files.credentials("closed"),"key_name":"KEY"},
-      "agents":[{"id":"agent"}],"dir":files.0.join("run"),"max_wall_s":2,"replay":"strict"});
+      "instances":[{"id":"agent"}],"dir":files.0.join("run"),"max_wall_s":2,"replay":"strict"});
     let capture = files.0.join("captures");
     cli(&config, &files.0.join("closed.json"), &capture, false);
     let captured = texts(&capture);
@@ -1489,12 +1509,12 @@ fn a_hosted_request_ignores_the_users_curlrc() {
     assert_eq!(peer.requests().len(), 1, "the provider saw the request");
 }
 
-/// While an agent's model call retries a transient failure (here a serving outage), the status
-/// feed (`observed.json`) shows it `retrying`, with its failures so far and their kind, and
+/// While an agent's model call retries a transient failure (here a serving outage), the run's
+/// status (`Control::status`) shows it `retrying`, with its failures so far and their kind, and
 /// healthy: an outage is retried for as long as it lasts. Once the server answers, it goes on.
 #[test]
 fn a_retrying_agent_shows_in_the_status_feed() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     let files = Scratch::new();
     let up = Arc::new(AtomicBool::new(false));
     let serving = up.clone();
@@ -1516,17 +1536,14 @@ fn a_retrying_agent_shows_in_the_status_feed() {
     let mut model = Sglang::new(&peer.url, 1);
     model.stream = false;
     let mut rt = Runtime::new(cfg, Arc::new(tokenizer::encoder()), Arc::new(model));
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
+    let control = rt.control();
     let run = std::thread::spawn(move || rt.run().unwrap());
-    let observed = files.0.join("run/observed.json");
     let started = std::time::Instant::now();
     let agent = loop {
         assert!(started.elapsed() < Duration::from_secs(30), "never shown retrying");
-        let status: J = std::fs::read(&observed)
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or(J::Null);
-        let agent = status["agents"][0].clone();
+        let status = control.status();
+        let agent = status["instances"][0].clone();
         if agent["state"] == "retrying" && agent["retrying"]["failures"].as_u64() >= Some(2) {
             break agent;
         }
@@ -1540,7 +1557,7 @@ fn a_retrying_agent_shows_in_the_status_feed() {
     assert!(!agent.to_string().contains("127.0.0.1"), "{agent}");
     up.store(true, Ordering::SeqCst);
     let report = run.join().unwrap();
-    assert_eq!(report.agents[0].stopped, Some(json!({"reason": "done"})));
+    assert_eq!(report.instances[0].stopped, Some(json!({"reason": "done"})));
 }
 
 /// A model server that answers `/v1/models` and `/get_server_info` with these bodies (HTTP 404
@@ -1570,11 +1587,11 @@ fn served(window: usize) -> J {
 }
 
 /// A native binding's window is the server's (a page's viewport is its screen's): asked once,
-/// when the binding is validated. The runtime reports it (stderr, `observed.json`), lays prompts
+/// when the binding is validated. The runtime reports it (stderr, `Control::status`), lays prompts
 /// out in it, and never sends a prompt over it: the call fails with a ContextError instead.
 #[test]
 fn a_native_binding_takes_its_window_from_the_server_and_never_sends_a_prompt_over_it() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     let peer = reporting(served(4096), J::Null);
     let enc = Arc::new(tokenizer::encoder());
     let model = from_config(&json!({"kind":"sglang","url":peer.url,"stream":false}), enc.clone()).unwrap();
@@ -1604,13 +1621,14 @@ fn a_native_binding_takes_its_window_from_the_server_and_never_sends_a_prompt_ov
     cfg.max_wall = Some(Duration::from_secs(60));
     let mut rt = Runtime::new(cfg, enc, model);
     for (id, words) in [("small", 100), ("large", 6000)] {
-        let mut spec = AgentSpec::new(id, json!({"words": words}));
+        let mut spec = InstanceSpec::new(id, json!({"words": words}));
         spec.max_new = 256;
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
+    let control = rt.control();
     let report = rt.run().unwrap();
     let stopped = |id: &str| {
-        let a = report.agents.iter().find(|a| a.id == id).unwrap();
+        let a = report.instances.iter().find(|a| a.id == id).unwrap();
         a.stopped
             .clone()
             .unwrap_or_else(|| panic!("{id}: {:?} {}", a.error, a.state))
@@ -1630,9 +1648,8 @@ fn a_native_binding_takes_its_window_from_the_server_and_never_sends_a_prompt_ov
         1,
         "only the prompt in the window was sent"
     );
-    let observed: J = serde_json::from_slice(&std::fs::read(files.0.join("run/observed.json")).unwrap()).unwrap();
     assert_eq!(
-        observed["models"],
+        control.status()["models"],
         json!({"default": {"context": 4096, "source": "server /v1/models"}})
     );
 }
@@ -1804,7 +1821,7 @@ fn the_window_falls_through_to_get_server_info() {
 }
 
 /// The window is part of the binding's identity, as it was when configured: a fleet that drops
-/// its hand-set `context` once the server reports the same one keeps its resume pin.
+/// its hand-set `context` once the server reports the same one keeps its restore pin.
 #[test]
 fn a_window_the_server_reports_keeps_the_pin_of_the_same_window_configured() {
     use affordance::runtime::model::{ModelTemplate, with_context, with_template};

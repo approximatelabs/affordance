@@ -24,7 +24,7 @@ An agent that reads its task, may run shell commands on this machine, and stops 
 
 The report prints when the agent stops: `"stopped": {"answer": "..."}`. It stops when it calls
 `answer`, or when it replies with no tool call (that reply is then the answer). Its journal and trace
-are in `.affordance/first/`; `affordance run --resume` continues the run, `--fresh` starts over.
+are in `.affordance/first/`; `affordance run --restore` continues the run, `--fresh` starts over.
 
 For a hosted API, set `url`, `model` and `context`, and `key_env: NAME` for the environment
 variable that holds its key. `affordance config` shows what a run will use.

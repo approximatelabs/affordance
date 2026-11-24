@@ -2,9 +2,9 @@
 use crate::tokenizer;
 use affordance::{
     View,
-    runtime::{Agent, AgentConfig, Command, Input},
+    runtime::{Command, Input, Instance, InstanceConfig},
 };
-use serde_json::json;
+use serde_json::{Value as J, json};
 use std::{collections::BTreeMap, path::PathBuf};
 
 struct Files(PathBuf);
@@ -30,8 +30,8 @@ impl Drop for Files {
         let _ = std::fs::remove_dir_all(&self.0);
     }
 }
-fn config() -> AgentConfig {
-    AgentConfig {
+fn config() -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         id: "a".into(),
@@ -51,7 +51,7 @@ fn event(name: &str, clock_ms: i64) -> Input {
     Input::Event {
         name: name.into(),
         payload: json!({}),
-        op: None,
+        id: None,
         clock_ms,
     }
 }
@@ -66,11 +66,11 @@ fn render_reuse_observes_fields_escapes_dates_and_fresh_handler_globals() {
         ("const context=harness;return String(context.clock_ms);", true),
         ("return JSON.stringify(harness);", true),
         ("return formatNow('%S');", true),
-        ("return String(harness.agent);", false),
+        ("return String(harness.instance);", false),
     ] {
         let files = Files::new();
         let view=files.view(&format!("export default function Main(){{useEvent('finish',()=>harness.stop({{clock:harness.clock_ms}}));{body}}}"),&enc);
-        let mut agent = Agent::new(config()).unwrap();
+        let mut agent = Instance::new(config()).unwrap();
         agent.start(&view, &enc).unwrap();
         let evaluations = agent.render_stats.evaluations;
         agent.handle(&view, &enc, Input::Tick { clock_ms: 10_000 }).unwrap();
@@ -84,12 +84,12 @@ fn render_reuse_observes_fields_escapes_dates_and_fresh_handler_globals() {
     }
     let files = Files::new();
     let view=files.view("export default function Main(){const context=harness;useEvent('finish',()=>harness.stop(context.clock_ms));return 'capture';}",&enc);
-    let mut agent = Agent::new(config()).unwrap();
+    let mut agent = Instance::new(config()).unwrap();
     agent.start(&view, &enc).unwrap();
     agent.handle(&view, &enc, event("finish", 20_000)).unwrap();
     assert_eq!(agent.stopped(), Some(&json!(20_000)));
     let view=files.view("export default function Main(){const roles=harness.machines;useEvent('finish',()=>harness.stop(Object.is(roles,harness.machines)));return 'captured field';}",&enc);
-    let mut agent = Agent::new(config()).unwrap();
+    let mut agent = Instance::new(config()).unwrap();
     agent.start(&view, &enc).unwrap();
     agent.handle(&view, &enc, event("finish", 20_000)).unwrap();
     assert_eq!(agent.stopped(), Some(&json!(true)));
@@ -107,7 +107,7 @@ fn an_input_frame_drains_member_microtasks_and_commits_effects_once_and_replays(
     }"#,
         &enc,
     );
-    let mut agent = Agent::new(config()).unwrap();
+    let mut agent = Instance::new(config()).unwrap();
     let initial = agent.start(&view, &enc).unwrap();
     assert!(
         initial
@@ -119,12 +119,27 @@ fn an_input_frame_drains_member_microtasks_and_commits_effects_once_and_replays(
     };
     let next = agent.handle(&view, &enc, input.clone()).unwrap();
     let state = agent.state();
+    // How inputs are batched never changes what the app computes: the batch gives what the same
+    // two events give one at a time (a captured `direct` too), with each one's effects pass.
+    let mut alone = Instance::new(config()).unwrap();
+    alone.start(&view, &enc).unwrap();
+    let mut each = alone.handle(&view, &enc, event("inc", 10)).unwrap();
+    each.extend(alone.handle(&view, &enc, event("inc", 20)).unwrap());
+    assert_eq!(state, alone.state());
     assert_eq!(state["__ui"]["@n"], 4);
-    assert_eq!(state["__ui"]["@direct"], 1);
-    assert_eq!(next.iter().filter(|c| matches!(c, Command::Call { .. })).count(), 1);
-    assert!(next.iter().any(|c| matches!(c,Command::Call {args,..} if args["n"]==4)));
+    assert_eq!(state["__ui"]["@direct"], 2);
+    let calls = |cs: &[Command]| -> Vec<J> {
+        cs.iter()
+            .filter_map(|c| match c {
+                Command::Call { args, .. } => Some(args["n"].clone()),
+                _ => None,
+            })
+            .collect()
+    };
+    assert_eq!(calls(&next), calls(&each));
+    assert_eq!(calls(&next), vec![json!(2), json!(4)]);
     assert_eq!(agent.journal_len(), 2);
-    let (restored, _) = Agent::restore(config(), [input], &view, &enc).unwrap();
+    let (restored, _) = Instance::restore(config(), [input], &view, &enc).unwrap();
     assert_eq!(restored.state(), state);
     for bad in [
         json!({"input":"batch","inputs":[]}),
@@ -137,7 +152,7 @@ fn an_input_frame_drains_member_microtasks_and_commits_effects_once_and_replays(
 
 #[test]
 fn multicast_has_one_durable_result_and_recovery_preserves_batched_delivery() {
-    use affordance::runtime::{AgentSpec, FnModel, Runtime, RuntimeConfig};
+    use affordance::runtime::{FnModel, InstanceSpec, Runtime, RuntimeConfig};
     use std::sync::Arc;
     let files = Files::new();
     let path = files.0.join("fleet.tsx");
@@ -170,14 +185,14 @@ fn multicast_has_one_durable_result_and_recovery_preserves_batched_delivery() {
         ("bad", json!({"bad":true})),
         ("hub", json!({"hub":true})),
     ] {
-        let mut spec = AgentSpec::new(id, props);
+        let mut spec = InstanceSpec::new(id, props);
         spec.model = None;
         spec.dedicated_worker = id == "hub";
-        runtime.add_agent(spec).unwrap();
+        runtime.add_instance(spec).unwrap();
     }
     let first = runtime.run().unwrap();
-    let good = first.agents.iter().find(|a| a.id == "good").unwrap();
-    let hub = first.agents.iter().find(|a| a.id == "hub").unwrap();
+    let good = first.instances.iter().find(|a| a.id == "good").unwrap();
+    let hub = first.instances.iter().find(|a| a.id == "hub").unwrap();
     assert!(good.error.is_none(), "{:?}", good.error);
     assert!(hub.error.is_none(), "{:?}", hub.error);
     assert_ne!(good.worker, hub.worker);
@@ -190,7 +205,7 @@ fn multicast_has_one_durable_result_and_recovery_preserves_batched_delivery() {
             &json!({"delivered":1,"failed":3,"undelivered":["bad","missing","hub"]})
         );
     }
-    let journal = std::fs::read_to_string(files.0.join("run/good/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&files.0, "run/good/journal.jsonl")).unwrap();
     let frames: Vec<Input> = journal
         .lines()
         .map(|line| serde_json::from_str(line).unwrap())
@@ -201,23 +216,23 @@ fn multicast_has_one_durable_result_and_recovery_preserves_batched_delivery() {
             .any(|input| matches!(input,Input::Batch {inputs} if inputs.len()>1)),
         "the burst must share a journal frame"
     );
-    let cached = Runtime::resume(cfg.clone(), enc.clone(), model.clone())
+    let cached = Runtime::restore(cfg.clone(), enc.clone(), model.clone())
         .unwrap()
         .run()
         .unwrap();
     for id in ["good", "hub"] {
         assert_eq!(
-            first.agents.iter().find(|a| a.id == id).unwrap().state,
-            cached.agents.iter().find(|a| a.id == id).unwrap().state
+            first.instances.iter().find(|a| a.id == id).unwrap().state,
+            cached.instances.iter().find(|a| a.id == id).unwrap().state
         );
     }
     for id in ["good", "hub"] {
-        let _ = std::fs::remove_file(files.0.join("run").join(id).join("checkpoint.json"));
+        let _ = std::fs::remove_file(crate::shared::instance_dir(&files.0.join("run"), id).join("checkpoint.json"));
     }
-    let replay = Runtime::resume(cfg, enc, model).unwrap().run().unwrap();
+    let replay = Runtime::restore(cfg, enc, model).unwrap().run().unwrap();
     for id in ["good", "hub"] {
-        let before = first.agents.iter().find(|a| a.id == id).unwrap();
-        let after = replay.agents.iter().find(|a| a.id == id).unwrap();
+        let before = first.instances.iter().find(|a| a.id == id).unwrap();
+        let after = replay.instances.iter().find(|a| a.id == id).unwrap();
         assert!(after.error.is_none(), "{:?}", after.error);
         assert_eq!(before.state, after.state);
         assert_eq!(before.stopped, after.stopped);
@@ -243,7 +258,7 @@ fn starting_an_agent_does_not_slow_down_with_the_agents_already_running() {
         let mut cfg = config();
         cfg.id = format!("a{i}");
         let started = std::time::Instant::now();
-        let mut agent = Agent::new(cfg).unwrap();
+        let mut agent = Instance::new(cfg).unwrap();
         agent.start(&view, &enc).unwrap();
         times.push(started.elapsed());
         agents.push(agent);

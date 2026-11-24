@@ -4,7 +4,7 @@ A chat model behind an OpenAI-compatible endpoint (`affordance serve`) that keep
 conversation itself, in its journal. A client may send its whole history or only its newest
 message; either way the model sees the same thing: a system prompt with summaries of older
 exchanges (every four exchanges become a leaf summary, every three leaves merge into one), the last
-six exchanges verbatim, and the new message. A restart with `--resume` keeps every conversation.
+six exchanges verbatim, and the new message. A restart with `--restore` keeps every conversation.
 
 ```sh
 affordance serve views/demo/memory_server --set model.url=http://127.0.0.1:8080/v1

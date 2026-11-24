@@ -84,16 +84,14 @@ pub fn load(base: &Path, overrides: &Overrides) -> Result<Deployment, String> {
         object.insert("dir".into(), J::String(path_string(&cwd.join(dir))));
     }
     if let Some(app) = &overrides.app {
+        // The deployment's app: every instance that names none of its own runs it.
         let app = J::String(path_string(&cwd.join(app)));
-        match object.get_mut("root").and_then(J::as_object_mut) {
-            Some(root) => root.insert("app".into(), app),
-            None => object
-                .entry("app")
-                .or_insert_with(|| J::Object(Map::new()))
-                .as_object_mut()
-                .ok_or("app must be a map")?
-                .insert("view".into(), app),
-        };
+        object
+            .entry("app")
+            .or_insert_with(|| J::Object(Map::new()))
+            .as_object_mut()
+            .ok_or("app must be a map")?
+            .insert("view".into(), app);
     }
     if !object.contains_key("dir") {
         let home = base.parent().unwrap_or(Path::new("."));
@@ -285,12 +283,11 @@ fn resolve(config: &mut J, base: &Path) {
             }
         }
     };
-    let agent = |a: Option<&mut J>| {
-        if let Some(a) = a.and_then(J::as_object_mut) {
-            format::paths(a, format::AGENT).into_iter().for_each(&at);
+    let instance = |a: &mut J| {
+        if let Some(a) = a.as_object_mut() {
+            format::paths(a, format::INSTANCE).into_iter().for_each(&at);
         }
     };
-    agent(o.get_mut("root"));
     named(o.get_mut("app"), format::APP_PATHS);
     named(o.get_mut("model"), format::MODEL_PATHS);
     for m in o
@@ -302,9 +299,8 @@ fn resolve(config: &mut J, base: &Path) {
     {
         named(Some(m), format::MODEL_PATHS);
     }
-    match o.get_mut("agents") {
-        Some(J::Array(list)) => list.iter_mut().for_each(|a| agent(Some(a))),
-        table => agent(table),
+    if let Some(J::Array(list)) = o.get_mut("instances") {
+        list.iter_mut().for_each(instance);
     }
     if let Some(machines) = o.get_mut("machines").and_then(J::as_object_mut) {
         for m in machines.values_mut() {
@@ -342,13 +338,8 @@ pub fn redacted(config: &J) -> J {
         }
     }
     hide(&mut out, &secrets);
-    if let Some(root) = out.get_mut("root") {
-        hide(root, &secrets);
-    }
-    match out.get_mut("agents") {
-        Some(J::Array(list)) => list.iter_mut().for_each(|a| hide(a, &secrets)),
-        Some(t @ J::Object(_)) => hide(t, &secrets),
-        _ => {}
+    if let Some(J::Array(list)) = out.get_mut("instances") {
+        list.iter_mut().for_each(|a| hide(a, &secrets));
     }
     // The same value written anywhere else (a prop, a header, another variable) is hidden too:
     // a secret is its value, wherever the file puts it.
@@ -361,11 +352,8 @@ pub fn redacted(config: &J) -> J {
         }
     };
     collect(config);
-    collect(&config["root"]);
-    match &config["agents"] {
-        J::Array(list) => list.iter().for_each(&mut collect),
-        t @ J::Object(_) => collect(t),
-        _ => {}
+    if let J::Array(list) = &config["instances"] {
+        list.iter().for_each(&mut collect);
     }
     fn scrub(v: &mut J, values: &[String]) {
         match v {

@@ -3,7 +3,7 @@ use affordance::{
     View,
     effects::Outcome,
     emit::Encoder,
-    runtime::{Agent, AgentConfig, CallContext, CancelToken, Command, Exec, Executor, Input},
+    runtime::{CallContext, CancelToken, Command, Exec, Executor, Input, Instance, InstanceConfig},
 };
 use serde_json::{Value as J, json};
 use std::{collections::BTreeMap, path::PathBuf};
@@ -14,8 +14,8 @@ fn root() -> PathBuf {
 fn enc() -> Encoder {
     Encoder::from_file(root().join("ref/tokenizers/zai-org__GLM-5.3.json").to_str().unwrap()).unwrap()
 }
-fn cfg() -> AgentConfig {
-    AgentConfig {
+fn cfg() -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -74,12 +74,12 @@ fn reply(enc: &Encoder, name: &str) -> Vec<u32> {
     ids.push(enc.token_id("<|observation|>").unwrap());
     ids
 }
-fn apply(a: &mut Agent, j: &mut Vec<Input>, v: &View, e: &Encoder, input: Input) -> Vec<Command> {
+fn apply(a: &mut Instance, j: &mut Vec<Input>, v: &View, e: &Encoder, input: Input) -> Vec<Command> {
     j.push(input.clone());
     a.handle(v, e, input).unwrap()
 }
-fn begin(v: &View, e: &Encoder) -> (Agent, Vec<Input>, Vec<Command>) {
-    let mut a = Agent::new(cfg()).unwrap();
+fn begin(v: &View, e: &Encoder) -> (Instance, Vec<Input>, Vec<Command>) {
+    let mut a = Instance::new(cfg()).unwrap();
     let cmds = a.start(v, e).unwrap();
     let task = cmds
         .iter()
@@ -111,7 +111,7 @@ fn begin(v: &View, e: &Encoder) -> (Agent, Vec<Input>, Vec<Command>) {
     let cmds = apply(&mut a, &mut j, v, e, Input::Tick { clock_ms: T0 + 150 });
     (a, j, cmds)
 }
-fn tools(a: &mut Agent) -> Vec<J> {
+fn tools(a: &mut Instance) -> Vec<J> {
     a.take_trace().into_iter().filter(|e| e["t"] == "tool").collect()
 }
 fn call(cmds: &[Command]) -> (u64, String, J) {
@@ -161,7 +161,7 @@ fn save(name: &str, events: &[J]) {
     }
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn completion_uses_dispatch_clock_and_preserves_answers_and_replay() {
     let e = enc();
     let v = fixture(
@@ -216,14 +216,14 @@ fn completion_uses_dispatch_clock_and_preserves_answers_and_replay() {
         tools(&mut a).is_empty(),
         "duplicate host result and second dispatch do not emit twice"
     );
-    let (mut r, pending) = Agent::restore_with(cfg(), j, &v, &e, |a| a.strict_replay = true).unwrap();
+    let (mut r, pending) = Instance::restore_with(cfg(), j, &v, &e, |a| a.strict_replay = true).unwrap();
     assert!(pending.is_empty());
     assert_eq!(r.state(), a.state());
     assert!(tools(&mut r).is_empty());
     save("completed-replay", &tools(&mut r));
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn thrown_error_and_abort_are_errors_without_invented_timeout() {
     let e = enc();
     let v = fixture(&e, "return await harness.machine.call({cmd:'private-command'});");
@@ -251,7 +251,7 @@ fn thrown_error_and_abort_are_errors_without_invented_timeout() {
     }
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn real_executor_timeout_is_explicit_and_not_an_exit_code_guess() {
     let e = enc();
     let v = fixture(
@@ -262,6 +262,7 @@ fn real_executor_timeout_is_explicit_and_not_an_exit_code_guess() {
     let (task, _, args) = call(&cmds);
     let ctx = CallContext {
         agent: "agent-0000".into(),
+        instance: String::new(),
         task,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),
@@ -292,7 +293,7 @@ fn real_executor_timeout_is_explicit_and_not_an_exit_code_guess() {
     save("exit-not-timeout", &trace);
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn early_answer_background_failure_and_interrupted_recovery_count_once() {
     let e = enc();
     let v = fixture(
@@ -305,7 +306,7 @@ fn early_answer_background_failure_and_interrupted_recovery_count_once() {
     assert_eq!(trace.len(), 1);
     check(&trace[0], 0, "ok", false);
     save("background", &trace);
-    let (mut restored, outstanding) = Agent::restore(cfg(), j.clone(), &v, &e).unwrap();
+    let (mut restored, outstanding) = Instance::restore(cfg(), j.clone(), &v, &e).unwrap();
     assert_eq!(outstanding.len(), 1);
     assert!(tools(&mut restored).is_empty());
     apply(
@@ -329,7 +330,7 @@ fn early_answer_background_failure_and_interrupted_recovery_count_once() {
     );
     let (a, j, cmds) = begin(&v, &e);
     let (task, _, _) = call(&cmds);
-    let (mut r, out) = Agent::restore_with(cfg(), j.clone(), &v, &e, |a| a.strict_replay = true).unwrap();
+    let (mut r, out) = Instance::restore_with(cfg(), j.clone(), &v, &e, |a| a.strict_replay = true).unwrap();
     assert_eq!(out.len(), 1);
     assert_eq!(r.state(), a.state());
     assert!(tools(&mut r).is_empty());
@@ -351,7 +352,7 @@ fn early_answer_background_failure_and_interrupted_recovery_count_once() {
     save("recovered", &trace);
 }
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn pure_notes_send_wait_and_unavailable_or_undispatched_calls() {
     let e = enc();
     for (label, body, expected_ms) in [
@@ -389,7 +390,7 @@ fn pure_notes_send_wait_and_unavailable_or_undispatched_calls() {
         save(label, &trace);
     }
     let v = fixture(&e, "return 'unused';");
-    let mut a = Agent::new(cfg()).unwrap();
+    let mut a = Instance::new(cfg()).unwrap();
     let cmds = a.start(&v, &e).unwrap();
     let task = cmds
         .iter()
@@ -423,7 +424,7 @@ fn pure_notes_send_wait_and_unavailable_or_undispatched_calls() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn session_shell_keeps_structured_timeout_through_inline_and_spilled_answers() {
     let e = enc();
     let v = View::load(&root().join("views/agents/session.tsx"), "Main", &e).unwrap();
@@ -435,7 +436,7 @@ fn session_shell_keeps_structured_timeout_through_inline_and_spilled_answers() {
         cfg.template = Some(affordance::runtime::model::ModelTemplate::new("glm53", json!({})).unwrap());
         cfg.props = json!({"id":"agent-0000","task":"generic fixture"});
         cfg.max_turns = Some(2);
-        let mut a = Agent::new(cfg).unwrap();
+        let mut a = Instance::new(cfg).unwrap();
         let cmds = a.start(&v, &e).unwrap();
         let task = cmds
             .iter()
@@ -520,9 +521,9 @@ fn session_shell_keeps_structured_timeout_through_inline_and_spilled_answers() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
-    use affordance::runtime::{AgentSpec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+    use affordance::runtime::{FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
     use std::{
         sync::{
             Arc,
@@ -585,24 +586,22 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
             Err(format!("cancelled: {}", ctx.cancel.reason()))
         }),
     );
-    let mut spec = AgentSpec::new("agent-0000", json!({"id":"agent-0000","task":"generic fixture"}));
+    let mut spec = InstanceSpec::new("agent-0000", json!({"id":"agent-0000","task":"generic fixture"}));
     spec.max_turns = Some(3);
-    rt.add_agent(spec).unwrap();
-    std::fs::create_dir_all(dir.join("control")).unwrap();
-    let pause = dir.join("control/pause.json");
-    let p = pause.clone();
-    let pauser = std::thread::spawn(move || {
+    rt.add_instance(spec).unwrap();
+    let control = rt.control();
+    let closer = std::thread::spawn(move || {
         let until = Instant::now() + Duration::from_secs(8);
         while !started.load(Ordering::SeqCst) {
             assert!(Instant::now() < until, "executor never started");
             std::thread::sleep(Duration::from_millis(5));
         }
-        std::fs::write(p, "{\"mode\":\"immediate\"}").unwrap();
+        control.close(Duration::ZERO);
     });
     rt.run().unwrap();
-    pauser.join().unwrap();
+    closer.join().unwrap();
     let read = || {
-        std::fs::read_to_string(dir.join("agent-0000/trace.jsonl"))
+        std::fs::read_to_string(crate::shared::inst(&dir, "agent-0000/trace.jsonl"))
             .unwrap()
             .lines()
             .map(|s| serde_json::from_str::<J>(s).unwrap())
@@ -612,8 +611,7 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
         read().iter().all(|e| e["t"] != "tool"),
         "controller cancellation has not completed the tool"
     );
-    std::fs::remove_file(pause).unwrap();
-    let mut rt = Runtime::resume(config(), e.clone(), model()).unwrap();
+    let mut rt = Runtime::restore(config(), e.clone(), model()).unwrap();
     rt.bind_machine(
         "home",
         Arc::new(|_: &CallContext, _: &J| {
@@ -621,7 +619,7 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
         }),
     );
     let report = rt.run().unwrap();
-    assert!(report.agents[0].error.is_none());
+    assert!(report.instances[0].error.is_none());
     let events = read();
     let completed: Vec<_> = events.iter().filter(|e| e["t"] == "tool").collect();
     assert_eq!(
@@ -632,31 +630,31 @@ fn real_host_pause_resume_and_completed_resume_append_one_semantic_event() {
         vec!["shell", "set_notes", "send_message"]
     );
     assert!(completed.iter().all(|e| e["status"] == "ok" && e["timed_out"] == false));
-    let before = std::fs::read(dir.join("agent-0000/trace.jsonl")).unwrap();
-    Runtime::resume(config(), e.clone(), model()).unwrap().run().unwrap();
+    let before = std::fs::read(crate::shared::inst(&dir, "agent-0000/trace.jsonl")).unwrap();
+    Runtime::restore(config(), e.clone(), model()).unwrap().run().unwrap();
     assert_eq!(
         read().iter().filter(|e| e["t"] == "tool").count(),
         3,
-        "completed resume must not re-append prior completions"
+        "completed restore must not re-append prior completions"
     );
     assert!(
-        std::fs::read(dir.join("agent-0000/trace.jsonl"))
+        std::fs::read(crate::shared::inst(&dir, "agent-0000/trace.jsonl"))
             .unwrap()
             .starts_with(&before)
     );
-    save("host-resumed", &events);
+    save("host-restored", &events);
     std::fs::remove_dir_all(dir).unwrap();
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn concurrent_calls_keep_distinct_identities_without_counting_subcalls() {
     let e = enc();
     let v = fixture(
         &e,
         "const r=await harness.machine.call({cmd:'private-command'});return {result:r.output,exit:r.exit,timed_out:r.timed_out};",
     );
-    let mut a = Agent::new(cfg()).unwrap();
+    let mut a = Instance::new(cfg()).unwrap();
     let cmds = a.start(&v, &e).unwrap();
     let task = cmds
         .iter()
@@ -728,14 +726,14 @@ fn concurrent_calls_keep_distinct_identities_without_counting_subcalls() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn long_names_are_bounded_without_colliding_or_retaining_payloads() {
     let e = enc();
     let mut names = vec![];
     for suffix in ["b", "c"] {
         let name = format!("{}{}", "a".repeat(160), suffix);
         let v = fixture_named(&e, "return 'private-output';", &name);
-        let mut a = Agent::new(cfg()).unwrap();
+        let mut a = Instance::new(cfg()).unwrap();
         let cmds = a.start(&v, &e).unwrap();
         let task = cmds
             .iter()

@@ -61,22 +61,43 @@ fn asked(result: Result<(u16, J, Option<String>), HttpError>) -> (Result<(u16, J
 
 static RID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-static CAPTURE_ERRORS: AtomicU64 = AtomicU64::new(0);
+/// What one run notes about its model calls, and where it captures them: each runtime has its own
+/// (`RuntimeConfig.capture_dir`), so two runs in one process never count each other's calls. A
+/// request carries its run's (`GenRequest.diagnostics`); the default captures nothing.
+#[derive(Debug, Clone, Default)]
+pub struct Diagnostics(std::sync::Arc<DiagnosticsInner>);
 
-static TOKEN_MISMATCHES: AtomicU64 = AtomicU64::new(0);
+#[derive(Debug, Default)]
+struct DiagnosticsInner {
+    capture_dir: Option<std::path::PathBuf>,
+    capture_errors: AtomicU64,
+    token_mismatches: AtomicU64,
+}
 
-/// Model calls whose prompt the server counted differently from the tokens laid out (the run
-/// summary's `token_mismatches`). It should be zero: the tokens laid out are the tokens the
-/// model reads. A file whose size the layout has wrong, or a server that tokenizes a prompt
-/// again, shows here.
-pub fn token_mismatches() -> u64 {
-    TOKEN_MISMATCHES.load(Ordering::Relaxed)
+impl Diagnostics {
+    /// Counters for one run, writing every request and response under `capture_dir` if given.
+    pub fn new(capture_dir: Option<std::path::PathBuf>) -> Self {
+        Diagnostics(std::sync::Arc::new(DiagnosticsInner {
+            capture_dir,
+            ..Default::default()
+        }))
+    }
+    /// Model calls whose prompt the server counted differently from the tokens laid out. It
+    /// should be zero: the tokens laid out are the tokens the model reads. A file whose size the
+    /// layout has wrong, or a server that tokenizes a prompt again, shows here.
+    pub fn token_mismatches(&self) -> u64 {
+        self.0.token_mismatches.load(Ordering::Relaxed)
+    }
+    /// Captures that could not be written.
+    pub fn capture_errors(&self) -> u64 {
+        self.0.capture_errors.load(Ordering::Relaxed)
+    }
 }
 
 /// A token-id server reported how many prompt tokens it processed for `req`.
 fn prompt_counted(req: &GenRequest, counted: Option<u64>) {
     let Some(counted) = counted else { return };
-    if counted != req.ids.len() as u64 && TOKEN_MISMATCHES.fetch_add(1, Ordering::Relaxed) < 5 {
+    if counted != req.ids.len() as u64 && req.diagnostics.0.token_mismatches.fetch_add(1, Ordering::Relaxed) < 5 {
         eprintln!(
             "affordance: {}: the prompt was laid out as {} tokens and the server counted {counted}. The model did not read the tokens that were laid out (a picture, clip or video whose size is wrong, or a server that tokenized the prompt again)",
             req.agent,
@@ -85,12 +106,8 @@ fn prompt_counted(req: &GenRequest, counted: Option<u64>) {
     }
 }
 
-/// Captures this process failed to write (the status feed's `capture_errors`).
-pub fn capture_errors() -> u64 {
-    CAPTURE_ERRORS.load(Ordering::Relaxed)
-}
-
-/// AFFORDANCE_CAPTURE_DIR: every request and response (and stream event) is written there, by agent.
+/// The run's capture directory (`RuntimeConfig.capture_dir`): every request and response (and
+/// stream event) is written there, by agent.
 /// `data` (the JSON of what is captured) is only built when capturing is on: a request body holds
 /// the whole prompt. A capture is diagnostics, like a browser's network log: a failed write (a
 /// full disk) never fails the call. It is counted, logged at the 1st, 2nd, 4th, ... failure, and
@@ -98,10 +115,11 @@ pub fn capture_errors() -> u64 {
 /// synced: a crash can lose the last captures, which a journal would need and a log does not.
 fn capture(req: &GenRequest, rid: &str, kind: &str, data: impl FnOnce() -> Vec<u8>) {
     let agent = req.agent.as_str();
-    let Ok(root) = std::env::var("AFFORDANCE_CAPTURE_DIR") else {
+    let Some(root) = &req.diagnostics.0.capture_dir else {
         return;
     };
-    let dir = std::path::Path::new(&root).join(agent);
+    // The instance's name, escaped into one path component: never a path of its own.
+    let dir = root.join(super::exec::instance_component(agent));
     let path = dir.join(format!("{rid}.{kind}.json"));
     let temporary = path.with_extension("tmp");
     let written = std::fs::create_dir_all(&dir).and_then(|_| {
@@ -116,7 +134,7 @@ fn capture(req: &GenRequest, rid: &str, kind: &str, data: impl FnOnce() -> Vec<u
     });
     if let Err(e) = written {
         let _ = std::fs::remove_file(&temporary);
-        let n = CAPTURE_ERRORS.fetch_add(1, Ordering::Relaxed) + 1;
+        let n = req.diagnostics.0.capture_errors.fetch_add(1, Ordering::Relaxed) + 1;
         if n.is_power_of_two() {
             eprintln!("request capture failed ({n} so far; the calls go on): {e}")
         }
@@ -243,11 +261,13 @@ pub struct GenRequest {
     pub sampling: J,
     /// Recorded in the request's capture (`harness.render`'s `tag`).
     pub tag: Option<String>,
-    /// The prompt's images (data URLs, `agent::image_source`), one per placeholder, in order.
+    /// The prompt's images (data URLs, `instance::image_source`), one per placeholder, in order.
     pub images: Vec<String>,
     /// Where each media element's tokens are in `ids`, and its placeholder: (start, count,
     /// placeholder).
     pub media: Vec<(usize, usize, u32)>,
+    /// The run's counters and capture directory.
+    pub diagnostics: Diagnostics,
 }
 
 impl GenRequest {
@@ -271,6 +291,7 @@ impl GenRequest {
             tag: None,
             images: vec![],
             media: vec![],
+            diagnostics: Diagnostics::default(),
         }
     }
 }
@@ -535,10 +556,6 @@ impl ModelError {
     pub fn cancelled(message: impl Into<String>) -> Self {
         Self::of(FailureKind::Cancelled, message)
     }
-    /// A failure that may pass (a network error, a rate limit, an outage).
-    pub fn transient(message: impl Into<String>) -> Self {
-        Self::of(FailureKind::Interrupted, message)
-    }
     /// An error from the HTTP transport, as the kind its failure is.
     fn transport(e: HttpError) -> Self {
         let kind = match e.failure {
@@ -645,7 +662,7 @@ pub trait Model: Send + Sync {
     /// Which model an instance talks to and how its prompts are laid out: the binding's kind,
     /// model and provider options (a LoRA), and its template and context (`Presented`). Not how it
     /// is reached (address, credentials, ranks, timeouts, retry policy, cache TTL) or sampled: a moved
-    /// server or a changed timeout resumes. The resume pin and recovery images use this.
+    /// server or a changed timeout restores. The restore pin and recovery images use this.
     fn replay_identity(&self) -> Option<J> {
         self.binding_identity()
             .map(|b| json!({"kind": b["kind"], "model": b["model"], "provider_options": b["provider_options"]}))
@@ -1118,7 +1135,7 @@ impl Sglang {
             ("audio", "audio_data"),
             ("video", "video_data"),
         ] {
-            let sources = super::agent::of_kind(&req.images, kind);
+            let sources = super::instance::of_kind(&req.images, kind);
             if !sources.is_empty() {
                 rest[field] = json!(sources);
             }
@@ -1176,10 +1193,13 @@ impl Sglang {
         let why = finish["message"]
             .as_str()
             .map_or_else(|| finish.to_string(), str::to_string);
-        ModelError::transient(redact_credentials(
-            format!("sglang /generate: the server aborted the request: {why}"),
-            headers,
-        ))
+        ModelError::of(
+            FailureKind::Interrupted,
+            redact_credentials(
+                format!("sglang /generate: the server aborted the request: {why}"),
+                headers,
+            ),
+        )
         .without_endpoint(&self.url)
     }
 }
@@ -1689,14 +1709,9 @@ impl Model for Completions {
     }
 }
 
-/// Retry a failed attempt with a short backoff while its failure may pass: not after a cancel, a
-/// protocol error or an HTTP status other than 429 or 5xx, and with no wait after the last
-/// attempt. `f` gets the attempt number (0-based) to tag onto its request. `on_fail` runs for a
-/// failed attempt the server may still hold (it was sent and not answered with a status), so its
-/// caller can tell the server to drop it instead of leaving it to the server's own cleanup.
-/// One attempt at `f`. A failure after the request was sent runs `on_fail` (a server may still
-/// hold the request: the client tells it to stop). The failure goes back as it is: whether the
-/// call is made again is the retry policy's, not the client's.
+/// One attempt at `f`. A failure after the request was sent runs `on_fail`: a server may still
+/// hold the request, and the client tells it to drop it. The failure goes back as it is: whether
+/// the call is made again is the retry policy's, not the client's.
 fn attempt<T>(
     cancel: &CancelToken,
     mut on_fail: impl FnMut(usize),
@@ -2094,7 +2109,7 @@ impl Chat {
                 Some(a) if (200..300).contains(&status) => a
                     .finish(stopped)
                     .map(|resp| (status, resp, delay))
-                    .map_err(|e| ModelError::transient(format!("{}: {e}", self.kind()))),
+                    .map_err(|e| ModelError::fatal(format!("{}: {e}", self.kind()))),
                 _ => Ok((status, resp, delay)),
             })
             .map_err(|e| e.without_endpoint(&self.url));
@@ -2191,13 +2206,13 @@ impl Chat {
         stream: Option<(&mut hosted_stream::Assembler, &mut (dyn FnMut(Delta<'_>) -> bool + 'f))>,
     ) -> Result<(u16, J, Option<Duration>, bool), ModelError> {
         use super::http::{ERROR_BODY_MAX, Request, Timing, exchange};
+        // Classified as the native bindings' are (a refused connection is `unreachable`), and
+        // named by the binding, the key never in the message.
         let failed = |e: HttpError| {
             let message = redact_credentials(format!("{}: {e}", self.kind()), headers);
-            if e.transient() {
-                ModelError::transient(message)
-            } else {
-                ModelError::fatal(message)
-            }
+            let mut error = ModelError::transport(e);
+            error.message = message;
+            error
         };
         // `headers` is the whole list the caller built (and the capture records), Content-Type included.
         let mut fields: Vec<(&str, String)> = headers.to_vec();
@@ -2214,7 +2229,7 @@ impl Chat {
         let timing = Timing::deadline(self.timeout).between(self.stall.filter(|_| stream.is_some()));
         let response = exchange(request, timing, &req.cancel).map_err(|e| {
             if req.cancel.is_cancelled() {
-                ModelError::from(format!("cancelled: {}", req.cancel.reason()))
+                ModelError::cancelled(format!("cancelled: {}", req.cancel.reason()))
             } else {
                 failed(e)
             }
@@ -2247,8 +2262,9 @@ impl Chat {
                 }
             });
             req.cancel.check().map_err(ModelError::cancelled)?;
+            // A malformed stream is a malformed reply, as it is without streaming.
             if let Some(e) = problem {
-                return Err(ModelError::transient(redact_credentials(
+                return Err(ModelError::fatal(redact_credentials(
                     format!("{}: {e}", self.kind()),
                     headers,
                 )));

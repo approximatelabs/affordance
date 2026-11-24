@@ -1,6 +1,6 @@
 use affordance::{
     emit::Encoder,
-    runtime::{AgentSpec, CallContext, FnModel, GenRequest, Runtime, RuntimeConfig},
+    runtime::{CallContext, FnModel, GenRequest, InstanceSpec, Runtime, RuntimeConfig},
 };
 use serde_json::{Value as J, json};
 use std::{
@@ -74,16 +74,16 @@ fn runtime(app: &Path) -> Runtime {
     )
 }
 fn run(mut runtime: Runtime) -> J {
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    report.agents[0].stopped.clone().expect("app did not stop")
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    report.instances[0].stopped.clone().expect("app did not stop")
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn headers_and_response_match_nodes_native_web_apis() {
     let dir = Scratch::new();
     let cases = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/fetch_cases.tsx");
@@ -113,7 +113,7 @@ process.stdout.write(JSON.stringify(result));
 
 #[cfg(feature = "http")]
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn global_fetch_returns_standard_responses_and_reuses_existing_authority_checks() {
     use affordance::connectors::http::{Http, HttpConfig};
     let server = fixture::Server::new(|request| {
@@ -195,7 +195,7 @@ harness.stop({info, value, clone: await clone.json(), immutable, consumed, used:
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn fetch_is_a_first_class_function_and_named_bindings_are_explicit() {
     let dir = Scratch::new();
     let library = concat!(env!("CARGO_MANIFEST_DIR"), "/views/lib/http.tsx");
@@ -226,7 +226,7 @@ harness.stop({missing, result: await request(custom)});
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn unsupported_fetch_features_fail_before_io_and_globals_can_be_shadowed() {
     let dir = Scratch::new();
     let app = dir.app(

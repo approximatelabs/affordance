@@ -17,7 +17,6 @@
 //! results, call arguments. Writing a blob is the agent's only I/O; blobs
 //! are content-addressed, so replaying the journal writes nothing new and reads the same text.
 use super::blobs::Blobs;
-use super::model::FailureKind;
 use crate::View;
 use crate::effects::{Outcome, Request};
 use crate::emit::{Encoder, RunCache};
@@ -36,7 +35,7 @@ pub(crate) use images::{clip_source, image_source, of_kind};
 pub use outstanding::OutstandingSummary;
 use outstanding::*;
 
-#[path = "agent_checkpoint.rs"]
+#[path = "instance_checkpoint.rs"]
 pub(crate) mod recovery;
 
 pub(crate) fn valid_instance_name(name: &str) -> bool {
@@ -85,12 +84,8 @@ pub enum Input {
         task: u64,
         /// What failed.
         error: String,
-        /// The failure may pass. What a journal written before failures had kinds says of it;
-        /// `kind` is read first.
-        transient: bool,
         /// What kind of failure it was.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        kind: Option<super::model::FailureKind>,
+        kind: super::model::FailureKind,
         /// How long the server asked the caller to wait before trying again.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         retry_after_ms: Option<u64>,
@@ -99,16 +94,16 @@ pub enum Input {
     },
     /// The outcome of a `Call` command.
     Result { task: u64, outcome: Outcome, clock_ms: i64 },
-    /// Something from outside (a message from another agent, a process exit, ...). `op`: the
-    /// operator's id for an event delivered through the control inbox (receipts, dedupe).
+    /// Something from outside (a message from another agent, a post, a process exit, ...).
     Event {
         /// The event's name, as `useEvent(name)` hears it.
         name: String,
         /// What it carries.
         payload: J,
+        /// Its delivery id, when it has one (a `send`'s message, a keyed post): an event whose id
+        /// this instance has already taken is journaled but not taken again.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        /// The operator's id for it, when it came through the control inbox.
-        op: Option<String>,
+        id: Option<String>,
         /// When it arrived, on the instance's clock.
         clock_ms: i64,
     },
@@ -155,11 +150,9 @@ fn validate_batch(inputs: &[Input]) -> Result<(), String> {
         || inputs.len() > MAX_INPUT_BATCH
         || inputs
             .iter()
-            .any(|input| !matches!(input, Input::Event { op: None, .. } | Input::Result { .. }))
+            .any(|input| !matches!(input, Input::Event { .. } | Input::Result { .. }))
     {
-        return Err(
-            "an input batch requires 1..64 event/result members without control receipts or nested batches".into(),
-        );
+        return Err("an input batch requires 1..64 event/result members and no nested batches".into());
     }
     Ok(())
 }
@@ -260,7 +253,7 @@ pub enum Command {
 
 /// Fixed per-agent configuration (not journaled: supplied again on restore).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentConfig {
+pub struct InstanceConfig {
     /// The agent's id: its name in events, traces and its directory.
     pub id: String,
     /// The app's root props (its starting state).
@@ -391,27 +384,29 @@ struct ModelCall {
     usage: J,
 }
 
-/// The view a page call laid out, kept for `dispatch(output)`: its handlers, the state and
-/// context they run with, where it was issued (`view`, dropped once dispatched), the reply's calls
-/// `(name, args, id, problem)`, and the dispatch's results once it has run (a second dispatch
-/// returns them).
+/// A page call's output kept for dispatch: the view its calls' handlers run from and the context
+/// they run with, where it was issued (`view`, dropped once every call has been started), the
+/// reply's calls `(name, args, id, problem)`, which have been started, and each call's result once
+/// it has answered (a later dispatch of the same call returns it).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Kept {
     #[serde(skip)]
     view: Option<(Rc<crate::Prepared>, Rc<Map>, Value, i64, u64)>,
     calls: Option<Vec<(String, J, String, Option<String>)>>,
-    dispatch: Option<u64>,
-    results: Option<J>,
+    #[serde(default)]
+    started: BTreeSet<usize>,
+    #[serde(default)]
+    results: Vec<Option<J>>,
 }
 
-/// A running `dispatch(output)`: the slots awaiting it, its tools still running, the results so
-/// far (in call order), and whether its calls are still being started.
+/// A running `dispatch(output, {calls})`: the output it is of, the slots awaiting it, the calls it
+/// answers for (in the order asked), and whether its calls are still being started. It resolves
+/// once each of its calls has a result, whichever dispatch started it.
 #[derive(Debug, Clone)]
 struct Dispatch {
     call: u64,
     waiters: Vec<(u64, usize)>,
-    pending: BTreeSet<u64>,
-    results: Vec<Option<J>>,
+    indices: Vec<usize>,
     starting: bool,
 }
 
@@ -527,13 +522,13 @@ pub(crate) struct Retry {
     since: i64,
 }
 
-pub struct Agent {
+pub struct Instance {
     realm: crate::microtasks::Realm,
     /// The handlers run since the last round of jobs ended, as a trace names them: where an
     /// unhandled rejection is reported from, also after its handler has finished.
     ran: HashMap<u64, String>,
     /// Its configuration.
-    pub cfg: AgentConfig,
+    pub cfg: InstanceConfig,
     /// The app's state: its props and, under `__ui`, its hooks, kept as language values (shared,
     /// never converted to JSON on the way to a render or a task).
     state: Rc<Map>,
@@ -570,8 +565,6 @@ pub struct Agent {
     /// The latest complete document, shared by lifecycle, model calls and mounts while all
     /// render inputs still match. Probes never publish or reuse this snapshot.
     last_render: Option<RenderSnapshot>,
-    /// Committed listeners for the current explicitly journaled frame; never checkpointed.
-    batch_document: Option<Rc<crate::Prepared>>,
     next_task: u64,
     next_handler: u64,
     stopped: Option<J>,
@@ -602,7 +595,7 @@ pub struct Agent {
     children: BTreeMap<String, J>,
     /// Its parent has been told it stopped (`onStop`).
     stop_reported: bool,
-    /// Ids (`_msg`) of the messages already taken: a resend after a crash is not taken twice.
+    /// Delivery ids (`Input::Event.id`) of the events already taken: a resend after a crash is not taken twice.
     seen_msgs: std::collections::BTreeSet<String>,
     /// A journaled reply answered a prompt this app no longer renders: the first such turn.
     diverged_at: Option<u64>,
@@ -698,9 +691,9 @@ fn result_value(v: &J) -> J {
     }
 }
 
-impl Agent {
+impl Instance {
     /// An agent for `cfg`, not yet started (`start`).
-    pub fn new(cfg: AgentConfig) -> Result<Agent, String> {
+    pub fn new(cfg: InstanceConfig) -> Result<Instance, String> {
         if !cfg.props.is_object() {
             return Err("agent props must be an object".into());
         }
@@ -709,7 +702,7 @@ impl Agent {
         }
         date(cfg.start_ms)?;
         let env_v = Value::from_json(&serde_json::to_value(&cfg.env).map_err(|e| e.to_string())?);
-        Ok(Agent {
+        Ok(Instance {
             state: Rc::new(Map::default()),
             env_v,
             clock_ms: cfg.start_ms,
@@ -728,7 +721,6 @@ impl Agent {
             version: 1,
             effects_version: 0,
             last_render: None,
-            batch_document: None,
             next_task: 0,
             realm: crate::microtasks::Queue::new(),
             ran: HashMap::new(),
@@ -763,24 +755,24 @@ impl Agent {
     /// Returns the agent and the commands still outstanding (the host submits them again;
     /// durable external work must be deduplicated by agent and task id).
     pub fn restore(
-        cfg: AgentConfig,
+        cfg: InstanceConfig,
         journal: impl IntoIterator<Item = Input>,
         view: &View,
         enc: &Encoder,
-    ) -> Result<(Agent, Vec<Command>), String> {
-        Agent::restore_with(cfg, journal, view, enc, |_| {})
+    ) -> Result<(Instance, Vec<Command>), String> {
+        Instance::restore_with(cfg, journal, view, enc, |_| {})
     }
 
     /// `restore`, with `setup` configuring the new agent before its journal is applied (blobs the
     /// journal refers to, strict replay). The journal is streamed: it is never all in memory.
     pub fn restore_with(
-        cfg: AgentConfig,
+        cfg: InstanceConfig,
         journal: impl IntoIterator<Item = Input>,
         view: &View,
         enc: &Encoder,
-        setup: impl FnOnce(&mut Agent),
-    ) -> Result<(Agent, Vec<Command>), String> {
-        let mut agent = Agent::new(cfg)?;
+        setup: impl FnOnce(&mut Instance),
+    ) -> Result<(Instance, Vec<Command>), String> {
+        let mut agent = Instance::new(cfg)?;
         setup(&mut agent);
         agent.start(view, enc)?;
         agent.trace.clear();
@@ -802,7 +794,7 @@ impl Agent {
                 e[4] += r.layouts - before.layouts;
                 e[5] += r.layout_us - before.layout_us;
             }
-            // Reconstructed diagnostics are never appended on resume. Drain per input so
+            // Reconstructed diagnostics are never appended on restore. Drain per input so
             // a long replay does not retain a second in-memory history of completions.
             agent.trace.clear();
         }
@@ -1019,9 +1011,9 @@ impl Agent {
             // The step that ended has drained and its effects pass has not run: a boundary.
             // Keeping one copies the instance's bookkeeping (its event log, the message ids it has
             // seen, kept outputs, children's props). While that is small every boundary is kept,
-            // so a resume starts from the last one. Once it is large, one is kept every
+            // so a restore starts from the last one. Once it is large, one is kept every
             // BOUNDARY_GAP inputs: a recovery image is written far less often than that, and a
-            // resume replays at most that many inputs more.
+            // restore replays at most that many inputs more.
             let bookkeeping = self.event_log.len()
                 + self.seen_msgs.len()
                 + self.children.len()
@@ -1233,20 +1225,25 @@ impl Agent {
 
     fn handle_inner(&mut self, view: &View, enc: &Encoder, mut input: Input) -> Result<Vec<Command>, String> {
         self.lower_input(&mut input)?;
+        // A batch is one journal record of several inputs, written together; each input still takes
+        // its own turn (its render, its handlers, their microtasks, its effects pass), as it would
+        // arriving alone, so how inputs are batched never changes what an app computes. One that
+        // stops the instance ends the frame (the rest are journaled and not taken, as after a stop).
         if let Input::Batch { inputs } = input {
-            self.clock_ms = self.clock_ms.max(inputs.first().map_or(self.clock_ms, Input::clock_ms));
-            self.batch_document = Some(self.evaluate(view, enc)?);
-            let result = (|| {
-                let mut commands = vec![];
-                for input in inputs {
-                    self.realm.borrow_mut().fuel = 0;
-                    commands.extend(self.handle_lowered(view, enc, input)?);
-                    commands.extend(self.drain_jobs(view, enc)?);
+            let last = inputs.len().saturating_sub(1);
+            let mut commands = vec![];
+            for (i, input) in inputs.into_iter().enumerate() {
+                if self.stopped.is_some() {
+                    self.journaled += 1;
+                    continue;
                 }
-                Ok(commands)
-            })();
-            self.batch_document = None;
-            return result;
+                self.realm.borrow_mut().fuel = 0;
+                commands.extend(self.handle_lowered(view, enc, input)?);
+                if i < last {
+                    commands.extend(self.checkpoint(view, enc)?);
+                }
+            }
+            return Ok(commands);
         }
         self.handle_lowered(view, enc, input)
     }
@@ -1322,7 +1319,6 @@ impl Agent {
             Input::ModelError {
                 task,
                 error,
-                transient,
                 kind,
                 retry_after_ms,
                 ..
@@ -1343,11 +1339,6 @@ impl Agent {
                     // says whether there is another and after how long, from the kind of failure,
                     // how many there have been, how long since the first, and the wait the server
                     // asked for. All of that is journaled, so a replay decides the same.
-                    let kind = kind.unwrap_or(if transient {
-                        FailureKind::Interrupted
-                    } else {
-                        FailureKind::Refused
-                    });
                     let slot = self.open.entry((h, i)).or_default();
                     let (failures, since) = slot
                         .retry
@@ -1390,12 +1381,8 @@ impl Agent {
                 }
                 _ => self.note(json!({"t": "late_result", "task": task})),
             },
-            Input::Event { name, payload, .. }
-                if payload["_msg"]
-                    .as_str()
-                    .is_some_and(|m| !self.seen_msgs.insert(m.to_owned())) =>
-            {
-                self.note(json!({"t": "duplicate_message", "event": name, "msg": payload["_msg"]}));
+            Input::Event { name, id: Some(id), .. } if !self.seen_msgs.insert(id.clone()) => {
+                self.note(json!({"t": "duplicate_message", "event": name, "id": id}));
             }
             Input::Event { name, payload, .. } => {
                 // A matching wait resolves at once (it consumes the event for its task); the event
@@ -1522,7 +1509,7 @@ impl Agent {
         let mut put = |k: &str, v: Value| {
             m.insert(std::rc::Rc::from(k), v);
         };
-        put("agent", Value::str(&self.cfg.id));
+        put("instance", Value::str(&self.cfg.id));
         put("turn", Value::Int(self.metrics.turns as i64));
         put("clock_ms", Value::Int(self.clock_ms));
         put("env", self.env_v.clone());
@@ -1732,14 +1719,13 @@ impl Agent {
             // cropped or hidden box is live), and run from it while the state is the one it
             // rendered (a listener that changed it makes the next one render again).
             let version = self.version;
-            // A batch's document, or the one the event was raised on (a prompt's `layout` goes to
-            // the listeners of the document that was laid out, as an event goes to the listeners
-            // registered when it fired), or the current one.
+            // The document the event was raised on (a prompt's `layout` goes to the listeners of
+            // the document that was laid out, as an event goes to the listeners registered when it
+            // fired), or the current one.
             let raised = doc.is_some();
-            let prepared = match (&self.batch_document, doc) {
-                (Some(prepared), _) => prepared.with_context(self.context(), date(self.clock_ms)?),
-                (None, Some(prepared)) => prepared.with_context(self.context(), date(self.clock_ms)?),
-                (None, None) => self.evaluate(view, enc)?,
+            let prepared = match doc {
+                Some(prepared) => prepared.with_context(self.context(), date(self.clock_ms)?),
+                None => self.evaluate(view, enc)?,
             };
             // A child's callback (`mount:<key>:onX`) runs that `<Mount>`'s handler.
             if event.starts_with("mount:") {
@@ -1778,8 +1764,7 @@ impl Agent {
             let ctx = self.context();
             for which in listeners {
                 let (state, clock) = (self.state.clone(), self.clock_ms);
-                let kept =
-                    (self.batch_document.is_some() || raised || self.version == version).then(|| prepared.clone());
+                let kept = (raised || self.version == version).then(|| prepared.clone());
                 out.extend(self.start_handler_at(
                     view,
                     enc,
@@ -2166,7 +2151,10 @@ impl Agent {
                         }
                         // `dispatch(output)`: run its calls (the result arrives when they have answered).
                         "dispatch" => {
-                            let (outcome, commands) = self.dispatch(view, enc, (id, i), args["call"].as_u64())?;
+                            let only = args["calls"]
+                                .as_array()
+                                .map(|a| a.iter().map(|v| v.as_u64()).collect::<Vec<_>>());
+                            let (outcome, commands) = self.dispatch(view, enc, (id, i), args["call"].as_u64(), only)?;
                             out.extend(commands);
                             if let Some(outcome) = outcome {
                                 self.resolve(id, i, outcome);
@@ -2338,7 +2326,7 @@ impl Agent {
 
     /// A tool's answer: its return value (or error), as its result in its dispatch:
     /// `{name, id, result, error?, ...meta}`.
-    fn respond(&mut self, id: u64, origin: &Origin, result: &Result<J, String>) {
+    fn respond(&mut self, _handler: u64, origin: &Origin, result: &Result<J, String>) {
         if let Origin::Tool {
             name,
             call_id,
@@ -2367,21 +2355,24 @@ impl Agent {
             // bounded identifiers and scalar metadata: never arguments, results or errors.
             // `at_ms` is its start; `turn` is the page call whose reply asked for it.
             let mut entry = None;
-            if let Some(d) = self.dispatches.get_mut(dispatch) {
-                if d.results[*index].is_none() {
+            let n = self.dispatches.get(dispatch).map(|d| d.call);
+            if let Some(slot) = n
+                .and_then(|n| self.kept.get_mut(&n))
+                .and_then(|k| k.results.get_mut(*index))
+            {
+                if slot.is_none() {
                     let timed_out = record["timed_out"] == true;
                     let error = result.is_err()
                         || record["error"] == true
                         || timed_out
                         || record["exit"].as_i64().is_some_and(|exit| exit != 0);
                     entry = Some(
-                        json!({"t": "tool", "tool": trace_tool_name(name), "at_ms": *started_ms, "turn": d.call,
+                        json!({"t": "tool", "tool": trace_tool_name(name), "at_ms": *started_ms, "turn": n,
                         "dispatch": dispatch, "index": index, "ms": self.clock_ms.saturating_sub(*started_ms).max(0),
                         "status": if error { "error" } else { "ok" }, "timed_out": timed_out}),
                     );
                 }
-                d.results[*index] = Some(record);
-                d.pending.remove(&id);
+                *slot = Some(record);
             }
             if let Some(entry) = entry {
                 self.note(entry);

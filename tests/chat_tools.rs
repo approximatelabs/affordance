@@ -51,7 +51,7 @@ fn projected_tools(e: &Encoder, r: &Rendered) -> J {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tools_follow_layout_and_dispatch_keeps_hook_state() {
     let e = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let v = view(
@@ -109,7 +109,7 @@ export default function Main({items, budget}) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn explicit_schemas_and_colliding_names_are_preserved() {
     let e = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let v = view(
@@ -155,7 +155,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn lossy_and_long_target_names_do_not_change_identity_when_rows_reorder() {
     let e = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let v = view(
@@ -199,7 +199,7 @@ export default function Main({items}) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn projecting_before_a_later_crop_fails_instead_of_publishing_stale_tools() {
     let e = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let v = view(
@@ -219,7 +219,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn safe_text_also_applies_when_label_marks_need_offsets() {
     let e = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let v = view(
@@ -261,7 +261,7 @@ fn one_app_keeps_state_in_both_model_formats() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn an_empty_notebook_list_keeps_a_nonnegative_scroll_position() {
     let e = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let v = notebook(&e, "qwen3");
@@ -302,7 +302,7 @@ fn switching_protocols_can_keep_the_same_native_app_state() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn native_run_cache_reuses_text_but_keeps_current_state_and_handlers() {
     let e = encoder("Qwen__Qwen3-4B-Instruct-2507");
     let v = notebook(&e, "qwen3");

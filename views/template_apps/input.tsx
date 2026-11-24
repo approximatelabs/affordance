@@ -36,17 +36,30 @@ export function said(m) {
 // reply as exactly the text the model generated, the replies stay as generated turns (their own
 // tokens are kept, so the prompt extends the last one and a server reuses its work).
 // `keep_replies` keeps them always. `write(messages, generate)` is the format's text for a
-// conversation; each reply is checked once (a conversation's earlier turns do not change).
+// conversation. A publisher may write a reply as generated while it is the last turn and rewrite
+// it once a newer user message follows (Qwen 3.6, DeepSeek V4.1 drop a past reply's thinking
+// then): each reply is checked when it arrives, and again, against the conversation up to that
+// message, when the next user message arrives. Earlier turns do not change, so a check is kept.
 export function publisherTurns(turns, keep_replies, write) {
   if (keep_replies || !turns.some(m => m.generated)) return turns;
   const written = turns.map(said);
-  const asGenerated = i => {
+  // Reply `i` is written as generated in the conversation's first `end` turns: as the last turn,
+  // or (with a newer user message) in the prompt that message asks for, generation prompt and all.
+  const asGenerated = (i, end) => {
     try {
-      return write(written.slice(0, i + 1), false).startsWith(write(written.slice(0, i), true) + textContent(turns[i].content));
+      return write(written.slice(0, end), end > i + 1).startsWith(write(written.slice(0, i), true) + textContent(turns[i].content));
     } catch (e) {
       return false;
     }
   };
-  const unchanged = memoScan(turns, true, (ok, m, i) => [ok && (!m.generated || asGenerated(i)), null], null).state;
-  return unchanged ? turns : written;
+  // State: whether every reply so far is written as generated, and the replies since the last
+  // user message (checked again when the next one arrives).
+  const scan = memoScan(turns, null, (s, m, i) => {
+    const {ok, pending} = s ?? {ok: true, pending: []};
+    if (!ok) return [{ok, pending: []}, null];
+    if (m.generated) return [{ok: asGenerated(i, i + 1), pending: [...pending, i]}, null];
+    if (m.role === "user" && pending.length) return [{ok: pending.every(j => asGenerated(j, i + 1)), pending: []}, null];
+    return [{ok, pending}, null];
+  }, null);
+  return scan.state?.ok === false ? written : turns;
 }

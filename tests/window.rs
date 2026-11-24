@@ -6,7 +6,7 @@
 //! with a ContextError naming the boxes.
 use affordance::View;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -46,10 +46,10 @@ export default function Main() {{
 }
 
 /// Run a chat of `turns` exchanges; returns every prompt sent and the agent's last error, if any.
-fn run(tss: &str, name: &str, turns: usize) -> (Vec<Vec<u32>>, Encoder, Agent) {
+fn run(tss: &str, name: &str, turns: usize) -> (Vec<Vec<u32>>, Encoder, Instance) {
     let enc = Encoder::from_file(root().join("ref/tokenizers/zai-org__GLM-5.3.json").to_str().unwrap()).unwrap();
     let view = chat(&enc, name, tss);
-    let mut agent = Agent::new(AgentConfig {
+    let mut agent = Instance::new(InstanceConfig {
         context: Some(CONTEXT),
         retry: Default::default(),
         template: None,
@@ -78,7 +78,7 @@ fn run(tss: &str, name: &str, turns: usize) -> (Vec<Vec<u32>>, Encoder, Agent) {
                 Input::Event {
                     name: "message".into(),
                     payload: json!({"text": text}),
-                    op: None,
+                    id: None,
                     clock_ms: clock,
                 },
             )
@@ -121,7 +121,7 @@ fn run(tss: &str, name: &str, turns: usize) -> (Vec<Vec<u32>>, Encoder, Agent) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_capped_history_keeps_every_prompt_in_the_window_and_cuts_rarely() {
     let (prompts, enc, _) = run(
         "history { max-tokens: 50win; overflow: drop-start; drop-step: 25%; }",
@@ -162,7 +162,7 @@ fn a_capped_history_keeps_every_prompt_in_the_window_and_cuts_rarely() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn without_a_cap_a_prompt_over_the_context_is_never_sent() {
     let (prompts, _, agent) = run("", "uncapped", 150);
     assert!(prompts.len() < 150, "the chat outgrew the context");
@@ -181,7 +181,7 @@ fn without_a_cap_a_prompt_over_the_context_is_never_sent() {
 /// After each prompt is laid out, `useEvent("layout")` hears what its boxes did (as
 /// ResizeObserver reports sizes): an app schedules a fold from it, never by measuring.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn the_layout_event_reports_what_the_boxes_did() {
     let (prompts, _, agent) = run(
         "history { max-tokens: 50win; overflow: drop-start; drop-step: 25%; }",

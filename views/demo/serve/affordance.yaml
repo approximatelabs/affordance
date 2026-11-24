@@ -1,6 +1,7 @@
 # Serve the echo app: `affordance serve` here, then `curl localhost:8000/hello`.
-root:
-  app: echo.tsx
+instances:
+  - id: root
+    app: echo.tsx
 model:               # unused by this app; a served app that calls a model names its server here
   kind: chat
   url: http://127.0.0.1:8080/v1

@@ -13,7 +13,7 @@
 //! PROPS adds props (JSON).
 use affordance::View;
 use affordance::effects::Outcome;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -140,7 +140,7 @@ struct Script {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn long_session_agent_is_one_view_file_on_the_generic_runtime() {
     let turns: usize = env("TURNS", 300);
     let (tmin, tmax): (u64, u64) = (env("THINK_MIN", 250), env("THINK_MAX", 700));
@@ -158,7 +158,7 @@ fn long_session_agent_is_one_view_file_on_the_generic_runtime() {
             props[k] = v;
         }
     }
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: Some(affordance::runtime::model::ModelTemplate::new("glm53", json!({"keep_replies": true})).unwrap()),
@@ -173,7 +173,7 @@ fn long_session_agent_is_one_view_file_on_the_generic_runtime() {
         machines: vec!["home".into()],
         model: Some("default".into()),
     };
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     let user = enc.token_id("<|user|>").unwrap();
     let obs = enc.token_id("<|observation|>").unwrap();
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15 ^ 7919);
@@ -229,7 +229,7 @@ fn long_session_agent_is_one_view_file_on_the_generic_runtime() {
             } => {
                 turn += 1;
                 // Invariants on the prompt. Its hash (continued from the last turn's) is the full one.
-                if prompt_hash.as_deref() != Some(affordance::runtime::agent::prompt_hash(&ids).as_str()) {
+                if prompt_hash.as_deref() != Some(affordance::runtime::instance::prompt_hash(&ids).as_str()) {
                     violations.push(format!("t{turn}: prompt hash"));
                 }
                 let h = ids[..ids.iter().position(|&x| x == user).unwrap()].to_vec();
@@ -453,7 +453,7 @@ fn long_session_agent_is_one_view_file_on_the_generic_runtime() {
                 sc.pending_q = 3;
                 Input::Event {
                     name: "message".into(),
-                    op: None,
+                    id: None,
                     payload: json!({"from": "agent-0042", "text": "Quick question: which port does your kv service listen on, and what was the error code of the checksum failure you hit early on?"}),
                     clock_ms: clock,
                 }
@@ -602,7 +602,7 @@ fn long_session_agent_is_one_view_file_on_the_generic_runtime() {
         assert_eq!(sc.reads, 2);
     }
     // The journal rebuilds the agent exactly.
-    let (replayed, _) = Agent::restore(cfg, journal, &view, &enc).unwrap();
+    let (replayed, _) = Instance::restore(cfg, journal, &view, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&replayed.state()),
         affordance::scenario::log_records(&agent.state())

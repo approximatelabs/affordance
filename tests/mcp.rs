@@ -4,7 +4,7 @@ use crate::http_fixture as fixture;
 use affordance::{
     connectors::http::{Http, HttpConfig},
     emit::Encoder,
-    runtime::{AgentSpec, CallContext, Executor, FnModel, GenRequest, Runtime, RuntimeConfig},
+    runtime::{CallContext, Executor, FnModel, GenRequest, InstanceSpec, Runtime, RuntimeConfig},
 };
 use fixture::{Response, Server};
 use serde_json::{Value as J, json};
@@ -90,12 +90,12 @@ fn model() -> Arc<dyn affordance::runtime::Model> {
 fn run(app: &Path, url: &str) -> J {
     let mut runtime = Runtime::new(config(app), encoder(), model());
     runtime.bind_machine("http", Arc::new(transport(url)));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    report.agents[0].stopped.clone().expect("app did not stop")
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    report.instances[0].stopped.clone().expect("app did not stop")
 }
 fn tool(name: &str) -> J {
     json!({"name": name, "description": "fixture tool", "inputSchema": {"type": "object", "properties": {
@@ -178,7 +178,7 @@ fn fixture() -> Server {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn tsx_mcp_discovers_pages_invokes_and_replays_without_network() {
     let dir = Scratch::new();
     let app = dir.app(r#"
@@ -209,12 +209,12 @@ harness.stop({info, listed, results, required, continued});
     config.dir = Some(dir.0.join("run"));
     let mut runtime = Runtime::new(config.clone(), encoder(), model());
     runtime.bind_machine("http", executor.clone());
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    let stopped = report.agents[0].stopped.as_ref().expect("did not stop");
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    let stopped = report.instances[0].stopped.as_ref().expect("did not stop");
     assert!(stopped.get("caught").is_none(), "{stopped}");
     assert_eq!(stopped["listed"]["tools"].as_array().unwrap().len(), 4);
     assert_eq!(stopped["listed"]["rejected"][0]["name"], "bad");
@@ -240,14 +240,14 @@ harness.stop({info, listed, results, required, continued});
     let calls = seen.len();
     drop(seen);
     assert_eq!(calls, 8);
-    let journal = std::fs::read_to_string(dir.0.join("run/a/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir.0, "run/a/journal.jsonl")).unwrap();
     assert!(!journal.contains("mcp-test-credential"));
     drop(server);
-    let mut resumed = Runtime::resume(config, encoder(), model()).unwrap();
-    resumed.bind_machine("http", executor);
-    let replay = resumed.run().unwrap();
-    assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
-    assert_eq!(replay.agents[0].stopped.as_ref(), Some(stopped));
+    let mut restored = Runtime::restore(config, encoder(), model()).unwrap();
+    restored.bind_machine("http", executor);
+    let replay = restored.run().unwrap();
+    assert!(replay.instances[0].error.is_none(), "{:?}", replay.instances[0].error);
+    assert_eq!(replay.instances[0].stopped.as_ref(), Some(stopped));
     assert_eq!(
         count.load(Ordering::SeqCst),
         calls,
@@ -256,7 +256,7 @@ harness.stop({info, listed, results, required, continued});
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn protocol_rpc_and_http_errors_are_distinct_from_tool_errors() {
     let dir = Scratch::new();
     let app = dir.app("const listed = await mcpClient('/mcp').listTools(); harness.stop(listed);");
@@ -323,20 +323,20 @@ fn protocol_rpc_and_http_errors_are_distinct_from_tool_errors() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn network_authority_is_still_an_instance_binding() {
     let dir = Scratch::new();
     let app = dir.app("await mcpClient('/mcp').discover(); harness.stop('unexpected');");
     let server = fixture();
     let mut runtime = Runtime::new(config(&app), encoder(), model());
     runtime.bind_machine("http", Arc::new(transport(&server.url)));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
     spec.machines = Some(vec![]);
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
     assert!(
-        report.agents[0].stopped.as_ref().unwrap()["caught"]["message"]
+        report.instances[0].stopped.as_ref().unwrap()["caught"]["message"]
             .as_str()
             .unwrap()
             .contains("no machine http")
@@ -345,7 +345,7 @@ fn network_authority_is_still_an_instance_binding() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn mcp_accepts_an_injected_fetch_function_with_standard_responses() {
     let dir = Scratch::new();
     let app = dir.app(
@@ -360,16 +360,16 @@ harness.stop(await client.listTools());
     );
     // No network binding: the injected function is ordinary app code.
     let mut runtime = Runtime::new(config(&app), encoder(), model());
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    assert_eq!(report.agents[0].stopped, Some(json!({"tools": [], "rejected": []})));
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    assert_eq!(report.instances[0].stopped, Some(json!({"tools": [], "rejected": []})));
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn example_exposes_only_app_selected_tools_and_dispatches_the_alias() {
     use affordance::runtime::GenReply;
     let app = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/views/demo/mcp/app.tsx"));
@@ -408,16 +408,16 @@ fn example_exposes_only_app_selected_tools_and_dispatches_the_alias() {
     let server = fixture();
     let mut runtime = Runtime::new(config(&app), enc, model);
     runtime.bind_machine("http", Arc::new(transport(&server.url)));
-    let mut spec = AgentSpec::new(
+    let mut spec = InstanceSpec::new(
         "a",
         json!({"task": "Try the remote tool.", "expose": {"echo": "remote_echo"}}),
     );
     spec.max_turns = Some(4);
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let report = runtime.run().unwrap();
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
     assert_eq!(calls.load(Ordering::SeqCst), 2, "{report:?}");
-    let state = &report.agents[0].state;
+    let state = &report.instances[0].state;
     let actions: Vec<&J> = state["__ui"]["@log"]["records"]
         .as_array()
         .unwrap()
@@ -441,7 +441,7 @@ fn example_exposes_only_app_selected_tools_and_dispatches_the_alias() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn mirrored_headers_encode_padding_newlines_and_literal_sentinels_and_skip_null() {
     let dir = Scratch::new();
     let app = dir.app(
@@ -478,7 +478,7 @@ harness.stop("done");
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn schema_annotations_are_checked_without_confusing_instance_data_with_schemas() {
     let dir = Scratch::new();
     let app = dir.app("harness.stop(await mcpClient('/mcp').listTools());");

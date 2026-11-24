@@ -26,7 +26,7 @@ Where it differs from OptMem:
 - **Write access is structural.** A session writes memory only through the `onNote` callback its
   parent passes it. A helper the session mounts gets no `onNote`, so it can read what it is given
   but cannot write.
-- **It is durable.** The memory is the root's journaled state, so a crash resumes the whole tree
+- **It is durable.** The memory is the root's journaled state, so a crash restores the whole tree
   (root and current session) from the journals.
 - **A session wakes once.** `wake` is fixed when the session mounts (`useState(wake)`). Notes made
   during the session change the root's memory, not the session's first message.

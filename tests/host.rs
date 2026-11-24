@@ -103,7 +103,7 @@ impl Frontend {
     }
 }
 
-fn start(url: &str, dir: &std::path::Path, resume: bool) -> Frontend {
+fn start(url: &str, dir: &std::path::Path, restore: bool) -> Frontend {
     let mut command = Command::new(env!("CARGO_BIN_EXE_affordance"));
     command
         .arg("host")
@@ -114,8 +114,8 @@ fn start(url: &str, dir: &std::path::Path, resume: bool) -> Frontend {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    if resume {
-        command.arg("--resume");
+    if restore {
+        command.arg("--restore");
     }
     let mut child = command.spawn().unwrap();
     let (tx, events) = channel();
@@ -148,7 +148,7 @@ fn a_frontend_drives_the_coding_chat_over_stdio() {
 
     // The call is announced, needs permission, and its output arrives as it runs; then its
     // result, and the reply streams.
-    f.send(json!({"type": "prompt", "text": "list files"}));
+    f.send(json!({"type": "event", "name": "user", "payload": {"text": "list files"}}));
     let calls = f.until("the call starting", ui("calls"));
     assert_eq!(calls["value"]["calls"][0]["name"], "run");
     assert_eq!(
@@ -185,13 +185,13 @@ fn a_frontend_drives_the_coding_chat_over_stdio() {
     assert_eq!(started["record"]["tool"], "run");
 
     // Escape in the middle of a long reply: it stops, and the chat waits for the next message.
-    f.send(json!({"type": "prompt", "text": "tell a story"}));
+    f.send(json!({"type": "event", "name": "user", "payload": {"text": "tell a story"}}));
     f.until("the story", |e| e["type"] == "delta" && e["text"] == "word3 ");
-    f.send(json!({"type": "abort"}));
+    f.send(json!({"type": "event", "name": "abort"}));
     f.until("idle after the abort", |e| {
         e["type"] == "ui" && e["value"]["state"] == "idle"
     });
-    f.send(json!({"type": "shutdown"}));
+    f.send(json!({"type": "close"}));
     f.until("exit", |e| e["type"] == "exit");
     assert!(f.child.wait().unwrap().success());
     let words = f
@@ -201,14 +201,14 @@ fn a_frontend_drives_the_coding_chat_over_stdio() {
         .count();
     assert!(words < 200, "the stream stopped soon after the abort ({words} words)");
 
-    let journal = std::fs::read_to_string(dir.join("root/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "root/journal.jsonl")).unwrap();
     let aborted: Vec<&str> = journal.lines().filter(|l| l.contains(r#""aborted":true"#)).collect();
     assert_eq!(aborted.len(), 1, "{journal}");
 
     // Closed, not lost: the run resumes from its journal, and a frontend that connects asks for
     // the conversation so far, with the story as it was cut.
     let mut f = start(&url, &dir, true);
-    f.send(json!({"type": "history"}));
+    f.send(json!({"type": "event", "name": "history"}));
     let history = f.until("the history", ui("history"));
     let history = history["value"]["history"].as_array().unwrap();
     let kinds: Vec<&str> = history.iter().map(|e| e["kind"].as_str().unwrap()).collect();
@@ -228,7 +228,7 @@ fn a_frontend_drives_the_coding_chat_over_stdio() {
             .unwrap()
             .starts_with("word0 word1 word2 word3 ")
     );
-    f.send(json!({"type": "shutdown"}));
+    f.send(json!({"type": "close"}));
     f.until("exit", |e| e["type"] == "exit");
     assert!(f.child.wait().unwrap().success());
     let _ = std::fs::remove_dir_all(&dir);
@@ -285,7 +285,7 @@ fn a_model_layer_serves_another_harnesss_conversation() {
     .unwrap();
     std::fs::write(
         dir.join("affordance.yaml"),
-        format!("root: {{app: app.tsx, model: default}}\nmodel: {{kind: chat, url: \"{url}\", model: local, context: 8192}}\n"),
+        format!("instances: [{{id: root, app: app.tsx, model: default}}]\nmodel: {{kind: chat, url: \"{url}\", model: local, context: 8192}}\n"),
     )
     .unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_affordance"))
@@ -351,7 +351,7 @@ fn a_model_layer_serves_another_harnesss_conversation() {
     assert_eq!(sent[3]["tool_call_id"], "call_1");
     assert_eq!(body["tools"][0]["function"]["name"], "bash");
     assert_eq!(body["max_tokens"], 300);
-    f.send(json!({"type": "shutdown"}));
+    f.send(json!({"type": "close"}));
     f.until("exit", |e| e["type"] == "exit");
     let _ = f.child.wait();
     let _ = std::fs::remove_dir_all(&dir);

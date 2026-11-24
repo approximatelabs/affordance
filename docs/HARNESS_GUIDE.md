@@ -249,7 +249,7 @@ record.
 ## 6. Effects: the harness API for external actions
 
 The runtime (`spec/HARNESS.md`, `docs/RUNTIME.md`) runs this loop for you: model calls, exact-id
-records, messages, waits, machines, resume. Use what follows only for a custom host.
+records, messages, waits, machines, restore. Use what follows only for a custom host.
 
 A handler that needs the outside world awaits a harness request. The host serves requests by
 **API name** (`machine:<role>`, `send`, `store.*`), so it never matches tool names:
@@ -282,7 +282,7 @@ Host loop for one tool call (`name`, `args` parsed from the reply):
    `{"kind": "action", "name": name, "result": ...}`.
 
 `Promise.all([...])` issues several requests at once (spec §7.2). A changed request on replay is a
-divergence error. Missing settlement counters use input order. Use `runtime::Agent` for long-lived
+divergence error. Missing settlement counters use input order. Use `runtime::Instance` for long-lived
 execution: it retains frames and only outstanding requests between inputs. The standalone
 transcript API retains no execution between calls.
 

@@ -5,7 +5,7 @@
 //! contains itself cannot go into state or to the host.
 use affordance::View;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Input};
+use affordance::runtime::{Input, Instance, InstanceConfig};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -51,7 +51,7 @@ class Counter {
 struct Rig {
     enc: Encoder,
     view: View,
-    agent: Agent,
+    agent: Instance,
     clock: i64,
 }
 
@@ -68,7 +68,7 @@ impl Rig {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("app.tsx"), APP).unwrap();
         let view = View::load(&dir.join("app.tsx"), "Main", &enc).unwrap();
-        let mut agent = Agent::new(AgentConfig {
+        let mut agent = Instance::new(InstanceConfig {
             context: None,
             retry: Default::default(),
             template: None,
@@ -101,7 +101,7 @@ impl Rig {
                 Input::Event {
                     name: name.into(),
                     payload,
-                    op: None,
+                    id: None,
                     clock_ms: self.clock,
                 },
             )
@@ -113,7 +113,7 @@ impl Rig {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_map_in_state_stays_a_map_and_changes_by_copy() {
     let mut r = Rig::new();
     r.event("add", json!({"k": "a", "v": 1}));
@@ -123,7 +123,7 @@ fn a_map_in_state_stays_a_map_and_changes_by_copy() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn state_is_frozen_and_copying_it_is_how_it_changes() {
     let mut r = Rig::new();
     r.event("copy", json!({}));
@@ -150,7 +150,7 @@ fn state_is_frozen_and_copying_it_is_how_it_changes() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_kept_closure_cannot_assign_its_captured_variable() {
     let mut r = Rig::new();
     r.event("assign-captured", json!({}));
@@ -163,7 +163,7 @@ fn a_kept_closure_cannot_assign_its_captured_variable() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_value_that_contains_itself_goes_neither_into_state_nor_to_the_host() {
     let mut r = Rig::new();
     r.event("cycle-into-state", json!({}));
@@ -181,7 +181,7 @@ fn a_value_that_contains_itself_goes_neither_into_state_nor_to_the_host() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_class_instance_in_state_keeps_its_class_and_is_frozen() {
     let mut r = Rig::new();
     r.event("counter-new", json!({}));
@@ -199,7 +199,7 @@ fn a_class_instance_in_state_keeps_its_class_and_is_frozen() {
 /// State nesting is bounded (128 levels), and the bound is the same when most of the depth is a
 /// subtree an earlier state check already passed (its height is kept, not walked again).
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn state_nesting_is_bounded_through_checked_subtrees() {
     let mut r = Rig::new();
     let mut fresh = vec![];

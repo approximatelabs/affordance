@@ -1,7 +1,7 @@
 //! Model calls (`model()`, `model(<View/>)`) and dispatching an output's calls.
 use super::*;
 
-impl Agent {
+impl Instance {
     /// `model(opts)`: the page's own view, rendered and laid out once, now, from live state, goes
     /// to the instance's model (the browser's `fetch`, with the page as its request). Its handlers
     /// are kept for `dispatch(output)`.
@@ -185,13 +185,14 @@ impl Agent {
             Kept {
                 view: Some((prepared, state, ctx, clock_ms, self.journaled as u64)),
                 calls: None,
-                dispatch: None,
-                results: None,
+                started: BTreeSet::new(),
+                results: vec![],
             },
         );
         // Old outputs go, and old undispatched views (a dispatch that is running keeps its own).
+        let running: BTreeSet<u64> = self.dispatches.values().map(|d| d.call).collect();
         while self.kept.len() > KEPT_OUTPUTS {
-            let Some(old) = self.kept.iter().find(|(_, k)| k.dispatch.is_none()).map(|(n, _)| *n) else {
+            let Some(old) = self.kept.keys().find(|n| !running.contains(n)).copied() else {
                 break;
             };
             self.kept.remove(&old);
@@ -199,7 +200,7 @@ impl Agent {
         let waiting: Vec<u64> = self
             .kept
             .iter()
-            .filter(|(_, k)| k.view.is_some() && k.dispatch.is_none() && k.results.is_none())
+            .filter(|(n, k)| k.view.is_some() && !running.contains(n) && k.started.is_empty())
             .map(|(n, _)| *n)
             .collect();
         for n in waiting.iter().take(waiting.len().saturating_sub(KEPT_VIEWS)) {
@@ -240,15 +241,14 @@ impl Agent {
                 .enumerate()
                 .map(|(i, c)| {
                     let name = c.name.clone();
-                    let problem = reply.problems.iter().find_map(|p| match p {
-                        Problem::UnknownAction(a) if *a == name => {
+                    // This call's own problem (`reply.problems` is the whole reply's, by name).
+                    let problem = match crate::reply::call_problem(&call.actions, &name, &c.args) {
+                        Some(Problem::UnknownAction(_)) => {
                             Some(format!("error: there is no tool named `{name}` on this screen"))
                         }
-                        Problem::BadArgs(e) if e.starts_with(&format!("{name}:")) => {
-                            Some(format!("error: bad arguments for {e}"))
-                        }
+                        Some(Problem::BadArgs(e)) => Some(format!("error: bad arguments for {e}")),
                         _ => None,
-                    });
+                    };
                     (
                         name,
                         c.args.clone(),
@@ -290,21 +290,25 @@ impl Agent {
             // a recovery image for as long as the app did not dispatch (a chat bot never does).
             if calls.is_empty() {
                 k.view = None;
-                k.results = Some(json!([]));
             }
+            k.results = vec![None; calls.len()];
             k.calls = Some(calls);
         }
         Outcome::Ok(value)
     }
 
-    /// `dispatch(output)`: run a page call's calls on the handlers of the view the model saw. A
-    /// second dispatch of the same output returns the same results.
+    /// `dispatch(output, {calls})`: run a page call's calls (all, or those at the indices given,
+    /// in that order) on the handlers of the view the model saw, and answer with their results.
+    /// Each call runs once: a call already started (by this dispatch or an earlier one) is waited
+    /// for, and one already answered gives its result again. So an app runs a reply's calls one
+    /// after another, all at once, or any way between, with plain promises.
     pub(super) fn dispatch(
         &mut self,
         view: &View,
         enc: &Encoder,
         waiter: (u64, usize),
         call: Option<u64>,
+        only: Option<Vec<Option<u64>>>,
     ) -> Result<(Option<Outcome>, Vec<Command>), String> {
         let mut out = vec![];
         let Some(n) = call else {
@@ -324,68 +328,102 @@ impl Agent {
         let Some(k) = self.kept.get_mut(&n) else {
             return Ok((Some(gone()), out));
         };
-        if let Some(r) = &k.results {
-            return Ok((Some(Outcome::Ok(r.clone())), out));
-        }
-        if let Some(d) = k.dispatch {
-            if let Some(d) = self.dispatches.get_mut(&d) {
-                d.waiters.push(waiter);
-            }
-            return Ok((None, out));
-        }
-        if k.calls.is_none() {
+        let Some(calls) = k.calls.clone() else {
             return Ok((
                 Some(Outcome::Error("InvalidStateError: dispatch before the reply".into())),
                 out,
             ));
-        }
-        // The tools run from the view; once dispatched, only the results stay.
-        let Some((prepared, state, ctx, clock, issued)) = k.view.take() else {
-            return Ok((Some(gone()), out));
         };
-        let calls = k.calls.take().unwrap();
+        let indices: Vec<usize> = match only {
+            None => (0..calls.len()).collect(),
+            Some(asked) => {
+                let mut indices = vec![];
+                for i in asked {
+                    match i.map(|i| i as usize).filter(|i| *i < calls.len()) {
+                        Some(i) if !indices.contains(&i) => indices.push(i),
+                        Some(_) => {}
+                        None => {
+                            return Ok((
+                                Some(Outcome::Error(format!(
+                                    "RangeError: dispatch: calls are indices into the output's {} calls",
+                                    calls.len()
+                                ))),
+                                out,
+                            ));
+                        }
+                    }
+                }
+                indices
+            }
+        };
+        let answered = |k: &Kept| {
+            J::Array(
+                indices
+                    .iter()
+                    .map(|&i| k.results[i].clone().unwrap_or(J::Null))
+                    .collect(),
+            )
+        };
+        if indices.iter().all(|&i| k.results[i].is_some()) {
+            return Ok((Some(Outcome::Ok(answered(k))), out));
+        }
+        let to_start: Vec<usize> = indices.iter().copied().filter(|i| !k.started.contains(i)).collect();
+        // The tools run from the view; once every call has been started, only the results stay.
+        let view_kept = match (&k.view, to_start.is_empty()) {
+            (_, true) => None,
+            (Some(v), false) => Some(v.clone()),
+            (None, false) => return Ok((Some(gone()), out)),
+        };
         let d = self.next_dispatch;
         self.next_dispatch += 1;
-        k.dispatch = Some(d);
         self.dispatches.insert(
             d,
             Dispatch {
                 call: n,
                 waiters: vec![waiter],
-                pending: BTreeSet::new(),
-                results: vec![None; calls.len()],
+                indices,
                 starting: true,
             },
         );
-        for (index, (name, args, call_id, problem)) in calls.into_iter().enumerate() {
-            match problem {
-                Some(error) => {
-                    self.dispatches.get_mut(&d).unwrap().results[index] =
-                        Some(json!({"name": name, "id": call_id, "result": error, "error": true}));
+        if let Some((prepared, state, ctx, clock, issued)) = view_kept {
+            for index in to_start {
+                let (name, args, call_id, problem) = calls[index].clone();
+                let k = self.kept.get_mut(&n).unwrap();
+                k.started.insert(index);
+                // Every call started: the view and the calls' arguments are no longer needed (only
+                // the results stay, and recovery images do not carry what was consumed).
+                if k.started.len() == calls.len() {
+                    k.view = None;
+                    for c in k.calls.iter_mut().flatten() {
+                        c.1 = J::Null;
+                    }
                 }
-                None => {
-                    let hid = self.next_handler;
-                    self.dispatches.get_mut(&d).unwrap().pending.insert(hid);
-                    let origin = Origin::Tool {
-                        name: name.clone(),
-                        call_id,
-                        dispatch: d,
-                        index,
-                        started_ms: self.clock_ms,
-                    };
-                    out.extend(self.start_handler_at(
-                        view,
-                        enc,
-                        origin,
-                        &name,
-                        0,
-                        args,
-                        state.clone(),
-                        ctx.clone(),
-                        clock,
-                        Some(prepared.clone()),
-                        Some(issued),
-                    )?);
+                match problem {
+                    Some(error) => {
+                        k.results[index] = Some(json!({"name": name, "id": call_id, "result": error, "error": true}));
+                    }
+                    None => {
+                        let origin = Origin::Tool {
+                            name: name.clone(),
+                            call_id,
+                            dispatch: d,
+                            index,
+                            started_ms: self.clock_ms,
+                        };
+                        out.extend(self.start_handler_at(
+                            view,
+                            enc,
+                            origin,
+                            &name,
+                            0,
+                            args,
+                            state.clone(),
+                            ctx.clone(),
+                            clock,
+                            Some(prepared.clone()),
+                            Some(issued),
+                        )?);
+                    }
                 }
             }
         }
@@ -396,23 +434,34 @@ impl Agent {
         Ok((None, out))
     }
 
-    /// Resolve the dispatches whose tools have all answered, with their results in call order.
+    /// Resolve the dispatches each of whose calls has answered, with their results in the order
+    /// asked.
     pub(super) fn finish_dispatches(&mut self) {
         let done: Vec<u64> = self
             .dispatches
             .iter()
-            .filter(|(_, d)| !d.starting && d.pending.is_empty())
+            .filter(|(_, d)| {
+                !d.starting
+                    && self
+                        .kept
+                        .get(&d.call)
+                        .is_none_or(|k| d.indices.iter().all(|&i| k.results.get(i).is_some_and(Option::is_some)))
+            })
             .map(|(k, _)| *k)
             .collect();
         for d in done {
             let Some(d) = self.dispatches.remove(&d) else {
                 continue;
             };
-            let results = J::Array(d.results.into_iter().map(|r| r.unwrap_or(J::Null)).collect());
-            if let Some(k) = self.kept.get_mut(&d.call) {
-                k.results = Some(results.clone());
-                k.dispatch = None;
-            }
+            let results = match self.kept.get(&d.call) {
+                Some(k) => J::Array(
+                    d.indices
+                        .iter()
+                        .map(|&i| k.results[i].clone().unwrap_or(J::Null))
+                        .collect(),
+                ),
+                None => J::Array(vec![]),
+            };
             for (h, i) in d.waiters {
                 self.resolve(h, i, Outcome::Ok(results.clone()));
             }

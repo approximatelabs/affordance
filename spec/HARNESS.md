@@ -11,17 +11,19 @@ Sections marked *not built* describe what it does not do yet.
 For ownership, document/computation boundaries and failure guarantees, see
 [CONTRACTS.md](CONTRACTS.md).
 
-Contract version: **8** (`CONTRACT_VERSION`, pinned in every journal). Version 8 pins a model
-binding by which model answers (kind, model, provider options, template, context), not how it is
-reached (docs/MODEL_BINDINGS.md); version 7 returned inspection paths as arrays of key segments.
-A journal of another version requires that version's binary to resume.
+Contract version: **9** (`CONTRACT_VERSION`, pinned in every journal). Version 9 carries an
+event's delivery id on the journaled event (`id`), not in its payload (`_msg`), and every model
+failure has its kind; version 8 pinned a model binding by which model answers (kind, model,
+provider options, template, context), not how it is reached (docs/MODEL_BINDINGS.md).
+A journal of another version requires that version's binary to restore.
 
 ## 1. Objects
 
 | Object | What it is |
 |---|---|
-| **Serving** | `affordance serve` delivers each HTTP request to the first instance as the event `request` (`{id, method, path, query, headers, body}`); the app answers with calls on the machine `client` (`{respond: id, status, headers, body}`, or streamed: `stream: true`, then `chunk`s, then `end`). An embedder posts events into a running runtime with `Runtime::inbox()`; each is journaled by the instance that takes it. See docs/RUNTIME.md. |
-| **Frontends** | `affordance host` runs a deployment for a frontend over stdio (JSON lines): prompts and aborts are the events `user` and `abort` to the first instance; a model's reply and a command's output stream out as they are produced (the observer's view, never journaled); the machine `ui` is the frontend (a call with `ask` waits for its answer). `Inbox::close` ends a run as closing a page does. See docs/RUNTIME.md. |
+| **Serving** | `affordance serve` delivers each HTTP request to the first instance as the event `request` (`{id, method, path, query, headers, body}`); the app answers with calls on the machine `client` (`{respond: id, status, headers, body}`, or streamed: `stream: true`, then `chunk`s, then `end`). An embedder posts events into a running runtime with `Control::post`; each is journaled by the instance that takes it. See docs/RUNTIME.md. |
+| **Frontends** | `affordance host` runs a deployment for a frontend over stdio (JSON lines): the control protocol's events go to the first instance; a model's reply and a command's output stream out as they are produced (the observer's view, never journaled); the machine `ui` is the frontend (a call with `ask` waits for its answer). See docs/RUNTIME.md. |
+| **Control** | A run's embedder holds a `Control` (`Runtime::control`): `post` an event (answered once it is committed; a `key` makes a repeated post a duplicate), `close` with a timeout for running calls, `status`, `set_model_limit`. The same operations reach a run over stdio (`affordance host`) or a Unix socket (`--control PATH`), and SIGINT/SIGTERM close it. A run is `starting`, `running`, `closing`, then `closed`; `Report.ended` says why (`stopped`, `idle`, `closed`, `max_wall`, `worker_lost`). See docs/RUNTIME.md, "Controlling a run". |
 | **Deployment** | The bindings a run starts with: model servers by name, machines by role, the run directory, limits. An `affordance.yaml` for `affordance run` (`docs/RUNTIME.md`), or a `RuntimeConfig` in Rust. |
 | **App** | A `.tsx` file and its imports. Its entry is the requested function, else the file's default export. Its identity is a hash of the entry name and every loaded file's relative path and contents (`View::source_hash`). A served app imports only from its own directory (and below) and from the library (the deployment's `library`, by default the nearest directory above the root app holding `index.json`, the installed `views/`), as a page loads scripts only from its allowed origins (CSP `script-src`). Paths are resolved through symlinks before the check; an import outside is a load error. |
 | **Instance** | An app mounted with props and bindings. It owns its state, journal and children. Its id is its path (`root/alice`). Every running thing is an instance: an agent, a root that mounts a fleet, a child of another app. |
@@ -55,8 +57,8 @@ mounts a child. A missing key unmounts it. Changed props are a `Props` input to 
 changed app, model or machines remounts it. Reconciliation is a deterministic function of state,
 so replay mounts the same children. A remount starts a fresh incarnation, including hook and
 store state. Recovery after a process restart restores the current incarnation instead. Old
-incarnations are preserved under the run directory's `.retired/` archive. Child keys cannot
-start with a dot or contain path separators or control characters. Inspection cursors are scoped to the
+incarnations are preserved under the run directory's `retired/`. Child keys cannot
+start with a dot or contain `/` or control characters. Inspection cursors are scoped to the
 incarnation, so reusing a child key produces a fresh state read.
 
 **The boundary.** The child runs as its own instance, so the element crosses a boundary, as a
@@ -87,7 +89,8 @@ its parent's. Top-level instances are bound to the deployment's machines unless 
 roles. With a model binding, an instance calls its model when its code says so
 (`model()`, §3); without one it only reacts.
 
-Children live on their parent's worker. Each journals under `<dir>/<parent>/<key>/`. On resume, a
+Children live on their parent's worker. Each journals in its own instance directory (below),
+like any instance. On restore, a
 parent's replay rebuilds its children set, and each child restores from its own journal and first
 props.
 
@@ -119,16 +122,15 @@ A task (a listener, an effect setup or cleanup, a tool call) runs its synchronou
 **Opt-in input frames.** Deployment `input_batch` (1..64, default 1) coalesces already-queued
 events/results per instance in a bounded worker window. A group is one `{"input":"batch",
 "inputs":[...]}` journal record, at most 1 MiB after blob lowering, written before execution or
-acknowledgement and committed like any record (§7). Oversized groups use individual records. Replies, ticks, props, control
-receipts, lifecycle operations and inspection are scheduling barriers; nested batches are
+acknowledgement and committed like any record (§7). Oversized groups use individual records. Replies, ticks, props, lifecycle
+operations and inspection are scheduling barriers; nested batches are
 invalid. No timer delays incoming work to fill a batch.
 
-Members run in order and drain their microtasks, with a fresh execution allowance per member.
-Listeners retain the frame's committed captures; functional setters see current state. Thus
-two `setN(n + 1)` calls using one captured `n` replace it with the same value, while two
-`setN(n => n + 1)` calls increment twice. Scheduled effects and reconciliation run at the frame
-boundary; explicit model/render calls still evaluate the requested document. Recorded
-batch boundaries govern replay. Agent `journal_len` counts logical members; JSONL line count
+Each member takes its own turn, as if it had arrived alone: its listeners run from a render of
+the current state, its microtasks drain, and its effects and reconciliation run, with a fresh
+execution allowance. A frame is a journal record, not an app-visible unit: batching never changes
+what an app computes (two queued `setN(n + 1)` give `n + 2`, as without it). A member that stops
+the instance ends the frame. Recorded batch boundaries govern replay. Agent `journal_len` counts logical members; JSONL line count
 counts physical frames. Checkpoint offsets and hashes remain byte-based. Existing individual
 records retain their semantics; older binaries cannot read the new batch shape.
 Every await yields to the instance's FIFO microtask queue. The current input's listeners run
@@ -170,7 +172,7 @@ that was already complete when the abort reached the model is journaled whole an
 normally (`aborted` absent): the journal decides the race. A machine call (and so `fetch`) is
 cancelled and rejects with `AbortError`. A call given a signal already aborted is never issued; it
 rejects with `AbortError` at once. A model call aborted and not yet answered when the host stops is
-stopped again on resume (it answers at once with what it has) rather than issued whole. Signals are
+stopped again on restore (it answers at once with what it has) rather than issued whole. Signals are
 the instance's: whether one is aborted, and why (`signal.aborted`, `signal.reason`,
 `signal.throwIfAborted()`), is kept with the instance (journal, images), so a controller kept in
 state, which is frozen, still aborts. They are read and aborted in handlers. `AbortSignal.abort()`
@@ -185,9 +187,13 @@ Native model responses must contain unsigned 32-bit integer token IDs; malformed
 protocol errors, rather than being silently dropped or truncated. Adapters do not retry these
 errors; the instance-level retry policy below still applies.
 
-`dispatch(output)` runs a page output's calls on the handlers of the view the model saw; each
-call's return value is its result, several run concurrently, and it resolves with
-`[{name, id, result, error?, ...meta}]` in call order. A call with a `problem` (an unknown tool, bad
+`dispatch(output, {calls?})` runs a page output's calls on the handlers of the view the model saw:
+all of them, or those at the indices in `calls`, and resolves with their
+`[{name, id, result, error?, ...meta}]` in the order asked. Each call's return value is its result,
+and the calls one dispatch starts run concurrently. A call runs once: dispatched again (alone or
+with others), it is waited for if running and its result given again once answered. So an app
+runs a reply's calls in order, all at once, or stopping at the first error, with plain promises
+(`views/lib/log.tsx` runs them in order by default). A call with a `problem` (an unknown tool, bad
 arguments) is answered with it and not run. Dispatching the same output again returns the same
 results; an output's view is kept until it is dispatched, or until 8 newer page calls have not been
 dispatched either; the output itself (for a repeated dispatch's results) is kept for 64 page calls.
@@ -214,21 +220,21 @@ IDs are overwritten. Held inputs receive IDs only when committed after the turn'
 |---|---|---|
 | `model(opts?)` | an output (see §3) | The page's own view to the instance's model. `{signal}` aborts it (§3). |
 | `model(<App .../>, opts?)` | an output | An ad-hoc prompt: lays out a component to exact ids and runs it once on the instance's model, through the same admission gate, rank pinning, captures and cancellation. The component's `protocol` span reads the reply. A prompt over `max_prompt` is not sent; the call fails with an error the task can catch. |
-| `dispatch(output)` | `[{name, id, result, error?, ...meta}]` | Runs a page output's calls (see §3). |
+| `dispatch(output, {calls?})` | `[{name, id, result, error?, ...meta}]` | Runs a page output's calls, or those at the indices given (see §3). |
 | `fetch(input, init?)` | `Promise<Response>` | Global Fetch over the bound `http` role. Supported options: `method`, `headers`, text `body`, `redirect`, `signal`. Headers, body readers and limitations: `docs/HTTP_AND_MCP.md`. |
 | `harness.machine.call(args, {signal}?)` | executor-specific JSON | The instance's first machine. An aborted `signal` cancels the call, which rejects with `AbortError`. Shell executors take `{cmd, timeout_s?, env?, stdin?}` and return `{output, exit, seconds, timed_out, truncated}`. Large strings cross as blob references (§7). |
 | `harness.machine.get(role).call(args)` | executor-specific JSON | A named one of several. `get` itself only names the machine; `call` issues the effect. |
 | `harness.send(to, payload, {event?})` | `{to, delivered}` | Event `message` (or `event`) to instance `to`, with `from` set by the harness (an operator's message has no `from`, so an app trusts control fields only without one). Completes when the receiver has journaled it. `mount:*` events are reserved (a `<Mount>`'s callbacks). |
 | `harness.send(ids, payload, {event?})` | `{delivered, failed, undelivered}` | Array of target IDs, deduplicated in input order. One result after all recipient acknowledgements; counts plus unconfirmed IDs in target order. Empty arrays succeed with zero counts. Self/missing/failed targets fail as for a single send. |
 | `harness.wait({ms?, events?})` | `{woke: "timeout"}` or `{woke: "event", event, payload}` | Parks the task. Without `ms`, waits only for an event. It wakes at once on a matching event journaled after the render its task runs from (one the model had not seen). |
-| `harness.inspect(targets, {select?, since?, as?})` | `{since, agents: {[id]: {version, changed, changes?, status}}}`, or with `as: "text"` `{since, text}` | A read-only copy of other instances' committed state (`targets`: an id, a list, or `"*"`), made on their workers between inputs; nothing is written to their journals. `select`: named hooks and `"props"` (whole, `{key, set}`), or `{key, path?, tail?}` (a followed list: `{key, path, from, items, length}`). `since`: an earlier read's opaque cursor; only changes to selections covered by that cursor are omitted. New/reselected paths, whole/follow modes and tail windows receive their initial copy even at the same journal position. The next cursor covers this call's selections. Values are JSON tagged where JSON has no word (`{"$": "map", entries}`). Needs the spec's `inspect` grant (§5). |
+| `harness.inspect(targets, {select?, since?, as?})` | `{since, instances: {[id]: {version, changed, changes?, status}}}`, or with `as: "text"` `{since, text}` | A read-only copy of other instances' committed state (`targets`: an id, a list, or `"*"`), made on their workers between inputs; nothing is written to their journals. `select`: named hooks and `"props"` (whole, `{key, set}`), or `{key, path?, tail?}` (a followed list: `{key, path, from, items, length}`). `since`: an earlier read's opaque cursor; only changes to selections covered by that cursor are omitted. New/reselected paths, whole/follow modes and tail windows receive their initial copy even at the same journal position. The next cursor covers this call's selections. Values are JSON tagged where JSON has no word (`{"$": "map", entries}`). Needs the spec's `inspect` grant (§5). |
 | `harness.store.put / get / search / list(args)` | `{key}`, `{text, offset, total}`, `{hits}`, `{keys}` | Per-instance storage. |
 | `harness.now()`, `harness.random()` | number | Logged values: replay sees the same. |
 | `harness.stop(value)` | nothing | Stops the instance. |
 | `Promise.all / race / any / allSettled` | as in JavaScript | Reactions run through the instance FIFO queue; `race` does not cancel other inputs. |
 
 **Data in a render:**
-- `harness.agent` (the instance id), `turn` (page calls so far), `clock_ms`, `env`, `prompt_tokens` (the last page prompt's length);
+- `harness.instance` (the instance id), `turn` (page calls so far), `clock_ms`, `env`, `prompt_tokens` (the last page prompt's length);
 - `machines` (the bound roles);
 - `owner`.
 
@@ -260,24 +266,20 @@ There is no other way out of the harness. Running on the harness's own host mean
 
 | Kind | Config | Runs |
 |---|---|---|
-| `local` | `home?` (`{agent}` filled) | `bash` on this host with only the instance's environ, in `home` when given. |
+| `local` | `home?`, `per_instance?` | `bash` on this host with only the instance's environ, in `home` when given (with `per_instance`, `home/<instance id>`). |
 | `ssh` | `target`, `key?`, `control_dir?`, `known_hosts?` | `bash` on a VM over a shared connection. |
-| `docker` | `image`, `name?` | `bash` in a container per instance, started on first use. |
-| `bwrap` | `home`, `network?` | `bash` in a bubblewrap sandbox: host read-only, `home` writable, no network by default. *Tested only where bubblewrap is installed.* |
+| `docker` | `image`, `name?` | `bash` in a container per instance (`<name>-<instance id>`), started on first use. |
+| `bwrap` | `home`, `per_instance?`, `network?`, `read?` | `bash` in a bubblewrap sandbox: host read-only, `home` writable, no network by default. *Tested only where bubblewrap is installed.* |
 | `command` | `argv`, `max_reply_bytes?` | A machine that brings its own executor: each call runs `argv` in its own process group, with `{agent, task, env, args}` as JSON on stdin, and takes a JSON result from stdout (at most `max_reply_bytes`, default 128 MiB: past it the call fails and the group is stopped). A cancelled call's group gets SIGTERM, then SIGKILL after 5 s. |
 | `http` | `url`, `headers?`, `timeout_ms?`, `max_request_bytes?`, `max_response_bytes?` | A generic HTTP executor on a bound origin. Calls take `{path?, method?, headers?, body?, timeout_ms?}` and return `{status, statusText, url, headers, body}`. Global Fetch uses the role `http`; named fetch functions use their assigned role. Protected headers are inserted by the host. See `docs/HTTP_AND_MCP.md`. |
 
-Local and bubblewrap home templates and Docker name templates replace `{agent}` with a safe,
-collision-free component: `i-` followed by UTF-8 bytes, retaining ASCII letters, digits, `-`
-and `.`, and escaping every other byte as `_hh` (including `_`). Example: `root/child` becomes
-`i-root_2fchild`, distinct from `root_child` (`i-root_5fchild`). Docker names are validated and
-names/images are passed as arguments. SSH target/key templates retain their documented raw ID
-substitution. Upgrading an existing local/bubblewrap deployment requires moving each old home
-to its new component path, or using an explicit fixed home; instance IDs and journals do not
-change. Docker deployments similarly need their old containers renamed if retaining them.
-
-`{n}` and `{id}` in a machine's config make one machine per agent. `count` makes a pool of roles
-(`vm-{n:04}`) that a root hands out.
+An instance's place on a machine (a `per_instance` home, its container) is named by the instance's
+id in the run (`instances/<id>/`), never by its name; outside a run (an executor called directly)
+the name stands in, escaped into one component (`i-` and the UTF-8 bytes, ASCII letters, digits,
+`-` and `.` kept and every other byte `_hh`: `root/child` is `i-root_2fchild`). Docker names are
+validated and names and images are passed as arguments. An ssh target and key are what the
+deployment says. `count` makes a pool of roles (`vm-{n:04}`, `{n}` the member's number) that a
+root hands out.
 
 A call's `stdin` reaches the command byte for byte as its standard input; a command that does not
 read it never runs it as script. A `command` machine gets it as `args.stdin`.
@@ -311,7 +313,7 @@ render from fields instead of JSON reply IDs. A passive (`callable:false`) rende
 definitions but disables provider calls in all hosted adapters, after merging request settings.
 Provider call responses violate this restriction and fail explicitly, including partial calls. Explicit template imports remain available.
 Template selection/options are part of configured binding identity; imported template sources
-are part of the app source pin. Direct `Agent` users supply resolved `AgentConfig.template`.
+are part of the app source pin. Direct `Instance` users supply resolved `InstanceConfig.template`.
 
 The stock CLI and `runtime::model::from_config` use one strict configuration contract.
 Unknown keys, wrong types, adapter-inapplicable settings and protected-field conflicts fail
@@ -418,7 +420,7 @@ next attempt waits at least that long, up to 300 s.
 Each failure is a journaled input carrying its kind and the server's requested wait, and the
 wait runs on the instance's clock. A replay or a restore therefore retries exactly as the run
 did. The trace has one `model_error` record per failure with `kind`, `failures` and
-`retry_in_ms`. A resumed instance keeps the policy it was started with.
+`retry_in_ms`. A restored instance keeps the policy it was started with.
 
 When the policy gives no further attempt, the awaiting task sees the error as a rejected
 promise, which the app can catch (`useLoop` stops the instance with it: `loop_error`).
@@ -468,7 +470,7 @@ durable at a commit. A commit syncs every journal written since the previous one
 appends their lengths to `<dir>/commit.jsonl`. A commit starts as soon as something waits on
 one or a worker has nothing queued, and otherwise at most 2 ms after the first record it covers.
 Effects that leave the process wait for the commit of the input that caused them: model
-requests, machine calls, control receipts and the status files. A fresh mount over an old
+requests, machine calls, the answer to an embedder's post, and the clock record. A fresh mount over an old
 instance directory (which it archives) waits for the commit too. Deliveries between instances
 (`harness.send`, its acknowledgement, callbacks), timers, the instance tree and `store.*`
 operations do not wait. Store records and blob files are written without a sync; a commit syncs
@@ -483,12 +485,12 @@ crash left named but empty is rewritten rather than reused. A record is written 
 it, so the truncated journals are a state the run passed through. No receiver keeps a delivery
 whose send was lost, and no sender keeps an acknowledgement for a delivery that was lost. A
 crash loses only the work since the last commit, and nothing outside the process observed that
-work. A clean shutdown commits everything and closes the log; a resume after it (or of a run
+work. A clean shutdown commits everything and closes the log; a restore after it (or of a run
 directory without a commit log) truncates nothing, so the journals stand as they are. Only the
 log's final line may be torn (an interrupted commit); a bad line before it is an error naming
 its byte offset, and recovery truncates nothing. Each truncation is reported on stderr with the
-instance id and byte counts. An instance whose `agent.json` cannot be read is left as it is and
-is not resumed; a journal whose last record cannot be read fails that instance's restore alone.
+instance id and byte counts. An instance whose `instance.json` cannot be read is left as it is and
+is not restored; a journal whose last record cannot be read fails that instance's restore alone.
 
 A runtime owns its run directory: before recovery it takes an exclusive lock on
 `<dir>/runtime.lock` and holds it until the run returns. A second runtime over the same
@@ -511,7 +513,7 @@ is in memory. Replay reconstructs computation, not live sockets, processes or a 
 heap. Outstanding external calls can run again (§5); cancellation does not undo remote writes.
 Deployment environment and credentials must be supplied again on restore.
 
-**Recovery checkpoints.** With a run directory the host may write `<id>/checkpoint.json`,
+**Recovery checkpoints.** With a run directory the host may write an instance's `checkpoint.json`,
 an optional recovery cache. It keeps the complete journal and all historical data. A compatible
 image restores supported data/metadata at a complete input boundary, then applies only newer
 journal inputs. An image is of an idle agent (no pending execution, cleanup closures or
@@ -531,27 +533,27 @@ dependencies, change notes (`harness.inspect`), counters, clock/randomness and d
 are preserved.
 
 The host writes an image after 256 additional inputs (of the agent if idle, else of its latest
-step boundary), and at shutdown and stop, so a pause images every agent that reached a step
-boundary and its resume replays at most the current step's inputs. Instances with configured
+step boundary), and at shutdown and stop, so a close images every agent that reached a step
+boundary and its restore replays at most the current step's inputs. Instances with configured
 secret environment values do not use recovery caches. Checkpoints require the same app source,
-entry, tokenizer, contract, complete AgentConfig, replay mode, spill threshold and model
+entry, tokenizer, contract, complete InstanceConfig, replay mode, spill threshold and model
 template; a model server's address, credentials, ranks and sampling are not part of the
 identity. The cache validates its checksum, the journal's last 64 KiB before the image's
 offset (so an image belongs to its journal) and the existence of every blob the journal refers
 to (recorded as lines are journaled); an unusable cache falls back to full replay. Restoring
-from an image reads only the journal after it: validation and receipts cover that suffix, and
-the last clock comes from the journal's tail. A full replay still reads and validates the whole
+from an image reads only the journal after it: validation covers that suffix (the delivery ids
+already taken are in the image), and the last clock comes from the journal's tail. A full replay still reads and validates the whole
 journal. Cache-write failure leaves the durable journal authoritative. Checkpoints neither
 migrate older formats nor serialize suspended stacks or host resources.
-`snapshot.json` remains diagnostic; the root run's `checkpoint.json` remains its shutdown report.
+`snapshot.json` remains diagnostic.
 
-**Pins.** `agent.json` records `pins: {contract, app, tokenizer}` from the first start. Each
-journaled reply carries the hash of the prompt it answered. On resume, the first turn whose prompt
-the current app no longer renders is reported (`diverged_at`). With `replay: "strict"` the resume
+**Pins.** `instance.json` records `pins: {contract, app, tokenizer}` from the first start. Each
+journaled reply carries the hash of the prompt it answered. On restore, the first turn whose prompt
+the current app no longer renders is reported (`diverged_at`). With `replay: "strict"` the restore
 is refused. A journal pinned to another `contract` is always refused: its inputs mean something
-else under this one, so it resumes only on a binary of its own contract.
+else under this one, so it restores only on a binary of its own contract.
 
-**The clock is logical.** It resumes from the saved clock, so time while stopped does not expire
+**The clock is logical.** It continues from the saved clock, so time while stopped does not expire
 waits.
 
 ## 9. Limits
@@ -574,8 +576,8 @@ waits.
 | Exec capture | 16 MiB | `truncated: true`. |
 | `command` reply (`max_reply_bytes`) | 128 MiB | The call fails and the command is stopped (a JSON reply cut short is not a result); stderr is kept to 64 KiB. |
 | `spill_bytes` | 64 KiB | Strings past it live on disk. |
-| `model_inflight` | `model_threads` | Model calls in flight, balanced across ranks. Adjustable while running (§10). |
-| `restore_concurrency` | CPUs available | Instances restoring at once on resume; the rest wait. Bounds the boot peak to the steady heap plus this many restores. |
+| `model_inflight` | `model_threads` | Model calls in flight, balanced across ranks. Adjustable while running (`Control::set_model_limit`). |
+| `restore_concurrency` | CPUs available | Instances restoring at once on restore; the rest wait. Bounds the boot peak to the steady heap plus this many restores. |
 
 *Not built:* storage quotas, per-minute call rates.
 
@@ -583,41 +585,59 @@ waits.
 
 Root specs accept `dedicated_worker: true`: allocate an additional render worker for that root
 and its mounted descendants, excluding other roots. `workers` still sizes the shared root
-pool. Placement applies to startup/resume membership; there is no dynamic root-spawn API.
+pool. Placement applies to startup/restore membership; there is no dynamic root-spawn API.
 Reports expose the physical worker index as diagnostics, not app state. Which root to isolate
 is deployment policy; there is no built-in channel hub. Children retain parent-worker placement.
 
-Multicast uses the existing `send` capability and `_msg` replay deduplication. It is not an
+Multicast uses the existing `send` capability and delivery-id replay deduplication (a send's
+event carries its message id as the journaled event's `id`, never in its payload). It is not an
 atomic multi-recipient transaction. A queued delivery dropped before commit reports failure;
 a completed aggregate result is replayed without sending again. Unfinished sends may repeat,
 and already-journaled receivers deduplicate them. Old sender incarnations cannot receive late
 acknowledgements. Journals are synced together by commits (§7), across instances and workers.
 
-With `dir`, the run directory is the operator's interface:
+With `dir`, the run directory holds the run's durable state (a controller uses `Control`, not
+these files). An instance's name is a label and never becomes a path: each instance, a child
+included, lives in `instances/<id>/` under an id the runtime assigned when it was first created
+(a UUIDv7), and its `instance.json` records its name. The run's own files sit beside `instances/`,
+where no name reaches them.
 
 | Path | Meaning |
 |---|---|
-| `<id>/agent.json` | The instance's spec and pins. Secrets are removed. |
-| `<id>/journal.jsonl` | Its inputs. **Sensitive:** tool outputs and messages are stored as they were. |
-| `commit.jsonl` | The journals' commits: each journal's committed length, by instance (§7). Resume truncates journals to the last one. |
+| `run.json` | The run's own record: the directory holds a run. |
+| `instances/<id>/instance.json` | The instance's name, spec and pins. Secrets are removed. |
+| `instances/<id>/journal.jsonl` | Its inputs. **Sensitive:** tool outputs and messages are stored as they were. |
+| `commit.jsonl` | The journals' commits: each journal's committed length, by instance (§7). A restore truncates journals to the last one. |
 | `runtime.lock` | Locked by the runtime that owns the directory (§7). |
-| `<id>/trace.jsonl` | Renders, replies, model calls (usage, cost), semantic tool completions, handler errors, stops. Secrets redacted. |
-| `<id>/snapshot.json` | Diagnostic state and metrics at shutdown. |
-| `<id>/checkpoint.json` | Optional verified recovery image and journal cursor (§8); distinct from the root shutdown report. |
+| `instances/<id>/trace.jsonl` | Renders, replies, model calls (usage, cost), semantic tool completions, handler errors, stops. Secrets redacted. |
+| `instances/<id>/snapshot.json` | Diagnostic state and metrics at shutdown. Secrets redacted. |
+| `instances/<id>/checkpoint.json` | Optional verified recovery image and journal cursor (§8). |
+| `retired/<id>/` | An instance a fresh mount (or a fresh run) replaced, as it was. |
 | `blobs/` | Large strings (§7). |
-| `clock.json`, `observed.json`, `checkpoint.json` | The logical clock, live status per instance, the last shutdown. The first two are rewritten about every 100 ms by a status thread (latest snapshot wins, so a slow disk delays neither pause handling nor the agents); the shutdown writes `clock.json` (`paused: true`) and `checkpoint.json` synchronously. An instance's status has its `state` (`starting`, `idle`, `model`, `tool`, `waiting`, `retrying`, `stopped`, `failed`), `healthy` and `handler_errors` (the errors thrown by its handlers, effects and callbacks, which no awaiter may see). While a model call retries a failure (§6), the state is `retrying` and `retrying` is `{failures, error}`: the failures so far and the last one's kind (`rate_limited`, `server_error`, `rejected`, `unreachable`, `timeout`, `aborted`, `cancelled` or `error`; never the server's address). A retrying instance is still healthy; otherwise `retrying` is null. `observed.json`'s `models` has each binding's window: `{name: {context, source}}` (§6 `context`; `source` is `server /v1/models`, `server /get_server_info`, `configured`, or `configured (the server reported none: ...)`; null without a window). |
-| `model_inflight` | One integer. Overrides the model admission limit while running. |
-| `control/pause.json` | `{mode: graceful \| fast \| immediate}` suspends the run (journals intact; `--resume` continues). Queued sends and inbox messages are not applied while it drains; their senders' calls stay outstanding and the resume delivers them (docs/RUNTIME.md, Serving and draining). |
-| `control/inbox/<op>.json` | `{operation_id, targets, payload}` delivers an operator message. It is journaled as an event with `op`, and acknowledged in `control/receipts/<id>/<op>.json`. Never delivered twice. |
+| `clock.json` | Where the logical clock stood (private recovery state, not an interface): rewritten about every 100 ms by its own thread, and at the end of the run, so a restore continues the clock from there, even after a crash during a long quiet wait. |
 
-`AFFORDANCE_CAPTURE_DIR` captures every model request and response. Capture is best-effort, like a
-browser's network log: a failed write never fails or resends the call; it is logged, counted in
-`observed.json`'s and the run report's `capture_errors`, and leaves no file.
+A run's live status is `Control::status` (also `status` over stdio or the control socket): its
+`state`, `clock_ms`, the model bindings' windows (`models`: `{name: {context, source}}`, §6
+`context`; `source` is `server /v1/models`, `server /get_server_info`, `configured`, or
+`configured (the server reported none: ...)`; null without a window), the model queue, and each
+instance. An instance's status has its `state` (`starting`, `idle`, `model`, `tool`, `waiting`,
+`retrying`, `stopped`, `failed`), `healthy` and `handler_errors` (the errors thrown by its
+handlers, effects and callbacks, which no awaiter may see). While a model call retries a failure
+(§6), the state is `retrying` and `retrying` is `{failures, error}`: the failures so far and the
+last one's kind (`rate_limited`, `server_error`, `rejected`, `unreachable`, `timeout`,
+`aborted`, `cancelled` or `error`; never the server's address). A retrying instance is still
+healthy; otherwise `retrying` is null.
+
+`AFFORDANCE_CAPTURE_DIR` (`RuntimeConfig.capture_dir` in Rust) captures every model request and
+response of the run. Capture is best-effort, like a browser's network log: a failed write never
+fails or resends the call; it is logged, counted in the status's and the run report's
+`capture_errors` (per run), and leaves no file.
 
 ### Semantic tool completion traces
 
-The journal's clock (`clock_ms`) is logical: it continues from where a paused run stopped, so
-a pause takes no time from waits and timeouts. Each start and resume writes a trace record
+The journal's clock (`clock_ms`) is logical: it stands still while a run's agents restore and
+from the moment the run begins closing, and continues from there, so neither a slow restore nor
+the time a run is closed takes anything from waits and timeouts. Each start and restore writes a trace record
 `{t:"clock", at_ms, wall_ms}`; until the next one, wall time is `at_ms + (wall_ms - at_ms)`.
 
 Every trace record has `at_ms`, its time in the journal's clock (`clock_ms`): when what it
@@ -639,7 +659,7 @@ canonical tool name; names over 128 Unicode characters use a 63-character
 prefix plus `#` and the full SHA256 of the name to remain bounded and distinct.
 `(agent, dispatch, index)` identifies the semantic call. `ms` is nonnegative logical elapsed milliseconds
 from actual dispatch, not the earlier clock captured by its view. It includes
-logical time passing across pause/recovery; it is not executor CPU time. `status` is
+logical time passing across close/restore; it is not executor CPU time. `status` is
 `"error"` for a thrown handler error or, in a `{result, ...meta}` answer, explicit
 `error:true`, `timed_out:true`, or a nonzero integer `exit`; otherwise it is `"ok"`.
 Other returned values are ordinary result data, not metadata envelopes.
@@ -653,7 +673,7 @@ excluded. Machine/store/send subcalls, callbacks and pending or rejected
 undispatched calls do not produce semantic completion events. An early answer
 is counted when returned even if background work continues; its later success
 or failure produces no second completion. Restore discards reconstructed
-traces and preserves outstanding work, so resuming completed calls does not
+traces and preserves outstanding work, so restoring completed calls does not
 append duplicates. Traces are best-effort diagnostics, not a transactional
 exactly-once lifetime ledger: a process crash between journal and trace writes
 can lose a completion. Consumers count completions in their bounded trace tail;

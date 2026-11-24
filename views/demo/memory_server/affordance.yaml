@@ -1,10 +1,11 @@
 # A chat model with a memory longer than its context, behind an OpenAI-compatible endpoint.
 #   affordance serve            (then point any OpenAI client at http://127.0.0.1:8000/v1)
 # Set model.url to an OpenAI-compatible server (llama.cpp, vLLM, Ollama) or a hosted API with
-# key_env. Restart with `affordance serve --resume`: the conversations continue.
-root:
-  app: app.tsx
-  model: default       # the root makes the model calls
+# key_env. Restart with `affordance serve --restore`: the conversations continue.
+instances:
+  - id: root
+    app: app.tsx
+    model: default       # the root makes the model calls
 model:
   kind: chat
   url: http://127.0.0.1:8080/v1

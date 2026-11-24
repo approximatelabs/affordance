@@ -17,7 +17,7 @@ machines:
   home:
     kind: local        # this machine's shell
 
-agents:
+instances:
   - id: first
     max_turns: 8
     props:

@@ -17,9 +17,12 @@ pub struct RuntimeConfig {
     /// Threads that run machine commands and other host calls.
     pub exec_threads: usize,
     /// Model calls in flight at once (the rest wait in arrival order); `None`: `model_threads`.
-    /// With `dir`, the file `<dir>/model_inflight` (one integer) overrides it while running, so a
-    /// controller outside the runtime can steer it from the model server's own metrics.
+    /// `Control::set_model_limit` changes it while running, so a controller outside the runtime
+    /// can steer it from the model server's own metrics.
     pub model_inflight: Option<usize>,
+    /// Where every model request and response is written, by agent (diagnostics, like a browser's
+    /// network log; the command sets it from `AFFORDANCE_CAPTURE_DIR`).
+    pub capture_dir: Option<PathBuf>,
     /// Instances restoring at once (replaying a journal or loading an image); the others wait
     /// their turn. Each restore holds its whole journal's working set for a moment, so the boot
     /// peak is the steady heap plus this many of them. `None`: the CPUs this process may use.
@@ -37,18 +40,18 @@ pub struct RuntimeConfig {
     /// that does not read it turns this off, so a shutdown does not materialize every log at once
     /// (each agent's `snapshot.json` has it).
     pub report_state: bool,
-    /// On resume, refuse an agent whose journal no longer replays to the same prompts (instead of
+    /// On restore, refuse an agent whose journal no longer replays to the same prompts (instead of
     /// recording `diverged_at` and continuing).
     pub strict_replay: bool,
     /// The deployment layer of every agent's environ.
     pub env: BTreeMap<String, String>,
-    /// Environ keys whose values are redacted in traces and in `agent.json`.
+    /// Environ keys whose values are redacted in traces and in `instance.json`.
     pub secrets: BTreeSet<String>,
-    /// Give up after this long (agents keep their journals; `resume` continues them).
+    /// Give up after this long (agents keep their journals; `restore` continues them).
     pub max_wall: Option<Duration>,
-    /// Serve: keep running while instances are idle (a chat waiting for its user), reading the
-    /// control inbox, until every instance stops, `max_wall`, or a pause. Without it (batch), the
-    /// run returns once nothing is in flight and no instance waits on anything.
+    /// Keep running while instances are idle (a chat waiting for its user, a server waiting for
+    /// requests), until every instance stops, `max_wall`, or `Control::close`. Without it (batch),
+    /// the run returns once nothing is in flight and no instance waits on anything.
     pub serve: bool,
     /// Bound on a single executor call.
     pub call_timeout: Duration,
@@ -132,6 +135,7 @@ impl RuntimeConfig {
             model_threads: 64,
             exec_threads: 64,
             model_inflight: None,
+            capture_dir: None,
             restore_concurrency: None,
             library: None,
             dir: None,
@@ -151,7 +155,7 @@ impl RuntimeConfig {
 
 /// One agent to run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentSpec {
+pub struct InstanceSpec {
     /// The agent's id: its directory name, and how other agents address it.
     pub id: String,
     /// A private render worker for this startup root and its descendants.
@@ -182,7 +186,7 @@ pub struct AgentSpec {
     /// `false`: no instance may inspect this one (nor its children).
     #[serde(default = "yes", skip_serializing_if = "is_yes")]
     pub inspectable: bool,
-    /// The hard prompt ceiling (see `AgentConfig::max_prompt`); children inherit it.
+    /// The hard prompt ceiling (see `InstanceConfig::max_prompt`); children inherit it.
     #[serde(default)]
     pub max_prompt: Option<usize>,
     /// Data-parallel rank to pin to; `None`: a stable hash of the id.
@@ -191,9 +195,6 @@ pub struct AgentSpec {
     /// The seed of `Math.random` and `harness.random`.
     #[serde(default)]
     pub seed: u64,
-    /// The agent's index in its deployment (fills `{n}` in machine configs, e.g. its VM).
-    #[serde(default)]
-    pub index: usize,
     /// Its app (a .tsx file); `None`: the runtime's `view`.
     #[serde(default)]
     pub app: Option<String>,
@@ -218,10 +219,10 @@ pub(super) fn is_no(b: &bool) -> bool {
     !*b
 }
 
-impl AgentSpec {
+impl InstanceSpec {
     /// An agent `id` with root props `props` and default limits.
     pub fn new(id: &str, props: J) -> Self {
-        AgentSpec {
+        InstanceSpec {
             id: id.into(),
             dedicated_worker: false,
             props,
@@ -235,7 +236,6 @@ impl AgentSpec {
             inspectable: true,
             rank: None,
             seed: 1,
-            index: 0,
             app: None,
             entry: None,
             model: default_model(),

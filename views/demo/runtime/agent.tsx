@@ -17,7 +17,7 @@ function lastModel(transcript) {
 
 function Screen({ notes, unread, nudge, setNotes, setUnread, log }) {
   return <>
-    <box label="status">{`${harness.agent} | turn ${harness.turn} | unread: ${unread}\nNotes: ${notes}\n`}</box>
+    <box label="status">{`${harness.instance} | turn ${harness.turn} | unread: ${unread}\nNotes: ${notes}\n`}</box>
     {nudge ? <box label="nudge">{nudge + "\n"}</box> : ""}
     <aff label="shell" tool_name="shell" description="Run a shell command in your VM."
          args_schema={{type: "object", properties: {command: {type: "string"}}, required: ["command"]}}

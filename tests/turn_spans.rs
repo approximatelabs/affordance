@@ -222,7 +222,7 @@ fn llama31_marks_each_message() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn glm53_keeps_an_assistant_with_its_observation_block() {
     let s = spans("GLM53App", "zai-org__GLM-5.3", qwen_log());
     assert_eq!(
@@ -249,7 +249,7 @@ fn glm53_keeps_an_assistant_with_its_observation_block() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn deepseek_v41_marks_each_exchange() {
     let s = spans(
         "DeepSeekV41App",
@@ -406,7 +406,7 @@ fn a_sheet_drops_whole_history_turns() {
 
 /// `clip-middle` keeps the head and the tail; `more` names what was hidden.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn clip_middle_keeps_head_and_tail() {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/Qwen__Qwen3-8B.json"));
     let dir = std::env::temp_dir().join(format!("aff-clip-middle-{}", std::process::id()));
@@ -445,7 +445,7 @@ fn clip_middle_keeps_head_and_tail() {
 /// `max-tokens: 80win` is a share of the prompt's window, which the model binding's `context`
 /// sets; with no window (no `context`) it caps nothing, like a page with no viewport.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_window_share_without_a_window_caps_nothing() {
     let (_, plain) = render_app("Qwen3App", "Qwen__Qwen3-8B", long_log(30), "");
     let (_, r) = render_app(
@@ -460,7 +460,7 @@ fn a_window_share_without_a_window_caps_nothing() {
 /// Tool output is capped by layout, in tokens: a `result` rule boxes each tool result's content
 /// inside its turn (the protocol tokens around it stay), and `{id}` names the record.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_sheet_caps_tool_results_in_tokens() {
     let long: String = (0..400).map(|i| format!("line {i} of the build output\n")).collect();
     let log = json!([
@@ -515,7 +515,7 @@ fn a_sheet_caps_tool_results_in_tokens() {
 /// Descendant selectors: an app styles the history its template writes by its own props
 /// (`Policy[mode="trunc"] history { ... }`), as CSS selects an element inside a classed one.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_descendant_selector_styles_the_history_inside_an_app_component() {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/Qwen__Qwen3-8B.json"));
     let dir = std::env::temp_dir().join(format!("aff-descendant-{}", std::process::id()));
@@ -571,7 +571,7 @@ export default function Main({{ log, mode }}) {{ return <Policy mode={{mode}} lo
 /// message, or a call with all its results) from the start; the system message and the screen
 /// stay, and a call never loses its results.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_hosted_history_drops_whole_units_before_serialization() {
     let messages = |tss: &str| {
         let (enc, r) = render_app("MessagesApp", "Qwen__Qwen3-8B", long_log(40), tss);
@@ -628,7 +628,7 @@ fn graded_log(n: usize) -> J {
 /// Graded overflow: `result:nth-last(n+K / S)` elides results at
 /// least K from the end among the history's, the boundary moving S at a time, natively and hosted.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn old_results_elide_in_steps() {
     let tss = r#"result:nth-last(n+5 / 3) { max-tokens: 6tok; overflow: elide; more: "[elided]"; }"#;
     for (app, tokenizer) in [
@@ -672,7 +672,7 @@ fn old_results_elide_in_steps() {
 
 /// Grading never moves a history drop's cut: the drop measures results at their static length.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn grading_does_not_move_the_history_cut() {
     let drop = "history { max-tokens: 900tok; overflow: drop-start; drop-step: 25%; }";
     let graded =
@@ -733,7 +733,7 @@ fn template_apps_emit_tokens_not_text_that_spells_them() {
 /// `reasoning_effort` reaches its prompt, and an option the app does not take (GLM-5.3 has no
 /// thinking switch) is refused, not silently ignored.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn template_options_are_the_apps_own() {
     use affordance::runtime::model::ModelTemplate;
     let error = ModelTemplate::new("glm53", json!({"enable_thinking": true})).unwrap_err();
@@ -780,7 +780,7 @@ export default function Main({{ effort }}) {{
 /// the box is then treated as over, not laid out whole. Found by the proof in `src/fit.rs`,
 /// whose claim had this as its one exception.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_history_cap_holds_when_old_results_grow() {
     let tss = "history { max-tokens: 1545tok; overflow: drop-start; }\n\
                result { max-tokens: 6tok; }\n\

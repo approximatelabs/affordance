@@ -22,7 +22,7 @@ by a developer. When a need appears here, the first question is what the web's a
 | The event loop | One instance: ordered inputs, tasks, microtasks |
 | `fetch` | `model()` (a fetch of a view), `harness.machine.call`, `fetch` |
 | `AbortController` | `AbortController` |
-| `postMessage` between windows | `harness.send` between instances; `Runtime::inbox` from outside |
+| `postMessage` between windows | `harness.send` between instances; `Control::post` from outside |
 | An iframe | `<Mount>`: a child instance with its own state and journal |
 | A Service Worker answering `fetch` events | `affordance serve`: the event `request`, answered on the machine `client` |
 | DevTools: console, network panel, the protocol | `console`, the observer, `affordance host` |
@@ -55,9 +55,9 @@ a conversation, a permission prompt or a file is.
    engine does not change.
 3. **If something is truly missing, add the smallest general primitive**: nothing in it names a
    product, a vendor, a file or a process; it is useful beyond the case that prompted it; a replay
-   reproduces it; it behaves under cancellation, pause and restore.
+   reproduces it; it behaves under cancellation, close and restore.
 4. **Check the ordinary cases**: a chat bot, an autonomous tool-using agent, a fleet of agents, a
-   resumed journal. If one needs a workaround, the primitive is wrong.
+   restored journal. If one needs a workaround, the primitive is wrong.
 
 ## Decisions, and why they went the way they did
 
@@ -93,7 +93,7 @@ summary says, is the app's: it listens for the layout event and makes an ordinar
 Worker's `fetch` event and `respondWith`. So a request is an event to the app, and the response
 is a call on a machine named `client`. Routing, JSON, and an OpenAI-compatible API are library
 TSX. The one thing that was missing was a way for a program outside to post an event into a
-running runtime; that became `Runtime::inbox`, which knows nothing about HTTP.
+running runtime; that became `Control::post`, which knows nothing about HTTP.
 
 **A frontend.** A terminal UI needs to drive an agent and watch it. The web's answer is the
 DevTools protocol: a second channel that sees the page without being the page. `affordance host`

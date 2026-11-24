@@ -30,7 +30,7 @@ then:
 3. loops until the cell finishes.
 
 So sub-LLM calls are the instance's own model calls. They are in its journal and under its budget,
-and on resume they replay instead of being called again. The REPL never sees a key or a model
+and on restore they replay instead of being called again. The REPL never sees a key or a model
 endpoint.
 
 ## Run

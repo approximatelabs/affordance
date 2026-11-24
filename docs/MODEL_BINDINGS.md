@@ -83,8 +83,8 @@ A `chat` binding with no `context` asks its server the same way (`GET {url}/mode
 OpenAI-compatible server (vLLM, SGLang) reports its window there. Hosted APIs (and the Anthropic
 and Responses bindings) do not report one: such a binding needs `context` (or `"none"`), and the
 error says so. The runtime logs each binding's window on stderr
-(`model binding "default": window 262144 tokens (server /v1/models)`), and `observed.json` shows
-it under `models` (`{"default": {"context": 262144, "source": "server /v1/models"}}`).
+(`model binding "default": window 262144 tokens (server /v1/models)`), and the run's status
+(`Control::status`) shows it under `models` (`{"default": {"context": 262144, "source": "server /v1/models"}}`).
 
 ## Provider options and sampling
 
@@ -339,7 +339,7 @@ Persisted instances record a digest of their built-in model binding's replay ide
 the existing app/tokenizer pins: which model answers (kind, model, provider options such as a
 LoRA, template, context: the window in effect, the same whether the server reported it or the
 config stated it), not how it is reached (address, credentials, ranks, timeouts,
-cache TTL) or sampled, so moving a server or changing a timeout resumes. `"replay":"strict"`
+cache TTL) or sampled, so moving a server or changing a timeout restores. `"replay":"strict"`
 refuses a changed or missing model identity before inference. Warning replay reports the
 difference and preserves the journal's original pins. Existing journals without this identity
 cannot acquire a strict guarantee retrospectively.
@@ -403,7 +403,7 @@ The endpoint addresses and credential paths are supplied by the deployment opera
       "provider_options": {"logprobs": 1}
     }
   },
-  "agents": [
+  "instances": [
     {"id": "one", "model": "default", "props": {"task": "Say hello."}},
     {"id": "two", "model": "B", "props": {"task": "Say hello."}},
     {"id": "three", "model": "C", "props": {"task": "Say hello."}}
@@ -412,7 +412,7 @@ The endpoint addresses and credential paths are supplied by the deployment opera
 }
 ```
 
-Save it as `affordance.yaml` (JSON is valid YAML) and run `affordance run`; add `--resume` to
+Save it as `affordance.yaml` (JSON is valid YAML) and run `affordance run`; add `--restore` to
 recover that run.
 This example adds no machine bindings or tool execution.
 
@@ -427,12 +427,12 @@ Direct constructors remain available: `Sglang::new`, `Completions::new`, `Chat::
 `model::with_template(client, ModelTemplate::new("glm53", options)?)` attaches presentation
 to any client while delegating its inference, streaming, cancellation and rank behavior.
 `Chat::new` advertises `messages` by default. Low-level `Agent` callers set
-`AgentConfig.template` to the same resolved `ModelTemplate` on fresh execution and restore;
+`InstanceConfig.template` to the same resolved `ModelTemplate` on fresh execution and restore;
 `Runtime` does this automatically for each binding, including mounted children.
 Wrapping a custom client preserves its identity opt-in: template metadata does not establish
 the identity of an otherwise unidentified inference implementation. Such clients must supply
 `Model::binding_identity` to receive strict binding-configuration checks. Checkpoint cache
-identity still includes the resolved `AgentConfig.template`.
+identity still includes the resolved `InstanceConfig.template`.
 Native clients expose `auth: Option<Credentials>` and all stock clients expose `provider_options`.
 `Model::validate` runs before runtime workers start and before stock generation; mutating public
 client settings does not bypass validation. Custom adapters can implement `binding_identity`

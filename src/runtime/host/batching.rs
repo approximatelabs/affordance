@@ -5,7 +5,7 @@ const MAX_BYTES: usize = 1024 * 1024;
 
 fn eligible(input: &InputKind) -> bool {
     match input {
-        InputKind::Event { op: None, .. } | InputKind::Result { .. } => true,
+        InputKind::Event { .. } | InputKind::Result { .. } => true,
         InputKind::Completion { input, .. } => matches!(&**input, InputKind::Result { .. }),
         _ => false,
     }
@@ -44,19 +44,17 @@ pub(super) fn collect(queue: &mut VecDeque<Msg>, id: &str, first: InputKind, lim
     inputs
 }
 
-/// While the runtime quiesces, a queued input that is issued again on resume is not applied, so a
-/// pause never waits behind a backlog. A `send` (acked event) is abandoned: the sender's call stays
-/// outstanding in its journal and recovery reissues it. A control-inbox message (`op`) leaves its
-/// file without a receipt, so the coordinator posts it again on resume. Everything else (model and
-/// exec completions, ticks, mounts, props, parent callbacks) is applied. The caller counts the
-/// dropped inputs out of `inflight` with the rest.
+/// While the run closes, a queued delivery is not applied, so closing never waits behind a
+/// backlog. A `send` is abandoned: the sender's call stays outstanding in its journal and a restore
+/// issues it again. An embedder's post is told the run is closing, to post it again. Everything
+/// else (model and machine completions, ticks, mounts, props, parent callbacks) is applied. The
+/// caller counts the dropped inputs out of `inflight` with the rest.
 fn unless_reissued(kind: InputKind) -> Option<InputKind> {
     match kind {
         InputKind::Event { ack: Some(ack), .. } => {
             ack.abandon();
             None
         }
-        InputKind::Event { op: Some(_), .. } => None,
         other => Some(other),
     }
 }
@@ -72,7 +70,7 @@ pub(super) fn feed_group(
     timers: &mut Timers,
     local: &mut VecDeque<Msg>,
 ) {
-    let kinds = if shared.quiescing.load(Ordering::SeqCst) {
+    let kinds = if shared.closing.load(Ordering::SeqCst) {
         kinds.into_iter().filter_map(unless_reissued).collect()
     } else {
         kinds
@@ -112,16 +110,11 @@ pub(super) fn feed_group(
         };
         let clock_ms = shared.clock_ms().max(slot.agent.clock_ms());
         let (mut input, ack) = match kind {
-            InputKind::Event {
-                name,
-                payload,
-                ack,
-                op: None,
-            } => (
+            InputKind::Event { name, payload, ack, id } => (
                 Input::Event {
                     name,
                     payload,
-                    op: None,
+                    id,
                     clock_ms,
                 },
                 ack,
@@ -158,15 +151,19 @@ pub(super) fn feed_group(
     };
     if bytes > MAX_BYTES || inputs.len() == 1 {
         for (input, ack) in inputs.into_iter().zip(acks) {
-            let committed = apply(shared, w, &view, &enc, slot, input, timers, local);
-            if let Some(ack) = ack {
-                ack.finish(committed);
+            // A member that failed the instance ends the group: the rest are not journaled (their
+            // senders are told, as for any input to a failed instance).
+            if slot.error.is_some() {
+                settle(shared, w, slot, ack, false, timers, local);
+                continue;
             }
+            let journaled = apply(shared, w, &view, &enc, slot, input, timers, local);
+            settle(shared, w, slot, ack, journaled, timers, local);
         }
     } else {
-        let committed = apply(shared, w, &view, &enc, slot, Input::Batch { inputs }, timers, local);
-        for ack in acks.into_iter().flatten() {
-            ack.finish(committed);
+        let journaled = apply(shared, w, &view, &enc, slot, Input::Batch { inputs }, timers, local);
+        for ack in acks {
+            settle(shared, w, slot, ack, journaled, timers, local);
         }
     }
 }

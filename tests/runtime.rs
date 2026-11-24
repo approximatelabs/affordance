@@ -1,10 +1,10 @@
-//! The agent runtime core (`runtime::agent`): a deterministic agent driven by a scripted GLM-5.3
+//! The agent runtime core (`runtime::instance`): a deterministic agent driven by a scripted GLM-5.3
 //! model in a single-threaded host loop. Checks the app contract end to end: exact appends,
 //! tool results as `action` records, hooks, primitives, messages, waits, and journal replay.
 use affordance::View;
 use affordance::effects::Outcome;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::{BTreeMap, VecDeque};
 use std::path::PathBuf;
@@ -21,8 +21,8 @@ fn view(enc: &Encoder) -> View {
 }
 const T0: i64 = 1_791_000_000_000;
 
-fn config(id: &str, task: &str) -> AgentConfig {
-    AgentConfig {
+fn config(id: &str, task: &str) -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -40,7 +40,7 @@ fn config(id: &str, task: &str) -> AgentConfig {
 }
 
 /// Apply an input to an agent and keep it in the test's journal (an agent keeps none of its own).
-fn apply(agent: &mut Agent, journal: &mut Vec<Input>, v: &View, enc: &Encoder, input: Input) -> Vec<Command> {
+fn apply(agent: &mut Instance, journal: &mut Vec<Input>, v: &View, enc: &Encoder, input: Input) -> Vec<Command> {
     journal.push(input.clone());
     agent.handle(v, enc, input).unwrap()
 }
@@ -57,7 +57,7 @@ fn reply(enc: &Encoder, text: &str, stop: &str) -> Vec<u32> {
 struct Host<'a> {
     enc: &'a Encoder,
     view: &'a View,
-    agents: BTreeMap<String, Agent>,
+    instances: BTreeMap<String, Instance>,
     queue: VecDeque<(String, Command)>,
     timers: Vec<(String, i64)>,
     clock: i64,
@@ -73,7 +73,7 @@ impl<'a> Host<'a> {
         Host {
             enc,
             view,
-            agents: BTreeMap::new(),
+            instances: BTreeMap::new(),
             queue: VecDeque::new(),
             timers: vec![],
             clock: T0,
@@ -83,18 +83,18 @@ impl<'a> Host<'a> {
             journals: BTreeMap::new(),
         }
     }
-    fn add(&mut self, cfg: AgentConfig) {
+    fn add(&mut self, cfg: InstanceConfig) {
         let id = cfg.id.clone();
-        let mut agent = Agent::new(cfg).unwrap();
+        let mut agent = Instance::new(cfg).unwrap();
         for c in agent.start(self.view, self.enc).unwrap() {
             self.queue.push_back((id.clone(), c));
         }
-        self.agents.insert(id, agent);
+        self.instances.insert(id, agent);
     }
     fn feed(&mut self, id: &str, input: Input) {
         self.journals.entry(id.to_string()).or_default().push(input.clone());
         let cmds = self
-            .agents
+            .instances
             .get_mut(id)
             .unwrap()
             .handle(self.view, self.enc, input)
@@ -148,7 +148,7 @@ impl<'a> Host<'a> {
                                     Input::Event {
                                         name: "message".into(),
                                         payload,
-                                        op: None,
+                                        id: None,
                                         clock_ms: self.clock,
                                     },
                                 );
@@ -193,8 +193,41 @@ fn glm_call(think: &str, name: &str, args: &[(&str, &str)]) -> String {
     format!("{think}</think><tool_call>{name}{a}</tool_call>")
 }
 
+/// "A bad call does not stop a good call to the same tool." One reply calls `set_notes` with no
+/// text (outside its schema) and again with text: the first is answered with its problem, the
+/// second runs and the notes are saved.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
+fn a_bad_call_does_not_stop_a_good_call_to_the_same_tool() {
+    let enc = encoder();
+    let v = view(&enc);
+    let mut host = Host::new(&enc, &v, |_, turn| {
+        match turn {
+        1 => "Two calls.</think><tool_call>set_notes</tool_call><tool_call>set_notes<arg_key>text</arg_key><arg_value>saved</arg_value></tool_call>".into(),
+        _ => glm_call("Idle.", "wait", &[("seconds", "5")]),
+    }
+    });
+    host.add(config("agent-0001", "Take notes."));
+    host.run();
+    let agent = &host.instances["agent-0001"];
+    let results: Vec<J> = affordance::scenario::log_records(&agent.state())
+        .iter()
+        .filter(|r| r["kind"] == "action")
+        .take(2)
+        .map(|r| r["result"].clone())
+        .collect();
+    assert!(
+        results[0]
+            .as_str()
+            .is_some_and(|s| s.starts_with("error: bad arguments for set_notes")),
+        "{results:?}"
+    );
+    assert_eq!(results[1], "notes saved", "{results:?}");
+    assert_eq!(agent.state()["__ui"]["@notes"], "saved");
+}
+
+#[test]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn one_agent_session_is_exact_and_replays() {
     let enc = encoder();
     let v = view(&enc);
@@ -209,7 +242,7 @@ fn one_agent_session_is_exact_and_replays() {
     host.add(config("agent-0001", "Keep /srv healthy."));
     host.run();
     if std::env::var("DBG").is_ok() {
-        let a = host.agents.get_mut("agent-0001").unwrap();
+        let a = host.instances.get_mut("agent-0001").unwrap();
         for r in affordance::scenario::log_records(&a.state()) {
             let mut r = r.clone();
             r.as_object_mut().unwrap().remove("ids");
@@ -220,7 +253,7 @@ fn one_agent_session_is_exact_and_replays() {
         }
         eprintln!("M {:?}", a.metrics);
     }
-    let agent = &host.agents["agent-0001"];
+    let agent = &host.instances["agent-0001"];
     assert_eq!(agent.stopped(), Some(&json!({"reason": "max_turns"})));
     // Every turn after the first is an exact append of the previous prompt + reply.
     for w in host.prompts.windows(2) {
@@ -280,7 +313,7 @@ fn one_agent_session_is_exact_and_replays() {
     );
     // Replaying the journal reproduces the agent exactly.
     let (replayed, outstanding) =
-        Agent::restore(agent.cfg.clone(), host.journals[agent.id()].clone(), &v, &enc).unwrap();
+        Instance::restore(agent.cfg.clone(), host.journals[agent.id()].clone(), &v, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&replayed.state()),
         affordance::scenario::log_records(&agent.state())
@@ -291,7 +324,7 @@ fn one_agent_session_is_exact_and_replays() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn messages_arrive_with_the_next_turn_and_wake_waits() {
     let enc = encoder();
     let v = view(&enc);
@@ -307,7 +340,7 @@ fn messages_arrive_with_the_next_turn_and_wake_waits() {
     host.add(a);
     host.add(b);
     host.run();
-    let t = affordance::scenario::log_records(&host.agents["agent-a"].state()).to_vec();
+    let t = affordance::scenario::log_records(&host.instances["agent-a"].state()).to_vec();
     // a's 600 s wait was woken by the message, long before its deadline.
     let woke = t
         .iter()
@@ -334,14 +367,14 @@ fn messages_arrive_with_the_next_turn_and_wake_waits() {
         .unwrap();
     assert!(screen.contains("unread: 1"), "{screen}");
     // Both agents stayed exact across the message.
-    for a in host.agents.values() {
+    for a in host.instances.values() {
         assert_eq!(a.metrics.rewrites, 0, "{}", a.id());
     }
 }
 
 // ---- the multi-agent runtime (threads, pools, journals) ----
 
-use affordance::runtime::{AgentSpec, Exec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+use affordance::runtime::{Exec, FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
 use std::sync::{Arc, Mutex};
 
 /// A scripted GLM-5.3 model: each agent's n-th reply comes from `script(agent, n)`.
@@ -353,7 +386,7 @@ fn scripted(
     let counts: Mutex<BTreeMap<String, usize>> = Mutex::new(BTreeMap::new());
     Arc::new(FnModel(move |req: &GenRequest| {
         // The turn number is the count of model turns already in the prompt (stateless, so a
-        // resumed run continues the same script).
+        // restored run continues the same script).
         let asst = enc.token_id("<|assistant|>").unwrap();
         let n = req.ids.iter().filter(|&&t| t == asst).count();
         counts.lock().unwrap().insert(req.agent.clone(), n);
@@ -402,7 +435,7 @@ fn fleet_runtime(
     dir: &std::path::Path,
     delay_ms: u64,
     max_wall: Option<std::time::Duration>,
-    resume: bool,
+    restore: bool,
 ) -> affordance::runtime::Report {
     let enc = encoder();
     let mut cfg = RuntimeConfig::new(root().join("views/demo/runtime/agent.tsx"));
@@ -412,8 +445,8 @@ fn fleet_runtime(
     cfg.env.insert("DEPLOY_TOKEN".into(), "tok-5ecret-value".into());
     cfg.secrets.insert("DEPLOY_TOKEN".into());
     let model = scripted(enc.clone(), delay_ms, fleet_script);
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
@@ -426,27 +459,27 @@ fn fleet_runtime(
             affordance::runtime::Executor::call(&Exec::local(), ctx, &args)
         }),
     );
-    if !resume {
+    if !restore {
         for i in 0..6 {
-            let mut spec = AgentSpec::new(&format!("agent-{i}"), json!({"task": "Say hello to your neighbour."}));
+            let mut spec = InstanceSpec::new(&format!("agent-{i}"), json!({"task": "Say hello to your neighbour."}));
             spec.max_turns = Some(5);
             spec.max_new = 256;
             spec.machines = Some(vec!["home".into()]);
-            rt.add_agent(spec).unwrap();
+            rt.add_instance(spec).unwrap();
         }
     }
     rt.run().unwrap()
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
     let dir = std::env::temp_dir().join(format!("aff-runtime-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     // A run interrupted mid-way (a crash, from the agents' point of view) ...
     let first = fleet_runtime(&dir, 40, Some(std::time::Duration::from_millis(300)), false);
     assert!(!first.complete);
-    let partial: Vec<u64> = first.agents.iter().map(|a| a.metrics.turns).collect();
+    let partial: Vec<u64> = first.instances.iter().map(|a| a.metrics.turns).collect();
     assert!(
         partial.iter().all(|&t| t < 5) && partial.iter().any(|&t| t > 0),
         "interrupted mid-run: {partial:?}"
@@ -457,18 +490,18 @@ fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
         report.complete,
         "{:?}",
         report
-            .agents
+            .instances
             .iter()
             .map(|a| (&a.id, &a.stopped, &a.error))
             .collect::<Vec<_>>()
     );
-    assert_eq!(report.agents.len(), 6);
-    for a in &report.agents {
+    assert_eq!(report.instances.len(), 6);
+    for a in &report.instances {
         assert!(a.error.is_none(), "{}: {:?}", a.id, a.error);
         assert_eq!(a.metrics.turns, 5, "{}", a.id);
         assert_eq!(
             a.metrics.rewrites, 0,
-            "{}: every turn appends exactly, across the resume",
+            "{}: every turn appends exactly, across the restore",
             a.id
         );
         let records = affordance::scenario::log_records(&a.state);
@@ -495,8 +528,8 @@ fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
                 .collect::<Vec<_>>()
         );
         // ... but the runtime never writes the secret to disk.
-        let trace = std::fs::read_to_string(dir.join(&a.id).join("trace.jsonl")).unwrap();
-        let spec = std::fs::read_to_string(dir.join(&a.id).join("agent.json")).unwrap();
+        let trace = std::fs::read_to_string(crate::shared::instance_dir(&dir, &a.id).join("trace.jsonl")).unwrap();
+        let spec = std::fs::read_to_string(crate::shared::instance_dir(&dir, &a.id).join("instance.json")).unwrap();
         assert!(!trace.contains("tok-5ecret-value") && !spec.contains("tok-5ecret-value"));
         assert!(trace.contains("\"t\":\"render\""));
     }
@@ -539,6 +572,7 @@ fn exec_over_ssh_localhost() {
     };
     let ctx = CallContext {
         agent: "agent-0001".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
@@ -562,13 +596,13 @@ fn exec_over_ssh_localhost() {
 /// A refused model call is tried again as many times as the retry policy's `refused` says (here
 /// four), after a doubling wait and with the same prompt; then the app gets the error.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn model_errors_retry_with_backoff_then_stop() {
     let enc = encoder();
     let v = view(&enc);
     let mut cfg = config("agent-0001", "Task.");
     cfg.retry.refused = 4;
-    let mut agent = Agent::new(cfg).unwrap();
+    let mut agent = Instance::new(cfg).unwrap();
     let cmds = agent.start(&v, &enc).unwrap();
     let Command::Generate { task, ids, .. } = cmds[0].clone() else {
         panic!()
@@ -583,8 +617,7 @@ fn model_errors_retry_with_backoff_then_stop() {
                 Input::ModelError {
                     task,
                     error: "HTTP 400 invalid request".into(),
-                    transient: false,
-                    kind: None,
+                    kind: affordance::runtime::model::FailureKind::Refused,
                     retry_after_ms: None,
                     clock_ms: clock,
                 },
@@ -614,8 +647,7 @@ fn model_errors_retry_with_backoff_then_stop() {
             Input::ModelError {
                 task,
                 error: "HTTP 400 invalid request".into(),
-                transient: false,
-                kind: None,
+                kind: affordance::runtime::model::FailureKind::Refused,
                 retry_after_ms: None,
                 clock_ms: clock,
             },
@@ -632,12 +664,12 @@ fn model_errors_retry_with_backoff_then_stop() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn inference_outage_preserves_agent_and_retry_across_restore() {
     let enc = encoder();
     let v = view(&enc);
     let cfg = config("agent-outage", "Task.");
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     let first = agent.start(&v, &enc).unwrap();
     let Command::Generate {
         mut task,
@@ -658,8 +690,7 @@ fn inference_outage_preserves_agent_and_retry_across_restore() {
             Input::ModelError {
                 task,
                 error: "connection refused".into(),
-                transient: true,
-                kind: None,
+                kind: affordance::runtime::model::FailureKind::Interrupted,
                 retry_after_ms: None,
                 clock_ms: clock,
             },
@@ -668,7 +699,7 @@ fn inference_outage_preserves_agent_and_retry_across_restore() {
             panic!("{out:?}")
         };
         assert!(*at_ms - clock <= 30000);
-        let (restored, pending) = Agent::restore(cfg.clone(), journal.clone(), &v, &enc).unwrap();
+        let (restored, pending) = Instance::restore(cfg.clone(), journal.clone(), &v, &enc).unwrap();
         assert!(restored.stopped().is_none());
         assert!(pending.iter().any(|c| matches!(c,Command::Timer{at_ms:t} if t==at_ms)));
         agent = restored;
@@ -685,11 +716,11 @@ fn inference_outage_preserves_agent_and_retry_across_restore() {
 /// A reply cut off mid-thinking is recorded as thinking with
 /// `unclosed_think` + `cut_off`, never as content; a call cut off mid-way is never run.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn cut_off_replies_are_classified_not_misread() {
     let enc = encoder();
     let v = view(&enc);
-    let mut agent = Agent::new(config("agent-0001", "Task.")).unwrap();
+    let mut agent = Instance::new(config("agent-0001", "Task.")).unwrap();
     let Command::Generate { task, .. } = agent.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
     };
@@ -774,6 +805,7 @@ fn cancelled_exec_kills_the_process_group() {
     let token = CancelToken::new();
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: token.clone(),
@@ -798,7 +830,7 @@ fn cancelled_exec_kills_the_process_group() {
 
 /// A runtime that stops (here: max_wall) aborts commands its agents are still running.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn runtime_shutdown_cancels_running_commands() {
     let marker = format!("aff-shutdown-{}", std::process::id());
     let enc = encoder();
@@ -815,7 +847,7 @@ fn runtime_shutdown_cancels_running_commands() {
     });
     let mut rt = Runtime::new(cfg, enc, model);
     rt.bind_machine("home", Arc::new(Exec::local()));
-    rt.add_agent(AgentSpec::new("agent-0", json!({"task": "Run it."})))
+    rt.add_instance(InstanceSpec::new("agent-0", json!({"task": "Run it."})))
         .unwrap();
     let report = rt.run().unwrap();
     assert!(!report.complete);
@@ -824,7 +856,7 @@ fn runtime_shutdown_cancels_running_commands() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
     use std::time::Duration;
     let dir = std::env::temp_dir().join(format!("aff-pause-clock-{}", std::process::id()));
@@ -837,58 +869,144 @@ fn a_pause_freezes_the_wait_clock_and_mail_is_durable() {
         c
     };
     // Timings leave room for a loaded machine and still catch the regression: the run and the
-    // resume take 0.9 + 0.4 s of logical time, under the 2 s wait; the pause between them makes
+    // restore take 0.9 + 0.4 s of logical time, under the 2 s wait; the pause between them makes
     // 3.0 s of real time, past it (0.9 s, and not less, because the first run's budget also
     // covers starting up and its first turn).
     let make_model = || scripted(enc.clone(), 0, |_, _| glm_call("Waiting.", "wait", &[("seconds", "2")]));
     let mut first = Runtime::new(config(900), enc.clone(), make_model());
-    let mut spec = AgentSpec::new("agent-a", json!({"task":"Wait for an operator message."}));
+    let mut spec = InstanceSpec::new("agent-a", json!({"task":"Wait for an operator message."}));
     spec.max_turns = Some(2);
-    first.add_agent(spec).unwrap();
+    first.add_instance(spec).unwrap();
     let report = first.run().unwrap();
-    assert_eq!(report.agents[0].metrics.turns, 1);
+    assert_eq!(report.instances[0].metrics.turns, 1);
     std::thread::sleep(Duration::from_millis(1700));
-    let report = Runtime::resume(config(400), enc.clone(), make_model())
+    let report = Runtime::restore(config(400), enc.clone(), make_model())
         .unwrap()
         .run()
         .unwrap();
     assert_eq!(
-        report.agents[0].metrics.turns, 1,
+        report.instances[0].metrics.turns, 1,
         "suspended time must not expire the wait"
     );
-    let inbox = dir.join("control/inbox");
-    std::fs::create_dir_all(&inbox).unwrap();
-    std::fs::write(
-        inbox.join("abc123.json"),
-        json!({"operation_id":"abc123","targets":["agent-a"],"payload":{"from":"operator","text":"Please wake up."}})
-            .to_string(),
-    )
-    .unwrap();
-    let report = Runtime::resume(config(1500), enc.clone(), make_model())
-        .unwrap()
-        .run()
-        .unwrap();
-    assert_eq!(report.agents[0].metrics.turns, 2);
-    assert!(dir.join("control/receipts/agent-a/abc123.json").exists());
-    let journal = std::fs::read_to_string(dir.join("agent-a/journal.jsonl")).unwrap();
+    // A post with a key is answered once its line is committed; posted again (its answer lost,
+    // say), it is journaled but not taken a second time.
+    let mail = json!({"from":"operator","text":"Please wake up."});
+    let mut rt = Runtime::restore(config(1500), enc.clone(), make_model()).unwrap();
+    let delivered = rt.control().post("agent-a", "message", mail.clone(), Some("abc123"));
+    let report = rt.run().unwrap();
+    assert_eq!(delivered.wait(), Ok(()));
+    assert_eq!(report.instances[0].metrics.turns, 2);
+    let mut rt = Runtime::restore(config(400), enc.clone(), make_model()).unwrap();
+    let again = rt.control().post("agent-a", "message", mail, Some("abc123"));
+    let report = rt.run().unwrap();
+    assert_eq!(again.wait(), Ok(()));
+    assert_eq!(report.instances[0].metrics.turns, 2, "the same key is taken once");
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "agent-a/journal.jsonl")).unwrap();
     assert_eq!(
-        journal.matches("\"op\":\"abc123\"").count(),
-        1,
-        "the operation id is on the journaled event, not in the app's payload"
+        journal.matches("\"id\":\".post:abc123\"").count(),
+        2,
+        "the key is on the journaled event, not in the app's payload"
     );
-    assert!(!journal.contains("_control_operation"));
-    let _ = Runtime::resume(config(200), enc.clone(), make_model()).unwrap();
+    let trace = std::fs::read_to_string(crate::shared::inst(&dir, "agent-a/trace.jsonl")).unwrap();
+    assert!(
+        trace.contains("duplicate_message"),
+        "the second post is noted as a duplicate"
+    );
     std::fs::remove_dir_all(dir).unwrap();
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+fn a_timer_does_not_run_down_while_a_pause_waits_for_another_agents_command() {
+    // A 2.5 s timer in one agent; a 3.5 s command in another. A pause once the command has
+    // started waits for it to finish, by when the timer would be due; but the timer's time stops at the pause:
+    // it neither fires during the drain nor after the restore until the ~2.2 s it had left pass. (Found by Multiplet: a 240 s
+    // wait fired a second after its fleet restored.)
+    use std::process::Command as Process;
+    use std::time::{Duration, Instant};
+    let dir = std::env::temp_dir().join(format!("aff-pause-drain-clock-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let home = dir.join("home");
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(
+        dir.join("app.tsx"),
+        r#"export function Main({busy}) {
+  useEffect(() => {
+    async function run() {
+      const home = harness.machine.get("home");
+      if (busy) { await home.call({cmd: "touch busy-started; sleep 3.5"}); return; }
+      await harness.wait({ms: 2500, events: []});
+      await home.call({cmd: "touch timer-fired"});
+      harness.stop({});
+    }
+    run();
+  }, []);
+  return <box>timer</box>;
+}"#,
+    )
+    .unwrap();
+    let deployment = json!({
+        "app": {"view": "app.tsx", "entry": "Main"},
+        "model": {"kind": "chat", "url": "http://127.0.0.1:9/v1", "model": "x", "context": 1000},
+        "machines": {"home": {"kind": "local", "home": home}},
+        "instances": [
+            {"id": "busy", "model": null, "props": {"busy": true}},
+            {"id": "timer", "model": null, "props": {"busy": false}}
+        ],
+        "dir": "agents",
+        "max_wall_s": 20
+    });
+    std::fs::write(dir.join("deployment.json"), deployment.to_string()).unwrap();
+    let socket = dir.join("control.sock");
+    let run = |restore: bool| {
+        let mut command = Process::new(env!("CARGO_BIN_EXE_affordance"));
+        command.arg("run").arg("deployment.json").current_dir(&dir);
+        command.arg("--control").arg(&socket);
+        if restore {
+            command.arg("--restore");
+        }
+        command
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        command
+    };
+    let mut first = run(false).spawn().unwrap();
+    // The pause comes once the command is running (and the timer with it), so the drain is real.
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while !home.join("busy-started").exists() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    std::thread::sleep(Duration::from_millis(300));
+    crate::controller::Controller::connect(&socket).close(150_000);
+    assert!(first.wait().unwrap().success());
+    assert!(
+        !home.join("timer-fired").exists(),
+        "the timer fired while the pause drained"
+    );
+    let restored = Instant::now();
+    assert!(run(true).status().unwrap().success());
+    assert!(home.join("timer-fired").exists());
+    let waited = std::fs::metadata(home.join("timer-fired"))
+        .unwrap()
+        .modified()
+        .unwrap()
+        .duration_since(std::time::SystemTime::now() - restored.elapsed())
+        .unwrap_or_default();
+    eprintln!("after the restore the timer fired in {waited:?}");
+    assert!(
+        waited >= Duration::from_millis(2000),
+        "after the restore the timer fired in {waited:?}, not the ~2.2 s it had left"
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn recovery_repairs_a_torn_tail_before_appending() {
     use std::io::Write;
     let dir = std::env::temp_dir().join(format!("aff-torn-tail-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     fleet_runtime(&dir, 40, Some(std::time::Duration::from_millis(300)), false);
-    let path = dir.join("agent-0/journal.jsonl");
+    let path = crate::shared::inst(&dir, "agent-0/journal.jsonl");
     let before = std::fs::read(&path).unwrap();
     std::fs::OpenOptions::new()
         .append(true)
@@ -904,7 +1022,7 @@ fn recovery_repairs_a_torn_tail_before_appending() {
         serde_json::from_str::<Input>(line).unwrap();
     }
     assert!(
-        std::fs::read_dir(dir.join("agent-0"))
+        std::fs::read_dir(crate::shared::instance_dir(&dir, "agent-0"))
             .unwrap()
             .flatten()
             .any(|p| p.file_name().to_string_lossy().starts_with("torn-journal-"))
@@ -915,12 +1033,12 @@ fn recovery_repairs_a_torn_tail_before_appending() {
 /// A failing overflow handler (a summary that fails, perhaps for good) does not stop the agent:
 /// the turn proceeds with the prompt as it is, and the journal replays to the same agent.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_failing_overflow_handler_lets_the_turn_proceed() {
     let enc = encoder();
     let view = View::load(&root().join("views/demo/runtime/overflow_fails.tsx"), "Main", &enc).unwrap();
     let mut host = Host::new(&enc, &view, |_, _| glm_call("Go.", "nothing", &[]));
-    let unbound = || AgentConfig {
+    let unbound = || InstanceConfig {
         context: None,
         retry: Default::default(),
         machines: vec![],
@@ -928,11 +1046,11 @@ fn a_failing_overflow_handler_lets_the_turn_proceed() {
     };
     host.add(unbound());
     host.run();
-    let a = &host.agents["a"];
+    let a = &host.instances["a"];
     // The app's fold fails (no machine); it catches that, and the step goes on.
     assert!(!host.prompts.is_empty(), "the turn proceeded after the fold failed");
     assert_eq!(a.stopped().unwrap()["reason"], "max_turns", "{:?}", a.stopped());
-    let (b, _) = Agent::restore(unbound(), host.journals["a"].clone(), &view, &enc).unwrap();
+    let (b, _) = Instance::restore(unbound(), host.journals["a"].clone(), &view, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&b.state()),
         affordance::scenario::log_records(&a.state())
@@ -942,7 +1060,7 @@ fn a_failing_overflow_handler_lets_the_turn_proceed() {
 fn pinned_run(
     dir: &std::path::Path,
     view: &std::path::Path,
-    resume: bool,
+    restore: bool,
     strict: bool,
 ) -> affordance::runtime::Report {
     let enc = encoder();
@@ -953,34 +1071,35 @@ fn pinned_run(
     let model = scripted(enc.clone(), 0, |_, n| {
         glm_call("Note.", "set_notes", &[("text", &format!("n{n}"))])
     });
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
-    if !resume {
-        let mut spec = AgentSpec::new("agent-0", json!({"task": "Keep notes."}));
+    if !restore {
+        let mut spec = InstanceSpec::new("agent-0", json!({"task": "Keep notes."}));
         spec.max_turns = Some(3);
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     rt.run().unwrap()
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn resume_pins_the_app_and_detects_a_changed_one() {
     let dir = std::env::temp_dir().join(format!("aff-pins-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let original = root().join("views/demo/runtime/agent.tsx");
     let first = pinned_run(&dir, &original, false, false);
-    assert_eq!(first.agents[0].metrics.turns, 3);
-    let pins: J = serde_json::from_slice(&std::fs::read(dir.join("agent-0/agent.json")).unwrap()).unwrap();
+    assert_eq!(first.instances[0].metrics.turns, 3);
+    let pins: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "agent-0/instance.json")).unwrap()).unwrap();
     assert_eq!(pins["pins"]["contract"], affordance::runtime::host::CONTRACT_VERSION);
     assert_eq!(pins["pins"]["app"].as_str().unwrap().len(), 64);
     // The same app replays to the same prompts.
     let same = pinned_run(&dir, &original, true, false);
-    assert_eq!(same.agents[0].diverged_at, None);
-    assert_eq!(same.agents[0].state, first.agents[0].state);
+    assert_eq!(same.instances[0].diverged_at, None);
+    assert_eq!(same.instances[0].state, first.instances[0].state);
     // A changed status line: the first turn's prompt differs.
     let changed = root().join(format!("views/demo/runtime/.changed-{}.tsx", std::process::id()));
     std::fs::write(
@@ -993,16 +1112,17 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
     let loose = pinned_run(&dir, &changed, true, false);
     let strict = pinned_run(&dir, &changed, true, true);
     std::fs::remove_file(&changed).unwrap();
-    assert_eq!(loose.agents[0].diverged_at, Some(1), "turns count from 1");
+    assert_eq!(loose.instances[0].diverged_at, Some(1), "turns count from 1");
     assert!(
-        strict.agents[0]
+        strict.instances[0]
             .error
             .as_deref()
             .is_some_and(|e| e.contains("replay diverged at turn 1")),
         "{:?}",
-        strict.agents[0].error
+        strict.instances[0].error
     );
-    let after: J = serde_json::from_slice(&std::fs::read(dir.join("agent-0/agent.json")).unwrap()).unwrap();
+    let after: J =
+        serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir, "agent-0/instance.json")).unwrap()).unwrap();
     assert_eq!(
         after["pins"], pins["pins"],
         "the journal keeps the pins it was written against"
@@ -1010,15 +1130,19 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
     // A journal of another contract is refused, not replayed.
     let mut old = after.clone();
     old["pins"]["contract"] = json!(1);
-    std::fs::write(dir.join("agent-0/agent.json"), serde_json::to_string(&old).unwrap()).unwrap();
+    std::fs::write(
+        crate::shared::inst(&dir, "agent-0/instance.json"),
+        serde_json::to_string(&old).unwrap(),
+    )
+    .unwrap();
     let refused = pinned_run(&dir, &original, true, false);
-    let err = refused.agents[0].error.clone().unwrap_or_default();
-    assert!(err.contains("resume refused") && err.contains("contract 1"), "{err}");
-    assert_eq!(refused.agents[0].metrics.turns, 0);
+    let err = refused.instances[0].error.clone().unwrap_or_default();
+    assert!(err.contains("restore refused") && err.contains("contract 1"), "{err}");
+    assert_eq!(refused.instances[0].metrics.turns, 0);
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn harness_render_runs_a_component_once_on_the_model_through_the_harness() {
     let enc = encoder();
     let view = View::load(&root().join("views/demo/runtime/render_once.tsx"), "Main", &enc).unwrap();
@@ -1038,13 +1162,13 @@ fn harness_render_runs_a_component_once_on_the_model_through_the_harness() {
         text.contains("Rewrite the user's text politely") && text.contains("hi all") && !text.contains("Greet."),
         "{text}"
     );
-    let a = &host.agents["a"];
+    let a = &host.instances["a"];
     let action = affordance::scenario::log_records(&a.state())
         .into_iter()
         .find(|r| r["kind"] == "action")
         .unwrap();
     assert_eq!(action["result"], "Hello, everyone!");
-    let (b, _) = Agent::restore(config("a", "Greet."), host.journals["a"].clone(), &view, &enc).unwrap();
+    let (b, _) = Instance::restore(config("a", "Greet."), host.journals["a"].clone(), &view, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&b.state()),
         affordance::scenario::log_records(&a.state())
@@ -1055,12 +1179,12 @@ fn harness_render_runs_a_component_once_on_the_model_through_the_harness() {
 /// is retried with the same prompt after a capped backoff, for as long as it fails, across a
 /// restore; the handler never sees the failure.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_render_rate_limited_is_retried_not_failed() {
     let enc = encoder();
     let v = View::load(&root().join("views/demo/runtime/render_once.tsx"), "Main", &enc).unwrap();
     let cfg = config("a", "Greet.");
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     let Command::Generate { task, ids: page, .. } = agent.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
     };
@@ -1098,8 +1222,7 @@ fn a_render_rate_limited_is_retried_not_failed() {
             Input::ModelError {
                 task,
                 error: "HTTP 429 too many requests".into(),
-                transient: true,
-                kind: None,
+                kind: affordance::runtime::model::FailureKind::Interrupted,
                 retry_after_ms: None,
                 clock_ms: clock,
             },
@@ -1108,7 +1231,7 @@ fn a_render_rate_limited_is_retried_not_failed() {
             panic!("{out:?}")
         };
         assert_eq!(*at_ms, clock + 1000 * (1_i64 << (failure - 1).min(5)).min(30));
-        let (restored, pending) = Agent::restore(cfg.clone(), journal.clone(), &v, &enc).unwrap();
+        let (restored, pending) = Instance::restore(cfg.clone(), journal.clone(), &v, &enc).unwrap();
         assert!(
             pending.contains(&Command::Timer { at_ms: *at_ms }),
             "a restore keeps the retry: {pending:?}"
@@ -1151,7 +1274,7 @@ fn a_render_rate_limited_is_retried_not_failed() {
 /// A render's options reach its model call (budget, sampling, tag, priority); a render prompt over
 /// `max_prompt` is never sent, and the handler sees the error.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_render_has_its_own_options_and_respects_max_prompt() {
     use affordance::runtime::GenOptions;
     let enc = encoder();
@@ -1163,7 +1286,7 @@ fn a_render_has_its_own_options_and_respects_max_prompt() {
             "<|observation|>",
         )
     };
-    let mut a = Agent::new(config("a", "Greet.")).unwrap();
+    let mut a = Instance::new(config("a", "Greet.")).unwrap();
     let Command::Generate { task, .. } = a.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
     };
@@ -1197,11 +1320,11 @@ fn a_render_has_its_own_options_and_respects_max_prompt() {
         }
     );
     // A long text makes the render's prompt longer than the agent's first prompt.
-    let mut b = Agent::new(config("b", "Greet.")).unwrap();
+    let mut b = Instance::new(config("b", "Greet.")).unwrap();
     let Command::Generate { task, ids, .. } = b.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
     };
-    let mut b = Agent::new(AgentConfig {
+    let mut b = Instance::new(InstanceConfig {
         context: None,
         retry: Default::default(),
         max_prompt: Some(ids.len() + 20),
@@ -1246,7 +1369,7 @@ fn a_docker_machine_is_one_container_per_agent() {
         eprintln!("no docker daemon: skipped");
         return;
     }
-    let name = format!("aff-test-{{agent}}-{}", std::process::id());
+    let name = format!("aff-test-{}", std::process::id());
     let m = Exec {
         target: Target::Docker {
             image: "ubuntu:24.04".into(),
@@ -1257,6 +1380,7 @@ fn a_docker_machine_is_one_container_per_agent() {
     };
     let ctx = |agent: &str| CallContext {
         agent: agent.into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
@@ -1279,10 +1403,10 @@ fn a_docker_machine_is_one_container_per_agent() {
         "each agent has its own"
     );
     assert_eq!(run("a", "exit 3")["exit"], 3);
-    // The machine names an agent's container after the agent's directory name (`i-a`), not the
-    // bare id: removing `...-a-...` removed nothing, and every run left two containers behind.
+    // The machine names an instance's container `<name>-<instance id>` (outside a run, the name
+    // escaped: `i-a`).
     for agent in ["a", "b"] {
-        let container = name.replace("{agent}", &format!("i-{agent}"));
+        let container = format!("{name}-i-{agent}");
         let removed = std::process::Command::new("docker")
             .args(["rm", "-f", &container])
             .output()
@@ -1330,10 +1454,11 @@ fn a_bwrap_machine_shows_a_command_the_system_and_its_home_and_no_other_files() 
         std::fs::create_dir_all(dir).unwrap();
         std::fs::write(dir.join("note"), "a note\n").unwrap();
     }
-    let home = base.join("home-{agent}");
+    let home = base.join("homes");
     let m = Exec {
         target: Target::Bwrap {
             home: home.display().to_string(),
+            per_instance: true,
             network: false,
             read: vec![shown.display().to_string()],
         },
@@ -1342,6 +1467,7 @@ fn a_bwrap_machine_shows_a_command_the_system_and_its_home_and_no_other_files() 
     };
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
@@ -1371,7 +1497,7 @@ fn a_bwrap_machine_shows_a_command_the_system_and_its_home_and_no_other_files() 
     let _ = std::fs::remove_dir_all(&base);
 }
 
-fn tree_run(dir: &std::path::Path, resume: bool) -> affordance::runtime::Report {
+fn tree_run(dir: &std::path::Path, restore: bool) -> affordance::runtime::Report {
     let enc = encoder();
     let mut cfg = RuntimeConfig::new(root().join("views/demo/tree/root.tsx"));
     cfg.workers = 1;
@@ -1404,8 +1530,8 @@ fn tree_run(dir: &std::path::Path, resume: bool) -> affordance::runtime::Report 
             ..Default::default()
         })
     }));
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
@@ -1416,17 +1542,17 @@ fn tree_run(dir: &std::path::Path, resume: bool) -> affordance::runtime::Report 
             Arc::new(move |_: &affordance::runtime::CallContext, _: &J| Ok(json!({"output": host, "exit": 0}))),
         );
     }
-    if !resume {
-        let mut spec = AgentSpec::new("root", json!({"names": ["alice", "bob"]}));
+    if !restore {
+        let mut spec = InstanceSpec::new("root", json!({"names": ["alice", "bob"]}));
         spec.model = None;
         spec.machines = Some(vec!["m0".into(), "m1".into()]);
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     rt.run().unwrap()
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_callbacks() {
     let dir = std::env::temp_dir().join(format!("aff-tree-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1439,11 +1565,12 @@ fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_ca
         assert_eq!(mode & 0o077, 0, "the run directory's mode is {:o}", mode & 0o777);
     }
     let by = |id: &str| {
-        report
-            .agents
-            .iter()
-            .find(|a| a.id == id)
-            .unwrap_or_else(|| panic!("no {id}: {:?}", report.agents.iter().map(|a| &a.id).collect::<Vec<_>>()))
+        report.instances.iter().find(|a| a.id == id).unwrap_or_else(|| {
+            panic!(
+                "no {id}: {:?}",
+                report.instances.iter().map(|a| &a.id).collect::<Vec<_>>()
+            )
+        })
     };
     let (root_, alice, bob) = (by("root"), by("root/alice"), by("root/bob"));
     for a in [root_, alice, bob] {
@@ -1451,7 +1578,7 @@ fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_ca
     }
     assert_eq!(root_.metrics.turns, 0, "the root has no model");
     // Each child reached only the machine its parent handed it.
-    let host_of = |a: &affordance::runtime::AgentReport| {
+    let host_of = |a: &affordance::runtime::InstanceReport| {
         affordance::scenario::log_records(&a.state)
             .iter()
             .find(|r| r["name"] == "hostname")
@@ -1494,7 +1621,7 @@ fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_ca
     // The tree resumes from its journals: the root replays, then each child replays its own.
     let again = tree_run(&dir, true);
     for id in ["root", "root/alice", "root/bob"] {
-        let (a, b) = (by(id), again.agents.iter().find(|x| x.id == id).unwrap());
+        let (a, b) = (by(id), again.instances.iter().find(|x| x.id == id).unwrap());
         assert!(b.error.is_none() && b.diverged_at.is_none(), "{id}: {:?}", b.error);
         assert_eq!(b.state, a.state, "{id}");
     }
@@ -1505,7 +1632,7 @@ fn an_instance_tree_mounts_children_binds_their_machines_and_passes_props_and_ca
 /// render, on the layout event) when a prompt passes `trig` of the window (the binding's
 /// context less max_new), answers and submits; the root grades the answers.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn the_research_ladder_runs_its_policies_and_grades_answers() {
     let dir = std::env::temp_dir().join(format!("aff-research-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1576,32 +1703,33 @@ fn the_research_ladder_runs_its_policies_and_grades_answers() {
             &format!("m{n}"),
             Arc::new(Exec {
                 target: affordance::runtime::Target::Local {
-                    home: Some(dir.join("homes/{agent}").display().to_string()),
+                    home: Some(dir.join("homes").display().to_string()),
+                    per_instance: true,
                 },
                 default_timeout_s: 30,
                 max_capture: 1 << 20,
             }),
         );
     }
-    let mut spec = AgentSpec::new(
+    let mut spec = InstanceSpec::new(
         "root",
         json!({"questions": [{"question": "What is the default blob spill size?", "expect": ["64"]}], "policies": ["none", "compact"]}),
     );
     spec.model = None;
     spec.max_turns = Some(12);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    for a in &report.agents {
+    for a in &report.instances {
         assert!(a.error.is_none(), "{}: {:?}", a.id, a.error);
     }
-    let root_ = report.agents.iter().find(|a| a.id == "root").unwrap();
+    let root_ = report.instances.iter().find(|a| a.id == "root").unwrap();
     let results = &root_.state["__ui"]["@results"];
     for key in ["q0-none", "q0-compact"] {
         assert_eq!(results[key]["correct"], true, "{key}: {results}");
         assert_eq!(results[key]["exact"], "64 KiB");
     }
     // The compact run folded: its handoff summary is in its state, written by a render.
-    let compact = report.agents.iter().find(|a| a.id == "root/q0-compact").unwrap();
+    let compact = report.instances.iter().find(|a| a.id == "root/q0-compact").unwrap();
     let fold = &compact.state["__ui"]["@fold"];
     assert!(fold["summary"].as_str().unwrap().contains("spill size"), "{fold}");
     // Search ran on the machine: the first tool result lists docids.
@@ -1613,7 +1741,7 @@ fn the_research_ladder_runs_its_policies_and_grades_answers() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
     let dir = std::env::temp_dir().join(format!("aff-send-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1628,12 +1756,12 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
     });
     let mut rt = Runtime::new(cfg, enc.clone(), model);
     for id in ["a", "b"] {
-        let mut s = AgentSpec::new(id, json!({"task": "Talk."}));
+        let mut s = InstanceSpec::new(id, json!({"task": "Talk."}));
         s.max_turns = Some(3);
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     let report = rt.run().unwrap();
-    let a = report.agents.iter().find(|x| x.id == "a").unwrap();
+    let a = report.instances.iter().find(|x| x.id == "a").unwrap();
     let results: Vec<J> = affordance::scenario::log_records(&a.state)
         .iter()
         .filter(|r| r["kind"] == "action")
@@ -1650,7 +1778,7 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
     // The trace places each tool on the run's timeline under the model call that asked for it:
     // tool (`turn`) -> reply and render (`turn`) -> render (`task`) -> generate (`task`), every
     // record with its time (`at_ms`, the journal's clock), and a tool's start after its reply.
-    let trace: Vec<J> = std::fs::read_to_string(dir.join("a/trace.jsonl"))
+    let trace: Vec<J> = std::fs::read_to_string(crate::shared::inst(&dir, "a/trace.jsonl"))
         .unwrap()
         .lines()
         .map(|l| serde_json::from_str(l).unwrap())
@@ -1680,20 +1808,23 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
         at(&render) <= at(&generate) && at(&generate) <= at(&reply) && at(&reply) <= at(tool),
         "{render} {generate} {reply} {tool}"
     );
-    let b_journal = std::fs::read_to_string(dir.join("b/journal.jsonl")).unwrap();
+    let b_journal = std::fs::read_to_string(crate::shared::inst(&dir, "b/journal.jsonl")).unwrap();
     let msg = b_journal
         .lines()
         .find(|l| l.contains("\"name\":\"message\""))
         .expect("b journaled the message");
-    assert!(msg.contains("\"_msg\":\"a:"), "{msg}");
-    let a_journal = std::fs::read_to_string(dir.join("a/journal.jsonl")).unwrap();
+    // The message's delivery id is on the journaled event, not in the app's payload.
+    let parsed: J = serde_json::from_str(msg).unwrap();
+    assert!(parsed["id"].as_str().is_some_and(|id| id.starts_with("a:")), "{msg}");
+    assert!(parsed["payload"].get("_msg").is_none(), "{msg}");
+    let a_journal = std::fs::read_to_string(crate::shared::inst(&dir, "a/journal.jsonl")).unwrap();
     let ack = a_journal.lines().find(|l| l.contains("\"delivered\":true")).unwrap();
     let clock = |l: &str| serde_json::from_str::<J>(l).unwrap()["clock_ms"].as_i64().unwrap();
     assert!(clock(msg) <= clock(ack));
     // The same message again (a resend after a crash) is journaled but not taken twice.
     let event: Input = serde_json::from_str(msg).unwrap();
     let v = View::load(&root().join("views/demo/runtime/messenger.tsx"), "Main", &enc).unwrap();
-    let mut b = Agent::new(config("b", "Talk.")).unwrap();
+    let mut b = Instance::new(config("b", "Talk.")).unwrap();
     b.start(&v, &enc).unwrap();
     b.handle(&v, &enc, event.clone()).unwrap();
     b.handle(&v, &enc, event).unwrap();
@@ -1703,15 +1834,29 @@ fn send_completes_when_the_receiver_has_journaled_and_a_resend_is_taken_once() {
         .filter(|t| t["t"] == "duplicate_message")
         .count();
     assert_eq!(dups, 1, "the second copy is recognized and dropped");
+    // An event from outside whose payload happens to hold `_msg` is an ordinary event: both
+    // copies are taken.
+    let outside = Input::Event {
+        name: "message".into(),
+        payload: json!({"_msg": "a:1", "text": "hello"}),
+        id: None,
+        clock_ms: 0,
+    };
+    b.handle(&v, &enc, outside.clone()).unwrap();
+    b.handle(&v, &enc, outside).unwrap();
+    assert!(
+        !b.take_trace().iter().any(|t| t["t"] == "duplicate_message"),
+        "a payload's own fields never make an event a duplicate"
+    );
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_prompt_over_the_hard_ceiling_is_never_sent() {
     let enc = encoder();
     let v = view(&enc);
     let mut host = Host::new(&enc, &v, |_, _| glm_call("Go.", "wait", &[("seconds", "1")]));
-    host.add(AgentConfig {
+    host.add(InstanceConfig {
         context: None,
         retry: Default::default(),
         max_prompt: Some(50),
@@ -1719,11 +1864,11 @@ fn a_prompt_over_the_hard_ceiling_is_never_sent() {
     });
     host.run();
     assert!(host.prompts.is_empty());
-    assert_eq!(host.agents["a"].stopped().unwrap()["reason"], "prompt_over_limit");
+    assert_eq!(host.instances["a"].stopped().unwrap()["reason"], "prompt_over_limit");
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_mount_boundary_takes_one_component_with_json_props_and_callbacks() {
     let enc = encoder();
     let dir = std::env::temp_dir().join(format!("aff-mount-rules-{}", std::process::id()));
@@ -1778,7 +1923,7 @@ fn a_mount_boundary_takes_one_component_with_json_props_and_callbacks() {
 
 /// Context folding (R5): a branch's turns leave the prompt when it returns; its call and summary stay.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_returned_branch_folds_to_its_call_and_summary() {
     let dir = std::env::temp_dir().join(format!("aff-fold-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1840,21 +1985,22 @@ fn a_returned_branch_folds_to_its_call_and_summary() {
         "m0",
         Arc::new(Exec {
             target: affordance::runtime::Target::Local {
-                home: Some(dir.join("homes/{agent}").display().to_string()),
+                home: Some(dir.join("homes").display().to_string()),
+                per_instance: true,
             },
             default_timeout_s: 30,
             max_capture: 1 << 20,
         }),
     );
-    let mut spec = AgentSpec::new(
+    let mut spec = InstanceSpec::new(
         "root",
         json!({"questions": [{"question": "What is the default blob spill size?", "expect": ["64"]}], "policies": ["fold"]}),
     );
     spec.model = None;
     spec.max_turns = Some(10);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    let root_ = report.agents.iter().find(|a| a.id == "root").unwrap();
+    let root_ = report.instances.iter().find(|a| a.id == "root").unwrap();
     assert_eq!(
         root_.state["__ui"]["@results"]["q0-fold"]["correct"], true,
         "{}",
@@ -1875,7 +2021,7 @@ fn a_returned_branch_folds_to_its_call_and_summary() {
 /// of the memory's tree is compressed by the root (harness.render). The third wakes with older
 /// memories collapsed into summaries, finds the fact with `recall` and answers from it.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_memory_outlives_its_sessions_compresses_old_notes_and_recalls_them() {
     let dir = std::env::temp_dir().join(format!("aff-memory-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -1943,15 +2089,15 @@ fn a_memory_outlives_its_sessions_compresses_old_notes_and_recalls_them() {
         "Log observations of the build.",
         "What is the deploy key?",
     ];
-    let spec = AgentSpec::new("root", json!({"sessions": sessions, "wake_lines": 4}));
-    rt.add_agent(spec).unwrap();
+    let spec = InstanceSpec::new("root", json!({"sessions": sessions, "wake_lines": 4}));
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    for a in &report.agents {
+    for a in &report.instances {
         assert!(a.error.is_none(), "{}: {:?}", a.id, a.error);
     }
     let by = |id: &str| {
         report
-            .agents
+            .instances
             .iter()
             .find(|a| a.id == id)
             .unwrap_or_else(|| panic!("no {id}"))
@@ -1991,7 +2137,7 @@ fn a_memory_outlives_its_sessions_compresses_old_notes_and_recalls_them() {
 /// `llm_batch`; the harness answers the batch with parallel sub-LLM renders and resumes the cell,
 /// which counts and sets `answer`. The bench grades the count against the generator's.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
     let py = "python3";
     if std::process::Command::new(py).arg("--version").output().is_err() {
@@ -2095,17 +2241,18 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
         "m0",
         Arc::new(Exec {
             target: affordance::runtime::Target::Local {
-                home: Some(dir.join("homes/{agent}").display().to_string()),
+                home: Some(dir.join("homes").display().to_string()),
+                per_instance: true,
             },
             default_timeout_s: 60,
             max_capture: 1 << 20,
         }),
     );
-    let mut spec = AgentSpec::new("root", json!({"tasks": [task]}));
+    let mut spec = InstanceSpec::new("root", json!({"tasks": [task]}));
     spec.model = None;
     spec.max_turns = Some(6);
     spec.machines = Some(vec!["m0".into()]);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
     // The REPL daemon outlives the run (it belongs to the machine): stop it.
     for home in std::fs::read_dir(dir.join("homes")).unwrap().flatten() {
@@ -2114,11 +2261,15 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
             .env("HOME", home.path())
             .status();
     }
-    for a in &report.agents {
+    for a in &report.instances {
         assert!(a.error.is_none(), "{}: {:?}", a.id, a.error);
     }
     let id = task["id"].as_str().unwrap();
-    let rlm = report.agents.iter().find(|a| a.id == format!("root/{id}-rlm")).unwrap();
+    let rlm = report
+        .instances
+        .iter()
+        .find(|a| a.id == format!("root/{id}-rlm"))
+        .unwrap();
     // The first cell's output is what the model saw of the context: its type and size, not the text.
     let first = affordance::scenario::log_records(&rlm.state)
         .iter()
@@ -2132,7 +2283,7 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
         first.contains("[sub-LLM error: "),
         "a failed sub-LLM call is an error the code sees: {first}"
     );
-    let results = &report.agents.iter().find(|a| a.id == "root").unwrap().state["__ui"]["@results"];
+    let results = &report.instances.iter().find(|a| a.id == "root").unwrap().state["__ui"]["@results"];
     let r = &results[format!("{id}-rlm")];
     assert_eq!(r["correct"], true, "{results}");
     assert_eq!(
@@ -2142,13 +2293,13 @@ fn a_recursive_lm_works_on_its_context_in_a_repl_and_batches_sub_llm_calls() {
 }
 
 /// A long run keeps store payloads on disk: outputs over the
-/// inline cap stay in the store file, `read` returns a stored output word for word, and a resume
+/// inline cap stay in the store file, `read` returns a stored output word for word, and a restore
 /// (streamed from the journal) rebuilds the same agent. The app's log is its own state, bounded
 /// by its own policy (`log.release`, views/lib/log.tsx).
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
-    fn run(dir: &std::path::Path, resume: bool) -> affordance::runtime::Report {
+    fn run(dir: &std::path::Path, restore: bool) -> affordance::runtime::Report {
         let enc = encoder();
         let mut cfg = RuntimeConfig::new(root().join("views/agents/session.tsx"));
         cfg.workers = 1;
@@ -2183,8 +2334,8 @@ fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
             affordance::runtime::model::ModelTemplate::new("glm53", json!({"keep_replies": true})).unwrap(),
         )
         .unwrap();
-        let mut rt = if resume {
-            Runtime::resume(cfg, enc, model).unwrap()
+        let mut rt = if restore {
+            Runtime::restore(cfg, enc, model).unwrap()
         } else {
             Runtime::new(cfg, enc, model)
         };
@@ -2196,17 +2347,17 @@ fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
                 Ok(json!({"output": format!("{cmd}\n").repeat(1200), "exit": 0}))
             }),
         );
-        if !resume {
-            let mut spec = AgentSpec::new("a", json!({"id": "a", "n_agents": 1, "task": "Keep the build green."}));
+        if !restore {
+            let mut spec = InstanceSpec::new("a", json!({"id": "a", "n_agents": 1, "task": "Keep the build green."}));
             spec.max_turns = Some(40);
-            rt.add_agent(spec).unwrap();
+            rt.add_instance(spec).unwrap();
         }
         rt.run().unwrap()
     }
     let base = std::env::temp_dir().join(format!("aff-resident-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     let first = run(&base, false);
-    let p = &first.agents[0];
+    let p = &first.instances[0];
     assert!(p.error.is_none(), "{:?}", p.error);
     assert_eq!(p.metrics.turns, 40);
     // A clipped output read back is the output, word for word.
@@ -2219,8 +2370,8 @@ fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
     );
     // Resume streams the journal and rebuilds the same agent.
     let again = run(&base, true);
-    assert_eq!(affordance::scenario::log_records(&again.agents[0].state), records);
-    assert_eq!(again.agents[0].diverged_at, None);
+    assert_eq!(affordance::scenario::log_records(&again.instances[0].state), records);
+    assert_eq!(again.instances[0].diverged_at, None);
 }
 
 /// A machine that brings its own executor (`command`): the call's JSON goes in on stdin, its
@@ -2230,6 +2381,7 @@ fn a_command_machine_runs_its_program_per_call() {
     use affordance::runtime::{CallContext, CommandMachine, Executor};
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 7,
         env: BTreeMap::from([("K".into(), "v".into())]),
         cancel: Default::default(),
@@ -2253,6 +2405,7 @@ fn a_command_reply_past_its_bound_fails_the_call() {
     use affordance::runtime::{CallContext, CommandMachine, Executor};
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 1,
         env: BTreeMap::new(),
         cancel: Default::default(),
@@ -2320,6 +2473,7 @@ fn a_cancelled_command_call_lets_the_command_clean_up() {
     let cancel = CancelToken::new();
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: cancel.clone(),
@@ -2360,6 +2514,7 @@ fn a_cancelled_command_call_reaps_a_stubborn_descendant() {
     let cancel = CancelToken::new();
     let ctx = CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: cancel.clone(),
@@ -2405,7 +2560,7 @@ fn a_cancelled_command_call_reaps_a_stubborn_descendant() {
 /// An agent's `capabilities` limit the platform APIs it may call: without `send`, a send is an
 /// error result; machines are bound by `machines`, not by capabilities.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn capabilities_limit_the_platform_apis_an_agent_may_call() {
     let enc = encoder();
     let mut cfg = RuntimeConfig::new(root().join("views/demo/runtime/messenger.tsx"));
@@ -2416,15 +2571,15 @@ fn capabilities_limit_the_platform_apis_an_agent_may_call() {
     });
     let mut rt = Runtime::new(cfg, enc, model);
     for id in ["a", "b"] {
-        let mut s = AgentSpec::new(id, json!({"task": "Talk."}));
+        let mut s = InstanceSpec::new(id, json!({"task": "Talk."}));
         s.max_turns = Some(2);
         if id == "a" {
             s.capabilities = Some(vec!["store.*".into()]);
         }
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     let report = rt.run().unwrap();
-    let a = report.agents.iter().find(|x| x.id == "a").unwrap();
+    let a = report.instances.iter().find(|x| x.id == "a").unwrap();
     let result = affordance::scenario::log_records(&a.state)
         .iter()
         .find(|r| r["kind"] == "action")
@@ -2437,7 +2592,7 @@ fn capabilities_limit_the_platform_apis_an_agent_may_call() {
 
 /// session.tsx on each model family: its first prompt renders through the chosen template app.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn the_session_app_renders_for_each_template() {
     let ds = Encoder::from_file(
         root()
@@ -2458,7 +2613,7 @@ fn the_session_app_renders_for_each_template() {
         ("glm53", &glm, "<|assistant|>", json!({"reasoning_effort": "high"})),
     ] {
         let v = View::load(&root().join("views/agents/session.tsx"), "Main", enc).unwrap();
-        let mut a = Agent::new(AgentConfig {
+        let mut a = Instance::new(InstanceConfig {
             context: None,
             retry: Default::default(),
             template: Some(affordance::runtime::model::ModelTemplate::new(template, options).unwrap()),
@@ -2482,11 +2637,11 @@ fn the_session_app_renders_for_each_template() {
 /// A message that arrives while the model is generating has not been seen by the model. A wait
 /// its reply then calls wakes at once on it, instead of sleeping until its deadline.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
     let enc = encoder();
     let v = view(&enc);
-    let mut agent = Agent::new(config("agent-a", "Wait for b.")).unwrap();
+    let mut agent = Instance::new(config("agent-a", "Wait for b.")).unwrap();
     let mut journal = vec![];
     let Command::Generate { task, .. } = agent.start(&v, &enc).unwrap()[0].clone() else {
         panic!()
@@ -2500,7 +2655,7 @@ fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
         Input::Event {
             name: "message".into(),
             payload: json!({"from": "agent-b", "text": "port is 48213"}),
-            op: None,
+            id: None,
             clock_ms: T0 + 100,
         },
     );
@@ -2533,7 +2688,7 @@ fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
     assert!(t.iter().any(|r| r["content"] == "[message from agent-b] port is 48213"));
     assert!(out.iter().any(|c| matches!(c, Command::Generate { .. })));
     // Replay reaches the same agent.
-    let (b, _) = Agent::restore(config("agent-a", "Wait for b."), journal, &v, &enc).unwrap();
+    let (b, _) = Instance::restore(config("agent-a", "Wait for b."), journal, &v, &enc).unwrap();
     assert_eq!(
         affordance::scenario::log_records(&b.state()),
         affordance::scenario::log_records(&agent.state())
@@ -2541,9 +2696,9 @@ fn a_message_during_the_turn_wakes_the_wait_that_turn_chose() {
 }
 
 /// An immediate pause cancels a machine call in flight. That is the operator's, not the app's:
-/// no error result is journaled, and the resumed fleet runs the call again.
+/// no error result is journaled, and the restored fleet runs the call again.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
     use std::time::Duration;
     let dir = std::env::temp_dir().join(format!("aff-pause-call-{}", std::process::id()));
@@ -2578,36 +2733,32 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
             Err(format!("cancelled: {}", ctx.cancel.reason()))
         }),
     );
-    let mut spec = AgentSpec::new("agent-a", json!({"task": "Build it."}));
+    let mut spec = InstanceSpec::new("agent-a", json!({"task": "Build it."}));
     spec.max_turns = Some(2);
-    rt.add_agent(spec).unwrap();
-    let control = dir.join("control");
-    std::fs::create_dir_all(&control).unwrap();
-    let pause = control.join("pause.json");
-    let p = pause.clone();
-    let pauser = std::thread::spawn(move || {
+    rt.add_instance(spec).unwrap();
+    let control = rt.control();
+    let closer = std::thread::spawn(move || {
         while !started.load(std::sync::atomic::Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(10))
         }
-        std::fs::write(&p, json!({"mode": "immediate"}).to_string()).unwrap();
+        control.close(Duration::ZERO);
     });
     let report = rt.run().unwrap();
-    pauser.join().unwrap();
+    closer.join().unwrap();
     assert!(
-        !affordance::scenario::log_records(&report.agents[0].state)
+        !affordance::scenario::log_records(&report.instances[0].state)
             .iter()
             .any(|r| r["kind"] == "action"),
         "no tool result yet: {:?}",
-        affordance::scenario::log_records(&report.agents[0].state)
+        affordance::scenario::log_records(&report.instances[0].state)
     );
-    std::fs::remove_file(&pause).unwrap();
-    let mut rt = Runtime::resume(config(), enc.clone(), model()).unwrap();
+    let mut rt = Runtime::restore(config(), enc.clone(), model()).unwrap();
     rt.bind_machine(
         "home",
         Arc::new(|_: &affordance::runtime::CallContext, _: &J| Ok(json!({"output": "built ok", "exit": 0}))),
     );
     let report = rt.run().unwrap();
-    let results: Vec<_> = affordance::scenario::log_records(&report.agents[0].state)
+    let results: Vec<_> = affordance::scenario::log_records(&report.instances[0].state)
         .iter()
         .filter(|r| r["kind"] == "action")
         .map(|r| r["result"].clone())
@@ -2618,9 +2769,9 @@ fn a_pause_does_not_turn_a_cancelled_call_into_a_tool_error() {
 }
 
 /// The same for a model call: a pause (or the run ending) cancels it, but that is the host's, not
-/// a model failure. No model error is journaled, and the resumed run issues the call again.
+/// a model failure. No model error is journaled, and the restored run issues the call again.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
     use std::time::Duration;
     let dir = std::env::temp_dir().join(format!("aff-pause-model-{}", std::process::id()));
@@ -2644,48 +2795,43 @@ fn a_pause_does_not_turn_a_cancelled_model_call_into_a_model_error() {
         Err(format!("cancelled: {}", req.cancel.reason()))
     }));
     let mut rt = Runtime::new(config(), enc.clone(), hanging);
-    let mut spec = AgentSpec::new("agent-a", json!({"task": "Build it."}));
+    let mut spec = InstanceSpec::new("agent-a", json!({"task": "Build it."}));
     spec.max_turns = Some(1);
-    rt.add_agent(spec).unwrap();
-    let control = dir.join("control");
-    std::fs::create_dir_all(&control).unwrap();
-    let pause = control.join("pause.json");
-    let p = pause.clone();
-    let pauser = std::thread::spawn(move || {
+    rt.add_instance(spec).unwrap();
+    let control = rt.control();
+    let closer = std::thread::spawn(move || {
         while !started.load(std::sync::atomic::Ordering::SeqCst) {
             std::thread::sleep(Duration::from_millis(10))
         }
-        std::fs::write(&p, json!({"mode": "immediate"}).to_string()).unwrap();
+        control.close(Duration::ZERO);
     });
     rt.run().unwrap();
-    pauser.join().unwrap();
-    let journal = std::fs::read_to_string(dir.join("agent-a/journal.jsonl")).unwrap();
+    closer.join().unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "agent-a/journal.jsonl")).unwrap();
     assert!(
         !journal.contains("model_error"),
         "a host cancel is not a model error: {journal}"
     );
-    std::fs::remove_file(&pause).unwrap();
-    let rt = Runtime::resume(
+    let rt = Runtime::restore(
         config(),
         enc.clone(),
         scripted(enc.clone(), 0, |_, _| "Done.</think>Built.".into()),
     )
     .unwrap();
     let report = rt.run().unwrap();
-    let a = &report.agents[0];
+    let a = &report.instances[0];
     assert!(a.error.is_none(), "{:?}", a.error);
     assert_eq!(
         a.metrics.turns, 1,
-        "the resumed run issued the call again and the model answered"
+        "the restored run issued the call again and the model answered"
     );
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// Serve mode: an idle instance (nothing in flight, waiting only for events) keeps the run up,
-/// and a control-inbox file with a named event reaches its listener. In batch mode the same run
-/// returns at once.
+/// Kept running: an idle instance (nothing in flight, waiting only for events) keeps the run up,
+/// and a post with a named event reaches its listener. In batch mode the same run returns at once.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
     use std::time::{Duration, Instant};
     let dir = std::env::temp_dir().join(format!("aff-serve-{}", std::process::id()));
@@ -2710,46 +2856,41 @@ fn serve_keeps_idle_instances_up_and_the_inbox_names_its_event() {
     let model = || scripted(enc.clone(), 0, |_, _| "unused".into());
     // Batch: idle at once, so the run returns without the event.
     let mut rt = Runtime::new(config(false), enc.clone(), model());
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    rt.add_agent(spec.clone()).unwrap();
+    rt.add_instance(spec.clone()).unwrap();
     let report = rt.run().unwrap();
     assert!(!report.complete);
-    // Serve: the run waits; a `ping` event in the inbox stops the instance.
+    // Kept running: the run waits; a posted `ping` stops the instance.
     let _ = std::fs::remove_dir_all(dir.join("run"));
-    let inbox = dir.join("run/control/inbox");
-    std::fs::create_dir_all(&inbox).unwrap();
     let mut rt = Runtime::new(config(true), enc.clone(), model());
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let started = Instant::now();
+    let control = rt.control();
     let writer = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(800));
-        std::fs::write(
-            inbox.join("op1.json"),
-            json!({"operation_id": "op1", "targets": ["a"], "event": "ping", "payload": {"text": "hello"}}).to_string(),
-        )
-        .unwrap();
+        control.post("a", "ping", json!({"text": "hello"}), None).wait()
     });
     let report = rt.run().unwrap();
-    writer.join().unwrap();
+    assert_eq!(writer.join().unwrap(), Ok(()));
     assert!(report.complete, "stopped by the ping");
     assert!(
         started.elapsed() >= Duration::from_millis(700),
         "it waited for the event"
     );
-    assert_eq!(report.agents[0].stopped, Some(json!({"heard": "hello"})));
+    assert_eq!(report.instances[0].stopped, Some(json!({"heard": "hello"})));
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
-/// A handler error that is not a tool's (an effect, a callback) has no awaiter: the status feed
+/// A handler error that is not a tool's (an effect, a callback) has no awaiter: the run's status
 /// counts it, so a host sees an instance that threw and went idle, and the trace keeps it.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn the_status_feed_counts_handler_errors() {
     use std::time::{Duration, Instant};
     let dir = std::env::temp_dir().join(format!("aff-handler-errors-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    std::fs::create_dir_all(dir.join("run/control/inbox")).unwrap();
+    std::fs::create_dir_all(&dir).unwrap();
     let app = dir.join("thrower.tsx");
     std::fs::write(
         &app,
@@ -2763,18 +2904,15 @@ fn the_status_feed_counts_handler_errors() {
     let mut cfg = RuntimeConfig::new(&app);
     (cfg.dir, cfg.serve, cfg.max_wall) = (Some(dir.join("run")), true, Some(Duration::from_secs(30)));
     let mut rt = Runtime::new(cfg, enc.clone(), scripted(enc.clone(), 0, |_, _| "unused".into()));
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.model = None;
-    rt.add_agent(spec).unwrap();
-    let run = dir.join("run");
+    rt.add_instance(spec).unwrap();
+    let control = rt.control();
     let watcher = std::thread::spawn(move || {
         let started = Instant::now();
         let seen = loop {
-            let observed: J = std::fs::read(run.join("observed.json"))
-                .ok()
-                .and_then(|b| serde_json::from_slice(&b).ok())
-                .unwrap_or(J::Null);
-            let a = observed["agents"]
+            let observed = control.status();
+            let a = observed["instances"]
                 .as_array()
                 .and_then(|a| a.iter().find(|a| a["id"] == "a").cloned());
             if let Some(a) = a.filter(|a| a["handler_errors"] == 1) {
@@ -2785,25 +2923,18 @@ fn the_status_feed_counts_handler_errors() {
             }
             std::thread::sleep(Duration::from_millis(20));
         };
-        std::fs::write(
-            run.join("control/inbox/op1.json"),
-            json!({"operation_id": "op1", "targets": ["a"], "event": "ping"}).to_string(),
-        )
-        .unwrap();
+        drop(control.post("a", "ping", json!({}), None));
         seen
     });
     let report = rt.run().unwrap();
-    let seen = watcher
-        .join()
-        .unwrap()
-        .expect("observed.json counts the effect's error");
+    let seen = watcher.join().unwrap().expect("the status counts the effect's error");
     assert_eq!(
         (seen["state"].as_str(), seen["healthy"].as_bool()),
         (Some("idle"), Some(true)),
         "{seen}"
     );
     assert!(report.complete);
-    let trace = std::fs::read_to_string(dir.join("run/a/trace.jsonl")).unwrap();
+    let trace = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/trace.jsonl")).unwrap();
     assert!(
         trace
             .lines()
@@ -2816,7 +2947,7 @@ fn the_status_feed_counts_handler_errors() {
 /// A `<Mount>`'s callbacks (`mount:<key>:<prop>`) are the runtime's to deliver: a peer cannot
 /// send one (as a page cannot forge a trusted event), and a plain `<aff>` cannot claim a handler.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn mount_callbacks_and_handlers_cannot_be_forged() {
     let dir = std::env::temp_dir().join(format!("aff-forge-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -2842,13 +2973,13 @@ fn mount_callbacks_and_handlers_cannot_be_forged() {
         Arc::new(FnModel(|_: &GenRequest| panic!("no model call"))),
     );
     for id in ["a", "b"] {
-        let mut s = AgentSpec::new(id, json!({}));
+        let mut s = InstanceSpec::new(id, json!({}));
         s.model = None;
-        rt.add_agent(s).unwrap();
+        rt.add_instance(s).unwrap();
     }
     let report = rt.run().unwrap();
     let stopped = report
-        .agents
+        .instances
         .iter()
         .find(|x| x.id == "a")
         .unwrap()
@@ -2876,10 +3007,10 @@ fn mount_callbacks_and_handlers_cannot_be_forged() {
 }
 
 /// A secret is redacted as a value, not as its JSON spelling: one holding newlines, quotes and
-/// backslashes (a PEM key, a service account's JSON) never reaches agent.json or the trace, and
+/// backslashes (a PEM key, a service account's JSON) never reaches instance.json or the trace, and
 /// the agent starts. A secret too short to redact is refused.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn secrets_with_newlines_and_quotes_are_redacted() {
     let dir = std::env::temp_dir().join(format!("aff-secrets-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -2898,15 +3029,15 @@ fn secrets_with_newlines_and_quotes_are_redacted() {
             encoder(),
             Arc::new(FnModel(|_: &GenRequest| panic!("no model call"))),
         );
-        let mut spec = AgentSpec::new("a", json!({"note": format!("the key is {key}")}));
+        let mut spec = InstanceSpec::new("a", json!({"note": format!("the key is {key}")}));
         spec.model = None;
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
         rt.run().unwrap()
     };
     let report = run(key);
-    assert!(report.agents[0].error.is_none(), "{:?}", report.agents[0].error);
-    for file in ["agent.json", "trace.jsonl"] {
-        let text = std::fs::read_to_string(dir.join("run/a").join(file)).unwrap();
+    assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+    for file in ["instance.json", "trace.jsonl"] {
+        let text = std::fs::read_to_string(crate::shared::instance_dir(&dir.join("run"), "a").join(file)).unwrap();
         let escaped = serde_json::to_string(key).unwrap();
         assert!(
             !text.contains(key) && !text.contains(escaped.trim_matches('"')) && !text.contains("ab\\\"c"),
@@ -2914,18 +3045,109 @@ fn secrets_with_newlines_and_quotes_are_redacted() {
         );
     }
     assert!(
-        std::fs::read_to_string(dir.join("run/a/agent.json"))
+        std::fs::read_to_string(crate::shared::inst(&dir, "run/a/instance.json"))
             .unwrap()
             .contains("the key is [secret:KEY]")
     );
     let report = run("pin");
     assert!(
-        report.agents[0]
+        report.instances[0]
             .error
             .as_deref()
             .is_some_and(|e| e.contains("too short to redact")),
         "{:?}",
-        report.agents[0].error
+        report.instances[0].error
     );
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// "A reply's calls run one after another by default, and an app can ask for them all at once."
+/// One reply asks for two steps; each step's machine call takes 200 ms. In order (the library's
+/// default) the second starts after the first has answered; with `{order: "parallel"}` both start
+/// before either answers. Every call runs once either way.
+#[test]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
+fn a_replys_calls_run_in_order_by_default_and_at_once_when_asked() {
+    use std::time::{Duration, Instant};
+    let dir = std::env::temp_dir().join(format!("aff-dispatch-order-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let app = dir.join("app.tsx");
+    std::fs::write(
+        &app,
+        r#"import { useLog } from "@ROOT@/views/lib/log.tsx";
+import { useLoop } from "@ROOT@/views/lib/loop.tsx";
+import { TurnStrategy } from "@ROOT@/views/strategies/turn_strategy.tsx";
+import { GLM53App } from "@ROOT@/views/template_apps/glm53.tsx";
+export default function Main({ order }) {
+  const log = useLog();
+  useLoop(log, {dispatch: order ? {order} : undefined});
+  const step = <aff label="step" tool_name="step" description="Take a step."
+      args_schema={{type: "object", properties: {n: {type: "integer"}}, required: ["n"]}}
+      onStep={async ({ n }) => { await harness.machine.call({n}); return "step " + String(n); }}>{"[step]"}</aff>;
+  return <GLM53App keep_replies={true}>
+    <TurnStrategy strategy="unrolled" log={[{kind: "input", content: "Take two steps."}, ...log.records]}>{step}</TurnStrategy>
+  </GLM53App>;
+}"#
+        .replace("@ROOT@", env!("CARGO_MANIFEST_DIR")),
+    )
+    .unwrap();
+    let enc = encoder();
+    let run = |order: Option<&str>| -> Vec<(i64, Instant, Instant)> {
+        let mut cfg = RuntimeConfig::new(&app);
+        cfg.max_wall = Some(Duration::from_secs(30));
+        cfg.library = Some(root().join("views"));
+        let model = scripted(enc.clone(), 0, |_, n| {
+            match n {
+            1 => "Two steps.</think><tool_call>step<arg_key>n</arg_key><arg_value>1</arg_value></tool_call><tool_call>step<arg_key>n</arg_key><arg_value>2</arg_value></tool_call>".into(),
+            _ => "Done.</think>Both steps are taken.".into(),
+        }
+        });
+        let mut rt = Runtime::new(cfg, enc.clone(), model);
+        let seen: Arc<Mutex<Vec<(i64, Instant, Instant)>>> = Arc::default();
+        let log = seen.clone();
+        rt.bind_machine(
+            "home",
+            Arc::new(move |_: &affordance::runtime::CallContext, args: &J| {
+                let started = Instant::now();
+                std::thread::sleep(Duration::from_millis(200));
+                log.lock()
+                    .unwrap()
+                    .push((args["n"].as_i64().unwrap(), started, Instant::now()));
+                Ok(json!({}))
+            }),
+        );
+        let props = match order {
+            Some(o) => json!({"order": o}),
+            None => json!({}),
+        };
+        rt.add_instance(InstanceSpec::new("a", props)).unwrap();
+        let report = rt.run().unwrap();
+        assert!(report.instances[0].error.is_none(), "{:?}", report.instances[0].error);
+        if std::env::var_os("DBG").is_some() {
+            eprintln!("stopped {:?}", report.instances[0].stopped);
+            for r in affordance::scenario::log_records(&report.instances[0].state) {
+                let mut r = r.clone();
+                r.as_object_mut().unwrap().remove("ids");
+                eprintln!("R {r}");
+            }
+        }
+        let mut seen = seen.lock().unwrap().clone();
+        seen.sort_by_key(|(_, started, _)| *started);
+        seen
+    };
+    let in_order = run(None);
+    assert_eq!(
+        in_order.iter().map(|(n, ..)| *n).collect::<Vec<_>>(),
+        [1, 2],
+        "each call once, in order"
+    );
+    assert!(
+        in_order[1].1 >= in_order[0].2,
+        "the second call started after the first answered"
+    );
+    let at_once = run(Some("parallel"));
+    assert_eq!(at_once.len(), 2, "each call once");
+    assert!(at_once[1].1 < at_once[0].2, "both calls started before either answered");
+    std::fs::remove_dir_all(&dir).unwrap();
 }

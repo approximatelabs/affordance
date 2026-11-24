@@ -1,16 +1,17 @@
 # A memory that outlives its sessions (see README.md). Set the provider's url and model, export its
 # key as API_KEY, and run `affordance run` here. The root needs a model binding for its compressions.
-root:
-  app: memory.tsx
-  model: default
-  max_turns: 20
-  props:
-    wake_lines: 6
-    sessions:
-      - "We are setting up a project. Facts to keep: ..."
-      - "Today's standup: ..."
-      - "Incident review: ..."
-      - "A new teammate asks: ... Answer from your memory."
+instances:
+  - id: root
+    app: memory.tsx
+    model: default
+    max_turns: 20
+    props:
+      wake_lines: 6
+      sessions:
+        - "We are setting up a project. Facts to keep: ..."
+        - "Today's standup: ..."
+        - "Incident review: ..."
+        - "A new teammate asks: ... Answer from your memory."
 model:
   kind: chat
   url: https://your-provider.example/v1

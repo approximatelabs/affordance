@@ -674,7 +674,7 @@ fn app_session(f: &Fixture, mut client: Chat, system: &str) -> (J, Vec<J>) {
         }
     }
     let usages = Arc::new(std::sync::Mutex::new(vec![]));
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     let dir = f.key.with_extension("session");
     std::fs::create_dir_all(&dir).unwrap();
     let app = dir.join("app.tsx");
@@ -714,24 +714,24 @@ fn app_session(f: &Fixture, mut client: Chat, system: &str) -> (J, Vec<J>) {
         usages: usages.clone(),
     });
     let mut runtime = Runtime::new(cfg.clone(), f.enc.clone(), model.clone());
-    let mut spec = AgentSpec::new("a", json!({"system":system}));
+    let mut spec = InstanceSpec::new("a", json!({"system":system}));
     spec.max_new = 4096;
-    runtime.add_agent(spec).unwrap();
+    runtime.add_instance(spec).unwrap();
     let first = runtime.run().unwrap();
-    let report = &first.agents[0];
+    let report = &first.instances[0];
     assert!(report.error.is_none(), "{:?}", report.error);
     assert_eq!(report.stopped, Some(json!({"done":true})), "{:?}", report.stopped);
     assert_eq!(report.state["__ui"]["@n"], 3);
     let state = report.state.clone();
-    let restored = Runtime::resume(cfg.clone(), f.enc.clone(), model.clone())
+    let restored = Runtime::restore(cfg.clone(), f.enc.clone(), model.clone())
         .unwrap()
         .run()
         .unwrap();
-    assert_eq!(restored.agents[0].state, state);
-    std::fs::remove_file(dir.join("run/a/checkpoint.json")).unwrap();
-    let replay = Runtime::resume(cfg, f.enc.clone(), model).unwrap().run().unwrap();
-    assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
-    assert_eq!(replay.agents[0].state, state);
+    assert_eq!(restored.instances[0].state, state);
+    std::fs::remove_file(crate::shared::inst(&dir, "run/a/checkpoint.json")).unwrap();
+    let replay = Runtime::restore(cfg, f.enc.clone(), model).unwrap().run().unwrap();
+    assert!(replay.instances[0].error.is_none(), "{:?}", replay.instances[0].error);
+    assert_eq!(replay.instances[0].state, state);
     std::fs::remove_dir_all(dir).unwrap();
     let recorded = usages.lock().unwrap().clone();
     assert_eq!(recorded.len(), 3, "replay must not reissue HTTP requests");
@@ -943,7 +943,7 @@ fn lossy_tokenizers_cannot_corrupt_native_provider_state() {
 
 #[test]
 fn summary_renders_disable_hosted_calls_without_changing_descriptions_or_active_requests() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     for kind in ["chat", "anthropic", "responses"] {
         for per_call in [false, true] {
             let f = Fixture::new();
@@ -1045,13 +1045,13 @@ fn summary_renders_disable_hosted_calls_without_changing_descriptions_or_active_
             let client: Arc<dyn Model> = Arc::new(client);
             let mut runtime = Runtime::new(cfg.clone(), f.enc.clone(), client.clone());
             runtime
-                .add_agent(AgentSpec::new(
+                .add_instance(InstanceSpec::new(
                     "a",
                     json!({"sampling":if per_call {json!({"tool_choice":forced})}else{json!({})}}),
                 ))
                 .unwrap();
             let first = runtime.run().unwrap();
-            let report = &first.agents[0];
+            let report = &first.instances[0];
             assert!(report.error.is_none(), "{:?}", report.error);
             let stop = report.stopped.as_ref().unwrap();
             assert_eq!(stop["summary"], "summary", "{kind}: {stop}");
@@ -1061,15 +1061,15 @@ fn summary_renders_disable_hosted_calls_without_changing_descriptions_or_active_
                 stop["violation"].as_str().unwrap().contains("non-callable render"),
                 "{kind}: {stop}"
             );
-            let recovered = Runtime::resume(cfg.clone(), f.enc.clone(), client.clone())
+            let recovered = Runtime::restore(cfg.clone(), f.enc.clone(), client.clone())
                 .unwrap()
                 .run()
                 .unwrap();
-            assert_eq!(recovered.agents[0].stopped, report.stopped);
-            std::fs::remove_file(dir.join("run/a/checkpoint.json")).unwrap();
-            let replay = Runtime::resume(cfg, f.enc.clone(), client).unwrap().run().unwrap();
-            assert_eq!(replay.agents[0].stopped, report.stopped);
-            assert!(replay.agents[0].error.is_none(), "{:?}", replay.agents[0].error);
+            assert_eq!(recovered.instances[0].stopped, report.stopped);
+            std::fs::remove_file(crate::shared::inst(&dir, "run/a/checkpoint.json")).unwrap();
+            let replay = Runtime::restore(cfg, f.enc.clone(), client).unwrap().run().unwrap();
+            assert_eq!(replay.instances[0].stopped, report.stopped);
+            assert!(replay.instances[0].error.is_none(), "{:?}", replay.instances[0].error);
             let seen = peer.join().unwrap();
             assert_eq!(seen.len(), 3);
             let none = if kind == "anthropic" {
@@ -1312,4 +1312,24 @@ fn a_hosted_reply_streams_its_text_and_stops_when_told() {
         written < 100,
         "the server stopped writing when the client left ({written} events)"
     );
+}
+
+/// "A hosted model server that cannot be reached is `unreachable`, and a cancelled call is
+/// `cancelled`", the same kinds the native bindings report, so `retry: {on: ["unreachable"]}`
+/// means the same on every binding.
+#[test]
+fn a_hosted_server_that_cannot_be_reached_is_unreachable_and_a_cancel_is_cancelled() {
+    let fixture = Fixture::new();
+    // Nothing listens here: the connection is refused before anything is sent.
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", closed.local_addr().unwrap());
+    drop(closed);
+    let client = fixture.client(&url);
+    let error = client.generate(&fixture.request(&session())).unwrap_err();
+    assert_eq!(error.kind, FailureKind::Unreachable, "{error}");
+    assert!(!error.message.contains("fixture-anthropic-secret"), "{error}");
+    let request = fixture.request(&session());
+    request.cancel.cancel("the caller stopped");
+    let error = client.generate(&request).unwrap_err();
+    assert_eq!(error.kind, FailureKind::Cancelled, "{error}");
 }

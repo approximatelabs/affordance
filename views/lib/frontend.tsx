@@ -128,7 +128,7 @@ export function useFrontend(log, options) {
           log.close(out, "the user stopped the turn");
         } else {
           if (calls.length) await tell({calls});
-          const results = await log.dispatch(out);
+          const results = await log.dispatch(out, options && options.dispatch);
           if (results.length) await tell({results: results.map(told)});
           more = out.calls.length > 0 && !turn().halted;
         }

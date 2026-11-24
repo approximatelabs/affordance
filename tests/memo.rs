@@ -351,6 +351,6 @@ export default function Main() { return <text>{String(memoScan(harness.items, nu
     assert_eq!(
         cache.memo.borrow().reused - reused,
         5,
-        "the render after the failure resumed at its prefix"
+        "the render after the failure restored at its prefix"
     );
 }

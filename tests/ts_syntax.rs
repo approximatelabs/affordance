@@ -41,7 +41,7 @@ fn run(enc: &Encoder, src: &str) -> Result<String, String> {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn type_syntax_is_parsed_and_erased() {
     let enc = enc();
     let cases: &[(&str, &str)] = &[
@@ -110,7 +110,7 @@ fn type_syntax_is_parsed_and_erased() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_package_import_is_an_error_not_silently_dropped() {
     let e = run(
         &enc(),

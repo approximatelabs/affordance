@@ -492,3 +492,109 @@ fn a_reply_from_a_format_with_no_tool_calls_is_read_as_text() {
         failed.join("\n")
     );
 }
+
+/// "A past reply's thinking is dropped where the publisher drops it." Qwen 3.6 and DeepSeek V4.1
+/// keep a reply's thinking while it is the last turn and drop it once a newer user message
+/// follows (DeepSeek only without tools; GLM 5.3 keeps it). The model generated the thinking; the
+/// next prompt must still be the publisher's (unless `keep_replies`). Checked with tools (the
+/// agent app) and without (a plain chat).
+#[test]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
+fn a_past_replys_thinking_is_dropped_where_the_publisher_drops_it() {
+    let index = load(root().join("views/index.json"));
+    let protocols = load(root().join("views/reply_protocols.json"));
+    let now = chrono::NaiveDate::from_ymd_opt(2026, 10, 5)
+        .unwrap()
+        .and_hms_opt(12, 0, 0)
+        .unwrap();
+    let thinking = "Weighing the build steps carefully.";
+    let tools = json!([{"type": "function", "function": {"name": "shell", "description": "Run a shell command in your VM.",
+        "parameters": {"type": "object", "properties": {"command": {"type": "string"}}, "required": ["command"]}}}]);
+    let mut problems = vec![];
+    for model in [
+        "Qwen__Qwen3.6-27B",
+        "zai-org__GLM-5.3",
+        "deepseek-ai__DeepSeek-V4.1-Flash",
+    ] {
+        for (fixture, with_tools) in [("any_model_agent.tsx", true), ("plain_chat.tsx", false)] {
+            let e = &index[model];
+            let enc =
+                Encoder::from_file(root().join(format!("ref/tokenizers/{model}.json")).to_str().unwrap()).unwrap();
+            // The publisher's own format: does it keep the thinking of a reply before the last user message?
+            let format = View::load(
+                &root().join("views").join(e["view"].as_str().unwrap()),
+                e["entry"].as_str().unwrap(),
+                &enc,
+            )
+            .unwrap();
+            let messages = json!([
+                {"role": "user", "content": "Build it."},
+                {"role": "assistant", "content": "Built.", "reasoning_content": thinking},
+                {"role": "user", "content": "Ship it."},
+            ]);
+            let mut case = json!({"messages": messages, "kwargs": {"add_generation_prompt": true}});
+            if with_tools {
+                case["tools"] = tools.clone();
+            }
+            let official = format
+                .render_chat_opts(
+                    &enc,
+                    affordance::state_from_json(&case, &e["agent"]["special"]),
+                    &mut RunCache::new(false),
+                    now,
+                    false,
+                )
+                .unwrap();
+            let publisher_drops = !enc.tok.decode(&official.ids, false).unwrap().contains(thinking);
+            // The app, with the reply as the model generated it (its thinking in its own tokens).
+            let row = protocols
+                .get(format!(
+                    "{}::{}",
+                    e["view"].as_str().unwrap(),
+                    e["entry"].as_str().unwrap()
+                ))
+                .unwrap_or(&e["agent"]);
+            let open = if row["in_think"] == true { "" } else { "<think>" };
+            let stop = row["stop"][0].as_str().unwrap_or_default();
+            let said = format!("{open}{thinking}</think>Built.{stop}");
+            let ids = enc.tok.encode(said, false).unwrap().get_ids().to_vec();
+            let view = View::load_model(
+                &root().join("tests/fixtures").join(fixture),
+                "Main",
+                &enc,
+                &model.replacen("__", "/", 1),
+                &json!({}),
+            )
+            .unwrap();
+            let log = json!([
+                {"kind": "input", "content": "Build it."},
+                {"kind": "model", "ids": ids, "content": "Built.", "reasoning": thinking},
+                {"kind": "input", "content": "Ship it."},
+            ]);
+            let Value::Map(state) = Value::from_json(&json!({"log": log})) else {
+                unreachable!()
+            };
+            let prompt = view
+                .render(
+                    &enc,
+                    std::rc::Rc::new(state.into_data()),
+                    &mut RunCache::new(false),
+                    now,
+                )
+                .unwrap();
+            let app_drops = !enc.tok.decode(&prompt.ids, false).unwrap().contains(thinking);
+            let tools = if with_tools { "with tools" } else { "without tools" };
+            eprintln!(
+                "{model} {tools}: publisher drops past thinking: {publisher_drops}; the app drops it: {app_drops}"
+            );
+            if publisher_drops != app_drops {
+                problems.push(format!(
+                    "{model} {tools}: the publisher {} the past reply's thinking, the app {} it",
+                    if publisher_drops { "drops" } else { "keeps" },
+                    if app_drops { "drops" } else { "keeps" }
+                ));
+            }
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}

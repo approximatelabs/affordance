@@ -5,7 +5,7 @@
 use affordance::View;
 use affordance::effects::Outcome;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -66,7 +66,7 @@ export default function Main() {{
 
 /// The first model call an agent on `view` makes: its ids, its files and where its media are.
 fn first_call(view: &View, enc: &Encoder) -> (Vec<u32>, Vec<String>, Vec<(usize, usize, u32)>) {
-    let mut agent = Agent::new(AgentConfig {
+    let mut agent = Instance::new(InstanceConfig {
         context: Some(32_768),
         retry: Default::default(),
         template: None,
@@ -227,16 +227,17 @@ fn sglang_is_sent_one_placeholder_and_the_resized_picture() {
     });
     let mut model = Sglang::new(&url, 1);
     model.stream = false;
+    let diagnostics = affordance::runtime::model::Diagnostics::default();
     let req = GenRequest {
         images: files.clone(),
         media: media.clone(),
+        diagnostics: diagnostics.clone(),
         ..GenRequest::new("a", ids.clone(), 8, vec![1], None, CancelToken::new())
     };
-    let before = affordance::runtime::model::token_mismatches();
     model.generate(&req).unwrap();
     // This server says it processed 3 prompt tokens, which is not what was laid out: a call
     // whose count differs is counted, for the run's summary (`token_mismatches`).
-    assert_eq!(affordance::runtime::model::token_mismatches(), before + 1);
+    assert_eq!(diagnostics.token_mismatches(), 1);
     let body = peer.join().unwrap();
     let sent: Vec<u64> = body["input_ids"]
         .as_array()
@@ -490,6 +491,12 @@ fn a_picture_under_one_familys_own_rule_takes_its_tokens_and_markers() {
 
 /// The prompt a model bound by its registered name gives a tool result of these pictures.
 fn bound_prompt(model: &str, pictures: &[String]) -> (Encoder, Vec<u32>) {
+    bound_prompt_in(model, pictures, true)
+}
+
+/// The same, with the pictures in a tool result or (for a format with no tool turns) in the
+/// user's message.
+fn bound_prompt_in(model: &str, pictures: &[String], in_tool_result: bool) -> (Encoder, Vec<u32>) {
     use affordance::emit::RunCache;
     use affordance::value::Value;
     let enc = Encoder::from_file(
@@ -513,11 +520,15 @@ fn bound_prompt(model: &str, pictures: &[String]) -> (Encoder, Vec<u32>) {
             .iter()
             .map(|p| json!({"type": "image_url", "image_url": {"url": p}})),
     );
-    let log = json!([
-        {"kind": "input", "content": "Look."},
-        {"kind": "model", "content": "", "calls": [{"id": "c1", "type": "function", "function": {"name": "shell", "arguments": {"command": "look"}}}]},
-        {"kind": "action", "name": "shell", "tool_call_id": "c1", "result": result},
-    ]);
+    let log = if in_tool_result {
+        json!([
+            {"kind": "input", "content": "Look."},
+            {"kind": "model", "content": "", "calls": [{"id": "c1", "type": "function", "function": {"name": "shell", "arguments": {"command": "look"}}}]},
+            {"kind": "action", "name": "shell", "tool_call_id": "c1", "result": result},
+        ])
+    } else {
+        json!([{"kind": "input", "content": result}])
+    };
     let Value::Map(state) = Value::from_json(&json!({"log": log})) else {
         unreachable!()
     };
@@ -562,4 +573,82 @@ fn ling_vl_has_its_processors_newline_after_a_pictures_end_marker() {
     let at = ids.iter().position(|&t| t == end).unwrap();
     assert_eq!(ids[at - 1], pad);
     assert!(enc.tok.decode(&ids[at + 1..at + 2], false).unwrap().starts_with('\n'));
+}
+
+/// "Every model with a picture rule shows a picture." For each registered model whose row has a
+/// picture rule, a small and a large picture in a tool result are laid out as pictures: never the
+/// alt text, never a render error. (A rule missing its markers, or a marker that is not a token of
+/// the model, once turned every picture of a family into "[picture not shown]" without a word.)
+#[test]
+#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+fn every_model_with_a_picture_rule_shows_a_picture() {
+    let index: J = serde_json::from_str(&std::fs::read_to_string(root().join("views/index.json")).unwrap()).unwrap();
+    let models: Vec<String> = index
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|(k, e)| !k.starts_with('_') && e["agent"]["media_metrics"]["image"].is_object())
+        .filter(|(k, _)| root().join(format!("ref/tokenizers/{k}.json")).exists())
+        .map(|(k, _)| k.clone())
+        .collect();
+    assert!(models.len() > 20, "{} models with a picture rule", models.len());
+    let pictures = [picture(224, 224), picture(1600, 1200)];
+    let results = crate::each::in_parallel(&models, |model| {
+        let name = model.replacen("__", "/", 1);
+        let render = |in_tool_result| {
+            std::panic::catch_unwind(|| {
+                let (enc, ids) = bound_prompt_in(&name, &pictures, in_tool_result);
+                enc.tok.decode(&ids, false).unwrap()
+            })
+        };
+        // A format whose publisher refuses tool turns is shown the pictures in the user's message.
+        let shown = render(true).or_else(|_| render(false));
+        match shown {
+            Err(e) => Some(format!(
+                "{model}: the render failed: {}",
+                e.downcast_ref::<String>()
+                    .map(String::as_str)
+                    .or(e.downcast_ref::<&str>().copied())
+                    .unwrap_or("?")
+                    .lines()
+                    .next()
+                    .unwrap_or("")
+            )),
+            Ok(text) if text.contains("[picture not shown]") => Some(format!("{model}: a picture was not shown")),
+            Ok(_) => None,
+        }
+    });
+    // Formats that require user and assistant turns to alternate: the app's latest user message and
+    // its screen are two turns, which the app joins only when both are text, so a picture in either
+    // cannot be given to these formats yet.
+    const ALTERNATING: [&str; 9] = [
+        "google__gemma-3-4b-it",
+        "google__gemma-3-12b-it",
+        "google__gemma-3-27b-it",
+        "google__gemma-3n-E2B-it",
+        "google__gemma-3n-E4B-it",
+        "mlabonne__gemma-3-27b-it-abliterated",
+        "meta-llama__Llama-Guard-4-12B",
+        "allenai__Molmo2-8B",
+        "mistral-experimental__pixtral-12b",
+    ];
+    let failed: Vec<String> = results.into_iter().flatten().collect();
+    let unexpected: Vec<&String> = failed
+        .iter()
+        .filter(|f| !ALTERNATING.iter().any(|m| f.starts_with(&format!("{m}:"))))
+        .collect();
+    assert!(
+        unexpected.is_empty(),
+        "{} of {}:\n{}",
+        unexpected.len(),
+        models.len(),
+        unexpected.iter().map(|s| s.as_str()).collect::<Vec<_>>().join("\n")
+    );
+    // A listed format that shows its pictures now no longer belongs in the list.
+    for m in ALTERNATING.iter().filter(|m| models.iter().any(|x| x == *m)) {
+        assert!(
+            failed.iter().any(|f| f.starts_with(&format!("{m}:"))),
+            "{m} shows its pictures now: remove it from ALTERNATING"
+        );
+    }
 }

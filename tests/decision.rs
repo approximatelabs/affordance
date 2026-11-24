@@ -157,7 +157,7 @@ export function Main({{ plan = "", recent_buttons = [] }}) {{
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn clm_view_gives_clm_state_and_candidate_inputs_token_for_token_on_256_courier_states() {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/Qwen__Qwen3-8B.json"));
     let v = View::load(&root().join("views/apps/courier_clm.tsx"), "Main", &enc).unwrap();

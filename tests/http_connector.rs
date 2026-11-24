@@ -15,6 +15,7 @@ use std::{
 fn context() -> CallContext {
     CallContext {
         agent: "caller".into(),
+        instance: String::new(),
         task: 7,
         env: BTreeMap::from([("TOKEN".into(), "hidden-token".into())]),
         cancel: CancelToken::new(),
@@ -237,7 +238,7 @@ fn completed_caller_cannot_cancel_a_later_request_on_its_pooled_connection() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn binary_configures_http_bindings_with_each_callers_credentials() {
     let server = Server::new(|request| {
         let caller = request.body.as_str();
@@ -251,7 +252,7 @@ fn binary_configures_http_bindings_with_each_callers_credentials() {
         &app,
         r#"export default function Main() {
 useEffect(() => { (async () => {
- const response = await harness.machine.get("api").call({method: "POST", body: harness.agent});
+ const response = await harness.machine.get("api").call({method: "POST", body: harness.instance});
  harness.stop(JSON.parse(response.body));
 })(); }, []); return "waiting";
 }"#,
@@ -261,7 +262,7 @@ useEffect(() => { (async () => {
         "app": {"view": app, "tokenizer": concat!(env!("CARGO_MANIFEST_DIR"), "/ref/tokenizers/Qwen__Qwen3-4B-Instruct-2507.json")},
         "model": {"kind": "sglang", "url": "http://127.0.0.1:1", "context": "none"},
         "machines": {"api": {"kind": "http", "url": server.url, "headers": {"Authorization": {"env": "TOKEN", "prefix": "Bearer "}}}},
-        "agents": [{"id": "alice", "model": null, "env": {"TOKEN": "alice-private"}},
+        "instances": [{"id": "alice", "model": null, "env": {"TOKEN": "alice-private"}},
                    {"id": "bob", "model": null, "env": {"TOKEN": "bob-private"}}],
         "secrets": ["TOKEN"], "dir": dir.join("run"), "max_wall_s": 5
     });
@@ -277,7 +278,7 @@ useEffect(() => { (async () => {
     assert_eq!(report["complete"], true, "{report}");
     assert_eq!(server.requests.lock().unwrap().len(), 2);
     for id in ["alice", "bob"] {
-        let journal = std::fs::read_to_string(dir.join(format!("run/{id}/journal.jsonl"))).unwrap();
+        let journal = std::fs::read_to_string(crate::shared::inst(&dir, &format!("run/{id}/journal.jsonl"))).unwrap();
         assert!(!journal.contains("-private"));
         assert!(journal.contains(id));
     }

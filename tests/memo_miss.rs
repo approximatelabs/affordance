@@ -3,7 +3,7 @@
 //! trace entry naming the cause, instead of an app silently getting slower with every input.
 use affordance::View;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Input};
+use affordance::runtime::{Input, Instance, InstanceConfig};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -39,7 +39,7 @@ export default function Main() {{
     )
     .unwrap();
     let view = View::load(&dir.join("app.tsx"), "Main", &enc).unwrap();
-    let mut a = Agent::new(AgentConfig {
+    let mut a = Instance::new(InstanceConfig {
         context: None,
         retry: Default::default(),
         id: "a".into(),
@@ -63,7 +63,7 @@ export default function Main() {{
             Input::Event {
                 name: "add".into(),
                 payload: json!({}),
-                op: None,
+                id: None,
                 clock_ms: 1_791_000_000_100 + n,
             },
         )
@@ -73,7 +73,7 @@ export default function Main() {{
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_scan_that_reuses_nothing_is_reported_once_with_its_cause() {
     let misses = agent("{n: 0}", "null");
     assert_eq!(misses.len(), 1, "{misses:?}");

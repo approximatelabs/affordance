@@ -1,6 +1,6 @@
 //! `affordance serve`: an app behind HTTP. The memory server demo (views/demo/memory_server) answers
 //! OpenAI-compatible chat requests through a stand-in model server; older exchanges fold into a tree
-//! of summaries the model sees; a streamed request gets server-sent events; a restart with --resume
+//! of summaries the model sees; a streamed request gets server-sent events; a restart with --restore
 //! keeps the conversation.
 use serde_json::{Value as J, json};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -93,7 +93,7 @@ fn listening(child: &mut Child) -> u16 {
     port
 }
 
-fn serve(model: &str, dir: &std::path::Path, resume: bool) -> (Child, u16) {
+fn serve(model: &str, dir: &std::path::Path, restore: bool) -> (Child, u16) {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_affordance"));
     cmd.arg("serve")
         .arg(root().join("views/demo/memory_server"))
@@ -102,8 +102,8 @@ fn serve(model: &str, dir: &std::path::Path, resume: bool) -> (Child, u16) {
         .arg(dir)
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
-    if resume {
-        cmd.arg("--resume");
+    if restore {
+        cmd.arg("--restore");
     }
     let mut child = cmd.spawn().unwrap();
     let port = listening(&mut child);
@@ -266,7 +266,7 @@ export default function Main() {
     .unwrap();
     std::fs::write(
         dir.join("affordance.yaml"),
-        "root: {app: app.tsx}\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\nserve: {listen: \"127.0.0.1:0\", timeout_s: 4}\n",
+        "instances: [{id: root, app: app.tsx}]\nmodel: {kind: chat, url: \"http://127.0.0.1:9/v1\", model: x, context: 1000}\nserve: {listen: \"127.0.0.1:0\", timeout_s: 4}\n",
     )
     .unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_affordance"))

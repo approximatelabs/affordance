@@ -10,12 +10,12 @@
 //!   its capabilities.
 //! - The environ is app-scoped: deployment layer, then per-agent. Values of `secrets` keys are
 //!   redacted in traces; apps may read them (like a page reading its cookies).
-//! - With `dir`, each agent has `agent.json`, `journal.jsonl` (its inputs: the agent can be
+//! - With `dir`, each agent has `instance.json`, `journal.jsonl` (its inputs: the agent can be
 //!   rebuilt from it), `trace.jsonl` (renders, model calls, effects, timings) and `store.jsonl`.
-use super::agent::{Agent, AgentConfig, Command, Input, Metrics};
 use super::blobs::Blobs;
 use super::cancel::CancelToken;
 use super::exec::{CallContext, Executor};
+use super::instance::{Command, Input, Instance, InstanceConfig, Metrics};
 use super::model::{GenRequest, Model};
 use super::store::Store;
 use crate::View;
@@ -41,14 +41,14 @@ mod pipe;
 mod status;
 use alloc::*;
 pub use alloc::{pad_heaps, tune_allocator};
-pub use config::{AgentSpec, Observed, Observer, RuntimeConfig};
+pub use config::{InstanceSpec, Observed, Observer, RuntimeConfig};
 use durable::{Durable, Journal, Ready};
 use model_gate::*;
 use pipe::Pipe;
 use status::*;
 
 /// The harness contract version a journal is written against (`spec/HARNESS.md`).
-pub const CONTRACT_VERSION: u32 = 8;
+pub const CONTRACT_VERSION: u32 = 9;
 static NEXT_INCARNATION: AtomicU64 = AtomicU64::new(1);
 
 fn fresh_incarnation() -> u64 {
@@ -57,17 +57,17 @@ fn fresh_incarnation() -> u64 {
 
 /// One agent at the end of a run.
 #[derive(Debug, Clone, Serialize)]
-pub struct AgentReport {
+pub struct InstanceReport {
     /// The agent's id.
     pub id: String,
     /// The render worker it ran on.
     pub worker: usize,
-    /// The first turn whose journaled prompt this app no longer renders (resume under changed code).
+    /// The first turn whose journaled prompt this app no longer renders (restore under changed code).
     pub diverged_at: Option<u64>,
     /// Its counters (turns, tokens, appends, errors), as replay recomputes them.
     pub metrics: Metrics,
     /// Render work done in this process, including replay.
-    pub render_stats: super::agent::RenderStats,
+    pub render_stats: super::instance::RenderStats,
     /// The value it stopped with (`harness.stop`), if it stopped.
     pub stopped: Option<J>,
     /// Its final state.
@@ -81,12 +81,36 @@ pub struct AgentReport {
 /// The end of a run.
 #[derive(Debug, Clone, Serialize)]
 pub struct Report {
-    /// Every agent, in the order they were added.
-    pub agents: Vec<AgentReport>,
+    /// Every instance, in the order they were added.
+    pub instances: Vec<InstanceReport>,
     /// Wall-clock seconds the run took.
     pub wall_s: f64,
-    /// Every agent stopped (otherwise the run went idle or hit `max_wall`).
+    /// Every agent stopped.
     pub complete: bool,
+    /// How the run ended.
+    pub ended: Ended,
+    /// Model calls whose prompt the server counted differently from the tokens laid out (should
+    /// be zero; `model::Diagnostics::token_mismatches`).
+    pub token_mismatches: u64,
+    /// Model captures that could not be written.
+    pub capture_errors: u64,
+}
+
+/// How a run ended. Every way but `Stopped` leaves outstanding work in the journals, which a
+/// restore continues.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Ended {
+    /// Every agent stopped.
+    Stopped,
+    /// A batch run (not kept running) had nothing left to do.
+    Idle,
+    /// The embedder closed it (`Control::close`).
+    Closed,
+    /// It ran for `max_wall`.
+    MaxWall,
+    /// A render worker died outside its instances' own code; its instances are reported failed.
+    WorkerLost,
 }
 
 enum Msg {
@@ -173,7 +197,7 @@ fn answer_inspect(shared: &Shared, g: &Gather) {
         }
         json!({"since": since, "text": text})
     } else {
-        json!({"since": since, "agents": parts.into_iter().map(|(id, (p, _))| (id, p)).collect::<serde_json::Map<_, _>>()})
+        json!({"since": since, "instances": parts.into_iter().map(|(id, (p, _))| (id, p)).collect::<serde_json::Map<_, _>>()})
     };
     shared.post(
         g.worker,
@@ -214,13 +238,12 @@ enum InputKind {
         task: u64,
         outcome: Outcome,
     },
-    /// An event; `ack` (sender, task): a `send` the sender is waiting on until this is journaled;
-    /// `op`: an operator's control-inbox operation id.
+    /// An event; `ack`: a `send` or a post waiting until this is journaled; `id`: its delivery id.
     Event {
         name: String,
         payload: J,
         ack: Option<delivery::Ack>,
-        op: Option<String>,
+        id: Option<String>,
     },
     /// Start a child instance. Only recovery of its parent may restore the current incarnation.
     Mount {
@@ -244,20 +267,6 @@ struct Pool {
     tx: Mutex<Sender<Box<dyn FnOnce() + Send>>>,
     /// Jobs running now.
     running: Arc<AtomicUsize>,
-}
-
-struct ControlWatcher {
-    stop: Sender<()>,
-    thread: Option<std::thread::JoinHandle<()>>,
-}
-
-impl Drop for ControlWatcher {
-    fn drop(&mut self) {
-        let _ = self.stop.send(());
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
-    }
 }
 
 impl Pool {
@@ -341,12 +350,20 @@ struct Shared {
     model_pool: Pool,
     exec_pool: Pool,
     model_gate: ModelGate,
-    quiescing: AtomicBool,
-    clock_base: i64,
-    clock_started: Instant,
+    /// The run is closing: no new model or machine call starts, and queued deliveries are left
+    /// for a restore (`batching::unless_reissued`).
+    closing: AtomicBool,
+    /// When the runtime started (the boot's own time is reported from it).
+    started: Instant,
+    /// The journals' clock: logical time, which passes only while the run is running.
+    clock: Clock,
+    /// What this run notes about its model calls, and where it captures them.
+    diagnostics: super::model::Diagnostics,
+    /// Instances whose committed files recovery found short (`durable::Cut::damaged`).
+    damaged: BTreeMap<String, String>,
     /// Instances no worker holds: unmounted ones as they were when they left, and lost ones
     /// (`lost`). The run's report includes them.
-    retired: Mutex<BTreeMap<String, AgentReport>>,
+    retired: Mutex<BTreeMap<String, InstanceReport>>,
     /// Group commit of the journals.
     durable: Arc<Durable>,
     /// Restores in progress, at most `restore_concurrency`.
@@ -383,6 +400,45 @@ impl Drop for Permit<'_> {
     }
 }
 
+/// The journals' clock. It stands still while the agents restore (it starts when the last worker
+/// has booted) and from the moment the run begins closing: work finishing then sees that moment
+/// and no later, so a timer neither fires nor loses time while the run boots or drains, and a
+/// restore continues every timer with what it had left.
+struct Clock(Mutex<ClockState>);
+struct ClockState {
+    at: i64,
+    since: Option<Instant>,
+    stopped: bool,
+}
+impl Clock {
+    fn new(at: i64) -> Clock {
+        Clock(Mutex::new(ClockState {
+            at,
+            since: None,
+            stopped: false,
+        }))
+    }
+    fn now(&self) -> i64 {
+        let c = self.0.lock().unwrap();
+        c.at + c.since.map_or(0, |t| t.elapsed().as_millis() as i64)
+    }
+    /// Let time pass (once the agents are running), unless the run is already closing.
+    fn start(&self) {
+        let mut c = self.0.lock().unwrap();
+        if !c.stopped && c.since.is_none() {
+            c.since = Some(Instant::now());
+        }
+    }
+    /// Stop it for good at this moment.
+    fn stop(&self) {
+        let mut c = self.0.lock().unwrap();
+        if let Some(t) = c.since.take() {
+            c.at += t.elapsed().as_millis() as i64;
+        }
+        c.stopped = true;
+    }
+}
+
 impl Shared {
     /// `j` with blob references replaced by their text (reports and snapshots leave the runtime).
     fn expand(&self, j: &J) -> J {
@@ -400,7 +456,25 @@ impl Shared {
         )
     }
     fn clock_ms(&self) -> i64 {
-        self.clock_base + self.clock_started.elapsed().as_millis() as i64
+        self.clock.now()
+    }
+    /// An existing instance's own directory (`layout.rs`), with a run directory.
+    fn instance_dir(&self, id: &str) -> Option<PathBuf> {
+        self.store.layout()?.dir(id)
+    }
+    /// An instance's id in the run (its directory's name), for a machine's per-instance place;
+    /// empty without a run directory (`CallContext.instance`).
+    fn instance_key(&self, id: &str) -> String {
+        self.instance_dir(id)
+            .and_then(|d| d.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .unwrap_or_default()
+    }
+    /// Begin closing: the clock stops at this moment, no new call starts, and calls still queued
+    /// for a model are left outstanding for a restore.
+    fn begin_closing(&self) {
+        self.clock.stop();
+        self.closing.store(true, Ordering::SeqCst);
+        suspend_queued_models(self);
     }
     /// List a machine call as live; cancelling its token stops it.
     fn token(&self, agent: &str, incarnation: u64, task: u64) -> CancelToken {
@@ -474,50 +548,90 @@ pub struct Runtime {
     cfg: RuntimeConfig,
     models: BTreeMap<String, ModelBinding>,
     machines: BTreeMap<String, Arc<dyn Executor>>,
-    specs: Vec<AgentSpec>,
-    /// The agents `resume` found journals for, with each journal's last clock (journals are
+    specs: Vec<InstanceSpec>,
+    /// The agents `restore` found journals for, with each journal's last clock (journals are
     /// streamed from disk when the agents start, never held here).
     journals: HashMap<String, i64>,
-    /// The journals' committed cut, recovered by `resume` (`run` recovers it otherwise).
+    /// The journals' committed cut, recovered by `restore` (`run` recovers it otherwise).
     cut: Option<durable::Cut>,
-    /// The lock on the run directory, taken by `resume` (`run` takes it otherwise).
+    /// The lock on the run directory, taken by `restore` (`run` takes it otherwise).
     owner: Option<durable::Owner>,
-    /// Events posted from outside while running (`inbox`); `run` drains the receiver.
-    inbox: Option<(Sender<Posted>, Receiver<Posted>)>,
+    /// The embedder's handle and the operations it sends (`control`); `run` drains the receiver.
+    control: Option<(Control, Receiver<Op>)>,
 }
 
-/// Events posted into a running runtime from outside it (an HTTP listener, a UI, a test): the
-/// embedder's `postMessage`. Each is delivered to its instance as an event (`useEvent(name)`),
-/// journaled by the instance that takes it, as a control-inbox event is.
+/// An embedder's handle on a run, as a browser's embedder holds a page: post events into it,
+/// read its status, set its model limit, close it. Take it with `Runtime::control` before `run`;
+/// it is cheap to clone and usable from any thread, before the run starts and while it runs.
 #[derive(Clone)]
-pub struct Inbox(Sender<Posted>);
+pub struct Control {
+    ops: Sender<Op>,
+    status: Arc<Mutex<J>>,
+}
 
-enum Posted {
-    Event {
+enum Op {
+    Post {
         target: String,
         event: String,
         payload: J,
+        key: Option<String>,
+        reply: Sender<Result<(), String>>,
     },
-    /// End the run (`Inbox::close`).
-    Close,
+    Close(Duration),
+    ModelLimit(usize),
 }
 
-impl Inbox {
-    /// Deliver `payload` to instance `target` as the event `event`. Fails once the run has ended.
-    pub fn post(&self, target: &str, event: &str, payload: J) -> Result<(), String> {
+/// A post's answer: `wait` returns once the event's journal line is committed (`Ok`), or with why
+/// it was not delivered. Dropping it does not withdraw the post.
+pub struct Delivery(Receiver<Result<(), String>>);
+
+impl Delivery {
+    /// Wait for the answer.
+    pub fn wait(self) -> Result<(), String> {
         self.0
-            .send(Posted::Event {
-                target: target.into(),
-                event: event.into(),
-                payload,
-            })
-            .map_err(|_| "the run has ended".to_string())
+            .recv()
+            .unwrap_or_else(|_| Err("the run ended before the post was delivered".into()))
+    }
+}
+
+impl Control {
+    /// Deliver `payload` to instance `target` as the event `event` (`useEvent(event)`), as
+    /// `postMessage` does. With a `key`, a post the instance has already taken (posted again after
+    /// a lost answer, or after a restore) is journaled but not taken a second time.
+    pub fn post(&self, target: &str, event: &str, payload: J, key: Option<&str>) -> Delivery {
+        let (reply, answer) = channel();
+        let op = Op::Post {
+            target: target.into(),
+            event: event.into(),
+            payload,
+            key: key.map(str::to_owned),
+            reply: reply.clone(),
+        };
+        if self.ops.send(op).is_err() {
+            let _ = reply.send(Err("the run has ended".into()));
+        }
+        Delivery(answer)
     }
 
-    /// End the run, as closing a page does: what is running is stopped as at `max_wall` (nothing
-    /// lost: the journals hold it, and a resume continues), and `run` returns.
-    pub fn close(&self) {
-        let _ = self.0.send(Posted::Close);
+    /// Close the run: the clock stops and no new call starts; calls still running get `timeout`
+    /// to finish, then are cancelled (nothing is lost: they stay outstanding in the journals, and a
+    /// restore issues them again). `run` returns once everything is committed. A second close may
+    /// shorten the time left; it never lengthens it.
+    pub fn close(&self, timeout: Duration) {
+        let _ = self.ops.send(Op::Close(timeout));
+    }
+
+    /// How many model calls may run at once (0 holds every model call while the rest of the run
+    /// goes on).
+    pub fn set_model_limit(&self, limit: usize) {
+        let _ = self.ops.send(Op::ModelLimit(limit));
+    }
+
+    /// The run's status: `state` (`starting`, `running`, `closing`, `closed`), `clock_ms`, each
+    /// agent's state, the model bindings' windows and the model queue. Refreshed about every
+    /// 100 ms while the run runs.
+    pub fn status(&self) -> J {
+        self.status.lock().unwrap().clone()
     }
 }
 
@@ -542,7 +656,7 @@ impl Runtime {
             journals: HashMap::new(),
             cut: None,
             owner: None,
-            inbox: None,
+            control: None,
         }
     }
 
@@ -567,12 +681,19 @@ impl Runtime {
         self
     }
 
-    /// A handle that posts events into this runtime while it runs (`Inbox::post`).
-    pub fn inbox(&mut self) -> Inbox {
-        Inbox(self.inbox.get_or_insert_with(channel).0.clone())
+    /// The embedder's handle on this run (`Control`). Every call returns a handle on the same run.
+    pub fn control(&mut self) -> Control {
+        self.control
+            .get_or_insert_with(|| {
+                let (ops, rx) = channel();
+                let status = Arc::new(Mutex::new(json!({"state": "starting"})));
+                (Control { ops, status }, rx)
+            })
+            .0
+            .clone()
     }
 
-    /// Bind another model by name: an instance (`AgentSpec.model`, `<Mount model>`) or a render
+    /// Bind another model by name: an instance (`InstanceSpec.model`, `<Mount model>`) or a render
     /// names the model it runs on; its prompts are rendered with `enc`.
     pub fn bind_model(&mut self, name: &str, enc: Arc<Encoder>, model: Arc<dyn Model>) -> &mut Self {
         self.models.insert(name.into(), (enc, model));
@@ -588,37 +709,44 @@ impl Runtime {
     }
 
     /// Add a root agent; ids are unique.
-    pub fn add_agent(&mut self, spec: AgentSpec) -> Result<&mut Self, String> {
+    pub fn add_instance(&mut self, spec: InstanceSpec) -> Result<&mut Self, String> {
         if self.specs.iter().any(|s| s.id == spec.id) {
             return Err(format!("duplicate agent {}", spec.id));
         }
-        if !super::agent::valid_instance_name(&spec.id) {
+        if !super::instance::valid_instance_name(&spec.id) {
             return Err(format!("bad agent id {:?}", spec.id));
         }
         self.specs.push(spec);
         Ok(self)
     }
 
-    /// The agents to run (after `add_agent`, or as read back by `resume`).
-    pub fn specs(&self) -> &[AgentSpec] {
+    /// The agents to run (after `add_instance`, or as read back by `restore`).
+    pub fn specs(&self) -> &[InstanceSpec] {
         &self.specs
     }
 
     /// Membership supplied by the controller on restart. Existing journals retain their
     /// original app props for deterministic replay; only fresh identities use new props.
-    pub fn membership(&mut self, wanted: Vec<AgentSpec>) -> Result<(), String> {
+    pub fn set_instances(&mut self, wanted: Vec<InstanceSpec>) -> Result<(), String> {
         let ids: BTreeSet<_> = wanted.iter().map(|s| s.id.clone()).collect();
         self.specs.retain(|s| ids.contains(&s.id));
         self.journals.retain(|id, _| ids.contains(id));
         for spec in wanted {
             if let Some(old) = self.specs.iter_mut().find(|old| old.id == spec.id) {
+                // Secret values are never saved (`instance.json` leaves them out): they come from the
+                // deployment again, as the deployment-wide ones do.
+                for (k, v) in &spec.env {
+                    if self.cfg.secrets.contains(k) {
+                        old.env.insert(k.clone(), v.clone());
+                    }
+                }
                 old.machines = spec.machines;
                 old.capabilities = spec.capabilities;
                 old.inspect = spec.inspect;
                 old.inspectable = spec.inspectable;
                 old.rank = spec.rank;
             } else {
-                self.add_agent(spec)?;
+                self.add_instance(spec)?;
             }
         }
         Ok(())
@@ -626,38 +754,44 @@ impl Runtime {
 
     /// Continue the agents journaled under `cfg.dir`: each is rebuilt from its journal and its
     /// outstanding work is submitted again. Secret env values come from `cfg.env` again.
-    pub fn resume(cfg: RuntimeConfig, enc: Arc<Encoder>, model: Arc<dyn Model>) -> Result<Self, String> {
-        let dir = cfg.dir.clone().ok_or("resume needs a runtime dir")?;
+    pub fn restore(cfg: RuntimeConfig, enc: Arc<Encoder>, model: Arc<dyn Model>) -> Result<Self, String> {
+        let dir = cfg.dir.clone().ok_or("restore needs a run directory")?;
         let mut rt = Runtime::new(cfg, enc, model);
         rt.owner = Some(durable::own(&dir)?);
         // A crash leaves the journals as the last commit made them, before anything reads them.
         rt.cut = Some(durable::recover(&dir)?);
-        let mut entries: Vec<_> = std::fs::read_dir(&dir)
-            .map_err(|e| format!("{}: {e}", dir.display()))?
+        // Every instance's directory (`instances/<id>/`); the roots among them are restored here,
+        // and each restores its children.
+        let mut entries: Vec<_> = std::fs::read_dir(dir.join(super::layout::INSTANCES))
+            .into_iter()
+            .flatten()
             .flatten()
             .map(|e| e.path())
-            .filter(|p| p.join("agent.json").exists())
+            .filter(|p| p.join("instance.json").exists())
             .collect();
         entries.sort();
         for path in entries {
-            // One agent's damage is its own: an unreadable spec leaves it unresumed (its files as
+            // One agent's damage is its own: an unreadable spec leaves it not restored (its files as
             // they are), and an unreadable journal fails its own restore.
-            let spec = std::fs::read(path.join("agent.json"))
+            let spec = std::fs::read(path.join("instance.json"))
                 .map_err(|e| e.to_string())
-                .and_then(|b| serde_json::from_slice::<AgentSpec>(&b).map_err(|e| e.to_string()));
+                .and_then(|b| serde_json::from_slice::<InstanceSpec>(&b).map_err(|e| e.to_string()));
             let spec = match spec {
                 Ok(spec) => spec,
                 Err(e) => {
-                    eprintln!("{}: not resumed: agent.json: {e}", path.display());
+                    eprintln!("{}: not restored: instance.json: {e}", path.display());
                     continue;
                 }
             };
-            if !super::agent::valid_instance_name(&spec.id)
-                || path.file_name().is_none_or(|name| name != spec.id.as_str())
-            {
+            // A child (`parent/key`) is restored by its parent.
+            if spec.id.contains('/') {
+                continue;
+            }
+            if !super::instance::valid_instance_name(&spec.id) {
                 return Err(format!(
-                    "{}: saved agent id does not match its directory",
-                    path.display()
+                    "{}: saved agent id {:?} is not a name",
+                    path.display(),
+                    spec.id
                 ));
             }
             let file = path.join("journal.jsonl");
@@ -675,7 +809,7 @@ impl Runtime {
 
     /// Run every agent until all have stopped, nothing can make progress, or `max_wall` passes.
     pub fn run(mut self) -> Result<Report, String> {
-        if !(1..=super::agent::MAX_INPUT_BATCH).contains(&self.cfg.input_batch) {
+        if !(1..=super::instance::MAX_INPUT_BATCH).contains(&self.cfg.input_batch) {
             return Err("input_batch must be an integer from 1 to 64".into());
         }
         for (name, (_, model)) in &self.models {
@@ -714,7 +848,7 @@ impl Runtime {
         let shared_workers = self.cfg.workers.max(1).min(self.specs.len() - dedicated);
         let n_workers = (shared_workers + dedicated).max(1);
         let mut route = HashMap::new();
-        let mut per_worker: Vec<Vec<AgentSpec>> = vec![vec![]; n_workers];
+        let mut per_worker: Vec<Vec<InstanceSpec>> = vec![vec![]; n_workers];
         let (mut shared_next, mut dedicated_next) = (0, shared_workers);
         for spec in &self.specs {
             let worker = if spec.dedicated_worker {
@@ -744,6 +878,12 @@ impl Runtime {
                     .create(dir)
                     .map_err(|e| e.to_string())?;
             }
+        }
+        // The run's own record: the directory holds a run (`layout::holds_a_run`).
+        if let Some(dir) = &self.cfg.dir
+            && !dir.join(super::layout::RUN).exists()
+        {
+            atomic_value(&dir.join(super::layout::RUN), &json!({"contract": CONTRACT_VERSION}))?;
         }
         let blobs = match &self.cfg.dir {
             Some(d) => Some(Arc::new(
@@ -781,9 +921,11 @@ impl Runtime {
                 self.models.values().map(|(_, m)| m.ranks().max(1)).sum(),
                 self.cfg.model_inflight.unwrap_or(self.cfg.model_threads),
             ),
-            quiescing: AtomicBool::new(false),
-            clock_base,
-            clock_started: Instant::now(),
+            closing: AtomicBool::new(false),
+            started,
+            clock: Clock::new(clock_base),
+            diagnostics: super::model::Diagnostics::new(self.cfg.capture_dir.clone()),
+            damaged: cut.as_ref().map(|c| c.damaged.clone()).unwrap_or_default(),
             retired: Default::default(),
             booting: Default::default(),
             durable: durable.clone(),
@@ -804,50 +946,11 @@ impl Runtime {
             }
         }
         let mut committing = Committing(durable.clone(), false);
-        let _control_watcher = if let Some(path) = self.cfg.dir.as_ref().map(|d| d.join("model_inflight")) {
-            // Apply a persisted controller allocation before workers submit the
-            // first wave, rather than overshooting it until the first poll.
-            if let Some(n) = std::fs::read_to_string(&path)
-                .ok()
-                .and_then(|s| s.trim().parse::<usize>().ok())
-            {
-                shared.model_gate.set_limit(n);
-            }
-            let shared = Arc::downgrade(&shared);
-            let (stop, wake) = channel();
-            let thread = std::thread::Builder::new()
-                .name("model-inflight".into())
-                .spawn(move || {
-                    while let Err(std::sync::mpsc::RecvTimeoutError::Timeout) =
-                        wake.recv_timeout(Duration::from_secs(2))
-                    {
-                        let Some(shared) = shared.upgrade() else { break };
-                        let Some(n) = std::fs::read_to_string(&path)
-                            .ok()
-                            .and_then(|s| s.trim().parse::<usize>().ok())
-                        else {
-                            continue;
-                        };
-                        if shared.model_gate.set_limit(n) {
-                            let (inflight, queued) = shared.model_gate.counts();
-                            eprintln!("model_inflight: {n} (in flight {inflight}, queued {queued})");
-                            pump_model(&shared);
-                        }
-                    }
-                })
-                .map_err(|e| e.to_string())?;
-            Some(ControlWatcher {
-                stop,
-                thread: Some(thread),
-            })
-        } else {
-            None
-        };
         shared.booting.store(n_workers, Ordering::SeqCst);
         let mut handles = vec![];
         for (w, (rx, specs)) in rxs.into_iter().zip(per_worker).enumerate() {
             let shared = shared.clone();
-            let resumed: HashSet<String> = specs
+            let restored: HashSet<String> = specs
                 .iter()
                 .filter(|s| self.journals.contains_key(&s.id))
                 .map(|s| s.id.clone())
@@ -868,36 +971,52 @@ impl Runtime {
             handles.push(
                 std::thread::Builder::new()
                     .name(format!("render-{w}"))
-                    .spawn(move || worker(w, shared, specs, resumed, rx))
+                    .spawn(move || worker(w, shared, specs, restored, rx))
                     .map_err(|e| e.to_string())?,
             );
         }
-        // Wait until every agent stopped, or nothing is in flight and no agent waits on anything.
-        let mut last_control = Instant::now() - Duration::from_secs(2);
-        let mut pause_started: Option<Instant> = None;
-        let mut queued_messages: BTreeSet<(PathBuf, String)> = BTreeSet::new();
-        let mut refused_messages: BTreeSet<PathBuf> = BTreeSet::new();
+        // Run until every agent stopped, a batch has nothing left to do, `max_wall` passes, a
+        // worker is lost, or the embedder closes the run. Every end goes through closing: the
+        // clock stops, no new call starts, and calls still running get the close's time to finish.
+        let (control, ops) = match self.control.take() {
+            Some((control, ops)) => (Some(control), Some(ops)),
+            None => (None, None),
+        };
+        let mut last_status = Instant::now() - Duration::from_secs(1);
         let mut last_trim = Instant::now();
         let status_writer = StatusWriter::start(self.cfg.dir.clone(), durable.clone());
-        let posted = self.inbox.take().map(|(_, rx)| rx);
-        let mut closed = false;
-        let complete = loop {
+        // Closing: when running calls are cancelled, and why the run ends. A later close may bring
+        // that moment forward, never put it back.
+        let mut closing: Option<(Instant, Ended)> = None;
+        let close = |closing: &mut Option<(Instant, Ended)>, timeout: Duration, why: Ended| {
+            let deadline = Instant::now() + timeout;
+            match closing {
+                Some((at, _)) => *at = (*at).min(deadline),
+                None => {
+                    shared.begin_closing();
+                    *closing = Some((deadline, why));
+                }
+            }
+        };
+        let ended = loop {
             std::thread::sleep(Duration::from_millis(5));
-            if let Some(rx) = &posted {
-                while let Ok(p) = rx.try_recv() {
-                    match p {
-                        Posted::Event { target, event, payload } => {
-                            let _ = shared.post_to(
-                                &target,
-                                InputKind::Event {
-                                    name: event,
-                                    payload,
-                                    ack: None,
-                                    op: None,
-                                },
-                            );
+            while let Some(op) = ops.as_ref().and_then(|rx| rx.try_recv().ok()) {
+                match op {
+                    Op::Post { reply, .. } if closing.is_some() => {
+                        let _ = reply.send(Err(delivery::CLOSING.into()));
+                    }
+                    Op::Post {
+                        target,
+                        event,
+                        payload,
+                        key,
+                        reply,
+                    } => delivery::post(&shared, &target, event, payload, key, reply),
+                    Op::Close(timeout) => close(&mut closing, timeout, Ended::Closed),
+                    Op::ModelLimit(limit) => {
+                        if shared.model_gate.set_limit(limit) {
+                            pump_model(&shared);
                         }
-                        Posted::Close => closed = true,
                     }
                 }
             }
@@ -905,147 +1024,75 @@ impl Runtime {
                 last_trim = Instant::now();
                 trim_heap();
             }
-            if last_control.elapsed() >= Duration::from_millis(100) {
-                last_control = Instant::now();
-                if let Some(dir) = &self.cfg.dir {
-                    let control = dir.join("control");
-                    // A pause, once begun, is carried through: commands issued since were dropped
-                    // for the resume to issue again, so it cannot be taken back by removing the
-                    // file. `pause_started` is the state; the file only starts it.
-                    if pause_started.is_some() || control.join("pause.json").exists() {
-                        shared.quiescing.store(true, Ordering::SeqCst);
-                        suspend_queued_models(&shared);
-                        let pause_at = pause_started.get_or_insert_with(Instant::now);
-                        let command: J = std::fs::read(control.join("pause.json"))
-                            .ok()
-                            .and_then(|b| serde_json::from_slice(&b).ok())
-                            .unwrap_or(json!({}));
-                        let mode = command["mode"].as_str().unwrap_or("graceful");
-                        if mode == "fast" {
-                            for live in shared.cancels.lock().unwrap().values().filter(|l| l.abort.is_some()) {
-                                live.token.cancel_by_host("controller fast pause");
-                            }
-                        }
-                        if mode == "immediate" || pause_at.elapsed() > Duration::from_secs(150) {
-                            for live in shared.cancels.lock().unwrap().values() {
-                                live.token.cancel_by_host("controller pause");
-                            }
-                        }
-                        if shared.inflight.load(Ordering::SeqCst) == 0 && shared.cancels.lock().unwrap().is_empty() {
-                            break false;
-                        }
-                    }
-                    if pause_started.is_none()
-                        && let Ok(entries) = std::fs::read_dir(control.join("inbox"))
-                    {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            if path.extension().and_then(|s| s.to_str()) != Some("json")
-                                || refused_messages.contains(&path)
-                            {
-                                continue;
-                            }
-                            let Ok(bytes) = std::fs::read(&path) else { continue };
-                            let Ok(message) = serde_json::from_slice::<J>(&bytes) else {
-                                continue;
-                            };
-                            let Some(targets) = message["targets"].as_array() else {
-                                continue;
-                            };
-                            // A message is known by its operation id (its receipt's name): without a
-                            // valid one it could not be told from a new message after a restart, so
-                            // it is refused, once, and never delivered.
-                            let op = message["operation_id"].as_str().unwrap_or("");
-                            if !valid_op(op) {
-                                eprintln!(
-                                    "{}: not delivered: operation_id must be 1 to 128 letters, digits, `-` or `_` (it names the receipt file)",
-                                    path.display()
-                                );
-                                refused_messages.insert(path);
-                                continue;
-                            }
-                            for target in targets.iter().filter_map(J::as_str) {
-                                // A target not started yet (a child, while its parent restores) gets
-                                // the message at a later scan; each target gets it once.
-                                if queued_messages.contains(&(path.clone(), target.to_string()))
-                                    || !shared.route.read().unwrap().contains_key(target)
-                                {
-                                    continue;
-                                }
-                                queued_messages.insert((path.clone(), target.to_string()));
-                                if control
-                                    .join("receipts")
-                                    .join(target)
-                                    .join(format!("{op}.json"))
-                                    .exists()
-                                {
-                                    continue;
-                                }
-                                shared.post_to(
-                                    target,
-                                    InputKind::Event {
-                                        name: message["event"].as_str().unwrap_or("message").into(),
-                                        payload: message["payload"].clone(),
-                                        ack: None,
-                                        op: Some(op.to_string()),
-                                    },
-                                );
-                            }
-                        }
-                    }
-                    // The status is copied under the lock and written by the status thread: a slow
-                    // disk delays neither the workers (they take this lock after every input) nor
-                    // this loop's pause handling.
-                    // A model call retrying a failure is shown as such; the agent is still healthy
-                    // (an outage is retried for as long as it lasts).
-                    // Copied out under the lock (every worker takes it after every input); the
-                    // JSON is built after it is released.
-                    let statuses: Vec<(String, Status)> = shared
-                        .status
+            let booted = shared.booting.load(Ordering::SeqCst) == 0;
+            if last_status.elapsed() >= Duration::from_millis(100) {
+                last_status = Instant::now();
+                let state = match (&closing, booted) {
+                    (Some(_), _) => "closing",
+                    (None, false) => "starting",
+                    (None, true) => "running",
+                };
+                let value = status_value(&shared, state, &windows);
+                status_writer.put(json!({"clock_ms": value["clock_ms"]}));
+                if let Some(control) = &control {
+                    *control.status.lock().unwrap() = value;
+                }
+            }
+            if let Some((deadline, why)) = closing {
+                if Instant::now() >= deadline {
+                    // Taken out first: a cancel runs callbacks, which must not run under the lock
+                    // every call takes.
+                    let tokens: Vec<CancelToken> = shared
+                        .cancels
                         .lock()
                         .unwrap()
-                        .iter()
-                        .map(|(id, s)| (id.clone(), *s))
+                        .values()
+                        .map(|l| l.token.clone())
                         .collect();
-                    let agents: Vec<J> = statuses.iter().map(|(id,s)| json!({"id":id,"state":if s.failed {"failed"} else if s.stopped {"stopped"} else if s.last_activity_ms == 0 {"starting"} else if s.retrying.is_some() {"retrying"} else {s.phase}, "healthy":!s.failed && !s.stopped && s.last_activity_ms > 0,
-                        "retrying":s.retrying.map(|(failures, error)| json!({"failures":failures,"error":error})),"turns":s.turns,"generated_tokens":s.generated_tokens,"handler_errors":s.handler_errors,"last_activity_ms":s.last_activity_ms,"outstanding":s.outstanding})).collect();
-                    let (model_active, model_queued) = shared.model_gate.counts();
-                    status_writer.put(json!({"clock_ms": shared.clock_ms(), "wall_ms": now_ms()}),
-                        json!({"at":now_ms() as f64/1000.0,"agents":agents,"models":windows,"model_active":model_active,"model_queued":model_queued,"capture_errors":super::model::capture_errors(),"quiescing":shared.quiescing.load(Ordering::SeqCst)}));
+                    for token in tokens {
+                        token.cancel_by_host("the run is closing");
+                    }
                 }
+                // A lost worker's messages are never consumed: the drain cannot finish, and need not.
+                if (shared.inflight.load(Ordering::SeqCst) == 0 && shared.cancels.lock().unwrap().is_empty())
+                    || handles.iter().any(|h| h.is_finished())
+                {
+                    break if handles.iter().any(|h| h.is_finished()) {
+                        Ended::WorkerLost
+                    } else {
+                        why
+                    };
+                }
+                continue;
             }
             let status = shared.status.lock().unwrap();
             let all_stopped = status.values().all(|s| s.stopped);
             // Idle only after every worker has started its agents (before that the status is partial).
-            let idle = shared.booting.load(Ordering::SeqCst) == 0
+            let idle = booted
                 && shared.inflight.load(Ordering::SeqCst) == 0
                 && status.values().all(|s| s.stopped || s.outstanding == 0);
+            drop(status);
             if all_stopped {
-                break true;
+                break Ended::Stopped;
             }
             if idle && !self.cfg.serve {
-                break false;
+                break Ended::Idle;
             }
             // A worker only ends when told to: one that ended died outside its instances' own
-            // code, and the work it owed is lost with it. The run stops now, not at `max_wall`:
-            // its agents are reported failed and the rest paused, to be resumed.
+            // code, and the work it owed is lost with it. Its agents are reported failed, the rest
+            // can be restored.
             if handles.iter().any(|h| h.is_finished()) {
-                break false;
-            }
-            if self.cfg.max_wall.is_some_and(|m| started.elapsed() > m) {
-                break false;
-            }
-            if closed {
-                break false;
+                close(&mut closing, Duration::ZERO, Ended::WorkerLost);
+            } else if self.cfg.max_wall.is_some_and(|m| started.elapsed() > m) {
+                close(&mut closing, Duration::ZERO, Ended::MaxWall);
             }
         };
-        // Abort everything still running (commands are killed, requests closed).
-        // No periodic status lands after this (the final clock below must be the last).
+        // Whatever is still running is stopped (commands are killed, requests closed). No periodic
+        // clock lands after this (the final one below must be the last).
         status_writer.finish();
-        shared.quiescing.store(true, Ordering::SeqCst);
-        suspend_queued_models(&shared);
+        shared.begin_closing();
         for (_, live) in shared.cancels.lock().unwrap().drain() {
-            live.token.cancel_by_host("runtime shutdown");
+            live.token.cancel_by_host("the run is closing");
         }
         // The commands just cancelled are being stopped on the machine threads (SIGTERM, then
         // SIGKILL after five seconds). The run does not return, and the process does not exit,
@@ -1059,7 +1106,7 @@ impl Runtime {
         for (w, joined) in joined.into_iter().enumerate() {
             match joined {
                 Ok(reports) => agents.extend(reports?),
-                // Its instances are failed (a resume restores them from their journals).
+                // Its instances are failed (a restore rebuilds them from their journals).
                 Err(panic) => {
                     let error = format!("render worker {w} {}", panicked(panic));
                     let held: Vec<String> = shared
@@ -1087,22 +1134,43 @@ impl Runtime {
             return Err(error);
         }
         if let Some(dir) = &self.cfg.dir {
-            atomic_value(
-                &dir.join("clock.json"),
-                &json!({"clock_ms": shared.clock_ms(), "wall_ms": now_ms(), "paused": true}),
-            )?;
-            atomic_value(
-                &dir.join("checkpoint.json"),
-                &json!({"at": now_ms(), "agents": agents.len(), "complete": complete}),
-            )?;
+            atomic_value(&dir.join("clock.json"), &json!({"clock_ms": shared.clock_ms()}))?;
+        }
+        if let Some(control) = &control {
+            let mut status = status_value(&shared, "closed", &windows);
+            status["ended"] = json!(ended);
+            *control.status.lock().unwrap() = status;
         }
         agents.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(Report {
-            agents,
+            instances: agents,
             wall_s: started.elapsed().as_secs_f64(),
-            complete,
+            complete: ended == Ended::Stopped,
+            ended,
+            token_mismatches: shared.diagnostics.token_mismatches(),
+            capture_errors: shared.diagnostics.capture_errors(),
         })
     }
+}
+
+/// The run's status for `Control::status`: its state, its clock, each agent, the model bindings'
+/// windows and the model queue.
+fn status_value(shared: &Shared, state: &str, windows: &serde_json::Map<String, J>) -> J {
+    // Copied out under the lock (every worker takes it after every input); the JSON is built after
+    // it is released. A model call retrying a failure is shown as such; the agent is still healthy
+    // (an outage is retried for as long as it lasts).
+    let statuses: Vec<(String, Status)> = shared
+        .status
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(id, s)| (id.clone(), *s))
+        .collect();
+    let agents: Vec<J> = statuses.iter().map(|(id,s)| json!({"id":id,"state":if s.failed {"failed"} else if s.stopped {"stopped"} else if s.last_activity_ms == 0 {"starting"} else if s.retrying.is_some() {"retrying"} else {s.phase}, "healthy":!s.failed && !s.stopped && s.last_activity_ms > 0,
+        "retrying":s.retrying.map(|(failures, error)| json!({"failures":failures,"error":error})),"turns":s.turns,"generated_tokens":s.generated_tokens,"handler_errors":s.handler_errors,"last_activity_ms":s.last_activity_ms,"outstanding":s.outstanding})).collect();
+    let (model_active, model_queued) = shared.model_gate.counts();
+    json!({"state": state, "clock_ms": shared.clock_ms(), "wall_ms": now_ms(), "instances": agents, "models": windows,
+        "model_active": model_active, "model_queued": model_queued, "capture_errors": shared.diagnostics.capture_errors()})
 }
 
 pub(super) fn atomic_value(path: &std::path::Path, value: &J) -> Result<(), String> {
@@ -1165,8 +1233,8 @@ const MIN_SECRET: usize = 4;
 
 struct Slot {
     incarnation: u64,
-    agent: Agent,
-    spec: AgentSpec,
+    agent: Instance,
+    spec: InstanceSpec,
     app: PathBuf,
     secrets: Vec<(String, String)>,
     journal: Option<Journal>,
@@ -1184,7 +1252,8 @@ struct Slot {
 #[allow(clippy::large_enum_variant)]
 enum Held {
     Command(Command),
-    Receipt(String),
+    /// An embedder's post, answered once its event is committed.
+    Answer(delivery::Ack),
 }
 
 /// A worker's loaded apps, by (file, entry, model binding): a view is bound to its model's tokenizer.
@@ -1235,7 +1304,7 @@ impl Views {
 }
 
 /// Thread-time spent in each phase of restoring agents (printed with the boot line under
-/// `AFFORDANCE_RESTORE_TIMING`): a diagnostic for resume cost.
+/// `AFFORDANCE_RESTORE_TIMING`): a diagnostic for restore cost.
 static PHASES: [std::sync::atomic::AtomicU64; 8] = [const { std::sync::atomic::AtomicU64::new(0) }; 8];
 const PHASE_NAMES: [&str; 8] = [
     "store_load",
@@ -1293,7 +1362,7 @@ fn lost(shared: &Shared, w: usize, id: &str, error: String) {
     );
     shared.retired.lock().unwrap().insert(
         id.to_string(),
-        AgentReport {
+        InstanceReport {
             id: id.to_string(),
             worker: w,
             diverged_at: None,
@@ -1311,7 +1380,7 @@ fn lost(shared: &Shared, w: usize, id: &str, error: String) {
 /// replays. Only that: an operational setting (workers, thread pools, `model_inflight`,
 /// `restore_concurrency`, timeouts, machines' commands, where the app is installed) changes
 /// none of it, and an image kept across a change of one saves its agent a full replay.
-fn checkpoint_identity(shared: &Shared, cfg: &AgentConfig, view: &View, enc: &Encoder) -> String {
+fn checkpoint_identity(shared: &Shared, cfg: &InstanceConfig, view: &View, enc: &Encoder) -> String {
     // Which model answers and how prompts are laid out (`replay_identity`), not how it is
     // reached: moving a server or changing a timeout keeps images.
     let model = cfg
@@ -1322,7 +1391,7 @@ fn checkpoint_identity(shared: &Shared, cfg: &AgentConfig, view: &View, enc: &En
     // The app is its files' contents and their paths relative to the root view (`source_hash`),
     // and which of them is the root: its name, not its absolute path. A deploy that installs
     // the same files in a new release directory moved every image's root path, and each agent
-    // of four 256-agent fleets replayed its whole journal on resume (347 s).
+    // of four 256-agent fleets replayed its whole journal on restore (347 s).
     let root = std::path::Path::new(&*view.prog.root)
         .file_name()
         .map(|n| n.to_string_lossy().into_owned());
@@ -1335,14 +1404,14 @@ fn checkpoint_identity(shared: &Shared, cfg: &AgentConfig, view: &View, enc: &En
 /// Returns where the journal stands, and the image's input count (`saved`) if one was used.
 fn restore_instance(
     shared: &Shared,
-    cfg: AgentConfig,
+    cfg: InstanceConfig,
     view: &View,
     enc: &Encoder,
     dir: &std::path::Path,
     allow_cache: bool,
-) -> Result<(Agent, Vec<Command>, super::checkpoint::Seed), String> {
+) -> Result<(Instance, Vec<Command>, super::checkpoint::Seed), String> {
     let key = checkpoint_identity(shared, &cfg, view, enc);
-    let setup = |a: &mut Agent| {
+    let setup = |a: &mut Instance| {
         if let Some(b) = shared.store.blobs() {
             a.set_blobs(b.clone());
         }
@@ -1351,7 +1420,7 @@ fn restore_instance(
     let mut cached = None;
     if allow_cache {
         let attempt = timed(1, || {
-            super::checkpoint::load(&dir.join(&cfg.id), &key, shared.store.blobs().map(AsRef::as_ref))
+            super::checkpoint::load(dir, &key, shared.store.blobs().map(AsRef::as_ref))
         })
         .and_then(|saved| {
             saved
@@ -1369,7 +1438,7 @@ fn restore_instance(
     }
     let offset = cached.as_ref().map_or(0, |(_, offset, _, _)| *offset);
     let mut refs = std::collections::BTreeSet::new();
-    let path = dir.join(&cfg.id).join("journal.jsonl");
+    let path = dir.join("journal.jsonl");
     // Validate the history this restore reads: from the image's offset (the image's own blobs
     // were checked when it loaded), or all of it for a full replay. An image does not excuse an
     // incomplete journal; a full replay, when one happens, still reads every record.
@@ -1389,7 +1458,7 @@ fn restore_instance(
     let journal = super::jsonl::JsonLines::<Input>::open_at(&path, "journal", offset)?
         .into_iter()
         .flatten();
-    if let Some((mut agent, offset, from, mut seen)) = cached {
+    if let Some((mut agent, _, from, mut seen)) = cached {
         let mut boundary = None;
         let replay = (|| -> Result<(), String> {
             // An image taken at a step boundary: the rest of its input's effects pass first.
@@ -1423,7 +1492,6 @@ fn restore_instance(
                 saved: Some(from),
                 bytes,
                 boundary,
-                offset,
                 refs: seen,
             },
         ))
@@ -1434,7 +1502,7 @@ fn restore_instance(
         let ends = std::cell::RefCell::new(std::collections::HashMap::new());
         let count = std::cell::Cell::new(0usize);
         let full = Instant::now();
-        let (agent, commands) = Agent::restore_with(
+        let (agent, commands) = Instance::restore_with(
             cfg,
             journal.map_while(Result::ok).map(|row| {
                 count.set(
@@ -1463,7 +1531,6 @@ fn restore_instance(
                 saved: None,
                 bytes,
                 boundary,
-                offset: 0,
                 refs,
             },
         ))
@@ -1474,19 +1541,11 @@ fn save_checkpoint(shared: &Shared, slot: &mut Slot, view: &View, force: bool) {
     if slot.error.is_some() {
         return;
     }
-    // An operator message's receipt is written once its input is committed, and a resume looks
-    // for unwritten receipts only in the journal after the image. So no image is written while a
-    // receipt is still held: one that covered the message's input would hide it from that search,
-    // and a crash just then would deliver the message a second time. (A forced image, at
-    // shutdown, is written after everything held has been released.)
-    if !force && slot.held.iter().any(|(_, held)| matches!(held, Held::Receipt(_))) {
-        return;
-    }
     if let Some(cache) = &mut slot.checkpoint {
         // An image is synced when written, and may refer to blobs no committed line refers to yet.
         match cache.save(&slot.agent, view, force, &|| shared.durable.sync_files()) {
             Ok(None) => {}
-            // Why a resume will replay more of the journal than an interval.
+            // Why a restore will replay more of the journal than an interval.
             Ok(Some(reason)) => {
                 let inputs = slot.agent.journal_len();
                 trace(slot, json!({"t":"checkpoint_refused","inputs":inputs,"reason":reason}));
@@ -1497,7 +1556,7 @@ fn save_checkpoint(shared: &Shared, slot: &mut Slot, view: &View, force: bool) {
 }
 
 /// The image to write for an instance as its worker stops, after everything held for a commit
-/// has been released (so no receipt is still held: see `save_checkpoint`).
+/// has been released.
 fn due_image(slot: &mut Slot, view: &View) -> Option<super::checkpoint::Ready> {
     if slot.error.is_some() {
         return None;
@@ -1547,10 +1606,10 @@ fn start_instance(
     w: usize,
     views: &mut Views,
     slots: &mut BTreeMap<String, Slot>,
-    spec: AgentSpec,
+    spec: InstanceSpec,
     app: PathBuf,
     env: BTreeMap<String, String>,
-    resumed: bool,
+    restored: bool,
     timers: &mut Timers,
     local: &mut VecDeque<Msg>,
 ) -> Result<(), String> {
@@ -1564,7 +1623,7 @@ fn start_instance(
         .machines
         .clone()
         .unwrap_or_else(|| shared.machines.keys().cloned().collect());
-    let mut cfg = AgentConfig {
+    let mut cfg = InstanceConfig {
         id: spec.id.clone(),
         props: spec.props.clone(),
         env,
@@ -1594,8 +1653,8 @@ fn start_instance(
     };
     shared.route.write().unwrap().insert(spec.id.clone(), w);
     let fail = |slots: &mut BTreeMap<String, Slot>,
-                cfg: AgentConfig,
-                spec: AgentSpec,
+                cfg: InstanceConfig,
+                spec: InstanceSpec,
                 app: PathBuf,
                 e: String|
      -> Result<(), String> {
@@ -1603,7 +1662,7 @@ fn start_instance(
         let id = spec.id.clone();
         let mut slot = Slot {
             incarnation,
-            agent: Agent::new(cfg)?,
+            agent: Instance::new(cfg)?,
             spec,
             app,
             secrets: vec![],
@@ -1618,6 +1677,9 @@ fn start_instance(
         slots.insert(id, slot);
         Ok(())
     };
+    if let Some(why) = shared.damaged.get(&spec.id).filter(|_| restored) {
+        return fail(slots, cfg, spec, app, why.clone());
+    }
     if let Some((k, _)) = secrets.iter().find(|(_, v)| v.len() < MIN_SECRET) {
         return fail(
             slots,
@@ -1633,32 +1695,31 @@ fn start_instance(
         Err(e) => return fail(slots, cfg, spec, app, e),
     };
     let (mut journal_file, mut trace_file) = (None, None);
-    if !resumed {
+    if !restored {
         shared.store.forget_tree(&spec.id);
     }
-    if let Some(dir) = &shared.cfg.dir {
-        let d = dir.join(&spec.id);
-        if !resumed && d.exists() {
-            let archive = dir.join(".retired").join(incarnation.to_string()).join(&spec.id);
-            std::fs::create_dir_all(archive.parent().unwrap()).map_err(|e| e.to_string())?;
-            std::fs::rename(&d, &archive).map_err(|e| format!("archive {}: {e}", d.display()))?;
-            for parent in [archive.parent().unwrap(), d.parent().unwrap()] {
-                std::fs::File::open(parent)
-                    .and_then(|f| f.sync_all())
-                    .map_err(|e| e.to_string())?;
+    // The instance's own directory (`layout.rs`): found by its name, never made from it. A fresh
+    // mount over an instance retires the old one's files (and its children's).
+    let inst: Option<PathBuf> = match shared.store.layout() {
+        Some(layout) => {
+            if !restored {
+                layout.retire_tree(&spec.id)?;
             }
+            Some(layout.dir_or_new(&spec.id)?)
         }
-        std::fs::create_dir_all(&d).map_err(|e| e.to_string())?;
+        None => None,
+    };
+    if let Some(d) = &inst {
         let mut stored = spec.clone();
         for k in &shared.cfg.secrets {
             stored.env.remove(k);
         }
-        let before = resumed
-            .then(|| std::fs::read(d.join("agent.json")).ok())
+        let before = restored
+            .then(|| std::fs::read(d.join("instance.json")).ok())
             .flatten()
             .and_then(|b| serde_json::from_slice::<J>(&b).ok());
         let start = before.as_ref().and_then(|v| v["start_ms"].as_i64());
-        // What the journal was written against. A resume under other code or tokenizer is
+        // What the journal was written against. A restore under other code or tokenizer is
         // reported, and replay then checks every turn's prompt (`diverged_at`). A journal of
         // another contract is refused: its inputs mean something else (like IndexedDB's
         // `VersionError`), so it needs the binary it was written with.
@@ -1683,13 +1744,13 @@ fn start_instance(
                 spec,
                 app,
                 format!(
-                    "resume refused: the journal was written under harness contract {old}, and this binary runs contract {CONTRACT_VERSION}; resume it with a contract-{old} binary"
+                    "restore refused: the journal was written under harness contract {old}, and this binary runs contract {CONTRACT_VERSION}; restore it with a contract-{old} binary"
                 ),
             );
         }
-        if resumed && pinned.as_ref().and_then(|old| old.get("model")) != pins.get("model") {
+        if restored && pinned.as_ref().and_then(|old| old.get("model")) != pins.get("model") {
             if shared.cfg.strict_replay {
-                return fail(slots,cfg,spec,app,"strict resume refused: model binding identity changed or was not recorded; restore the original binding configuration, or use warning replay explicitly".into());
+                return fail(slots,cfg,spec,app,"strict restore refused: model binding identity changed or was not recorded; restore the original binding configuration, or use warning replay explicitly".into());
             }
             eprintln!(
                 "{}: warning: model binding identity changed or was not recorded",
@@ -1697,23 +1758,15 @@ fn start_instance(
             );
         }
         if let Some(old) = pinned.as_ref().filter(|old| **old != pins) {
-            eprintln!("{}: resuming under changed pins {old} -> {pins}", spec.id);
+            eprintln!("{}: restoring under changed pins {old} -> {pins}", spec.id);
         }
         let mut stored_json = serde_json::to_value(&stored).map_err(|e| e.to_string())?;
-        // A resumed instance replays under what it was started with: its seed and its retry
+        // A restored instance replays under what it was started with: its seed and its retry
         // policy. Either one read from today's deployment could send the replay down a branch
         // the journal did not take.
-        if resumed && let Some(old) = &before {
-            let was: super::model::RetryPolicy = match old.get("retry") {
-                Some(policy) => serde_json::from_value(policy.clone()).map_err(|e| format!("agent.json retry: {e}"))?,
-                // A run started before there was one policy: its limit, and the four further
-                // tries a refused page call was given then.
-                None => super::model::RetryPolicy {
-                    for_ms: old.get("retry_for_ms").and_then(J::as_u64),
-                    refused: 4,
-                    ..Default::default()
-                },
-            };
+        if restored && let Some(old) = &before {
+            let was: super::model::RetryPolicy =
+                serde_json::from_value(old["retry"].clone()).map_err(|e| format!("instance.json retry: {e}"))?;
             if was != cfg.retry {
                 eprintln!(
                     "{}: model calls keep the retry policy this run was started with; a fresh run takes the new one",
@@ -1731,19 +1784,19 @@ fn start_instance(
         stored_json["pins"] = pinned.unwrap_or_else(|| {
             let mut initial = pins;
             // A warning restore cannot certify the model used by an unpinned old journal.
-            if resumed && initial.get("model").is_some() {
+            if restored && initial.get("model").is_some() {
                 initial["model"] = J::Null;
             }
             initial
         });
-        stored_json["incarnation"] = if resumed {
+        stored_json["incarnation"] = if restored {
             before.as_ref().and_then(|v| v["incarnation"].as_u64()).unwrap_or(0)
         } else {
             incarnation
         }
         .into();
         let clean = redact(stored_json, &secrets);
-        atomic_value(&d.join("agent.json"), &clean)?;
+        atomic_value(&d.join("instance.json"), &clean)?;
         let open = |name: &str| {
             std::fs::OpenOptions::new()
                 .create(true)
@@ -1757,15 +1810,15 @@ fn start_instance(
             return fail(slots, cfg, spec, app, format!("store recovery failed: {e}"));
         }
     }
-    let dir = shared.cfg.dir.clone().filter(|_| resumed);
+    let dir = inst.clone().filter(|_| restored);
     let (agent, commands, error, restored_from) = match &dir {
         Some(d) => {
-            let start = std::fs::read(d.join(&spec.id).join("agent.json"))
+            let start = std::fs::read(d.join("instance.json"))
                 .ok()
                 .and_then(|b| serde_json::from_slice::<J>(&b).ok())
                 .and_then(|v| v["start_ms"].as_i64())
                 .unwrap_or(cfg.start_ms);
-            let replay_cfg = AgentConfig {
+            let replay_cfg = InstanceConfig {
                 start_ms: start,
                 ..cfg.clone()
             };
@@ -1782,13 +1835,13 @@ fn start_instance(
             match restored {
                 Ok((a, cmds, seed)) => (a, cmds, None, Some(seed)),
                 Err(e) => {
-                    eprintln!("{}: resume failed: {e}", spec.id);
-                    (Agent::new(cfg)?, vec![], Some(format!("resume failed: {e}")), None)
+                    eprintln!("{}: restore failed: {e}", spec.id);
+                    (Instance::new(cfg)?, vec![], Some(format!("restore failed: {e}")), None)
                 }
             }
         }
         None => {
-            let mut a = Agent::new(cfg)?;
+            let mut a = Instance::new(cfg)?;
             if let Some(b) = shared.store.blobs() {
                 a.set_blobs(b.clone());
             }
@@ -1798,15 +1851,12 @@ fn start_instance(
             }
         }
     };
-    let receipts_from = restored_from.as_ref().map_or(0, |seed| seed.offset);
-    let checkpoint = shared
-        .cfg
-        .dir
+    let checkpoint = inst
         .as_ref()
         .filter(|_| secrets.is_empty() && error.is_none())
         .and_then(|d| {
             let key = checkpoint_identity(shared, &agent.cfg, &view, &enc);
-            match super::checkpoint::Checkpoint::new(&d.join(&spec.id), key, restored_from) {
+            match super::checkpoint::Checkpoint::new(d, key, restored_from) {
                 Ok(cache) => Some(cache),
                 Err(e) => {
                     eprintln!("{}: checkpoint cache unavailable: {e}", spec.id);
@@ -1820,12 +1870,9 @@ fn start_instance(
     } else {
         vec![]
     };
-    let incarnation = if resumed {
-        shared
-            .cfg
-            .dir
-            .as_ref()
-            .and_then(|d| std::fs::read(d.join(&id).join("agent.json")).ok())
+    let incarnation = if restored {
+        inst.as_ref()
+            .and_then(|d| std::fs::read(d.join("instance.json")).ok())
             .and_then(|b| serde_json::from_slice::<J>(&b).ok())
             .and_then(|v| v["incarnation"].as_u64())
             .unwrap_or(0)
@@ -1836,8 +1883,8 @@ fn start_instance(
         Some(file) => Some(Journal::new(file, &id, incarnation)?),
         None => None,
     };
-    if let (Some(journal), Some(dir), false) = (&journal, &shared.cfg.dir, resumed) {
-        shared.durable.register(journal, &dir.join(&id));
+    if let (Some(journal), Some(d), false) = (&journal, &inst, restored) {
+        shared.durable.register(journal, d);
     }
     // Its start's effects wait for whatever caused it (a parent's mount) to be committed.
     let epoch = shared.durable.written();
@@ -1858,27 +1905,13 @@ fn start_instance(
         },
     );
     let slot = slots.get_mut(&id).unwrap();
-    // The journal's clock is logical: it stops while the run is paused (a wait does not expire in
-    // the pause). Each start records where it stands against wall time, so a host can map any
+    // The journal's clock is logical: it stands still while the run restores and from when it
+    // begins closing (a wait does not expire while the run is closed). Each start records where it stands against wall time, so a host can map any
     // later `at_ms` or `clock_ms` to wall time: wall = at_ms + (wall_ms - at_ms) of this record.
     trace(
         slot,
         json!({"t": "clock", "at_ms": shared.clock_ms(), "wall_ms": now_ms()}),
     );
-    // Control operations already journaled get their receipts (again). Those before a recovery
-    // image got theirs when they were journaled, before the image's input: only the suffix is read.
-    if let Some(d) = &dir {
-        let from = receipts_from;
-        if let Some(reader) =
-            super::jsonl::JsonLines::<Input>::open_at(&d.join(&id).join("journal.jsonl"), "journal", from)?
-        {
-            for row in reader.map_while(Result::ok) {
-                if let Some(op) = receipt_op(&row.value) {
-                    write_receipt(shared, &id, &op)?;
-                }
-            }
-        }
-    }
     for c in commands {
         dispatch(shared, w, slot, c, timers, local);
     }
@@ -1923,10 +1956,10 @@ fn push_local(shared: &Shared, local: &mut VecDeque<Msg>, item: (String, InputKi
 fn worker(
     w: usize,
     shared: Arc<Shared>,
-    specs: Vec<AgentSpec>,
-    resumed: HashSet<String>,
+    specs: Vec<InstanceSpec>,
+    restored: HashSet<String>,
     rx: Receiver<Msg>,
-) -> Result<Vec<AgentReport>, String> {
+) -> Result<Vec<InstanceReport>, String> {
     let mut views = Views { loaded: HashMap::new() };
     let mut slots: BTreeMap<String, Slot> = BTreeMap::new();
     let mut timers = Timers::default();
@@ -1938,14 +1971,19 @@ fn worker(
     impl Drop for Booting<'_> {
         fn drop(&mut self) {
             let shared = self.0;
-            if shared.booting.fetch_sub(1, Ordering::SeqCst) != 1 || std::thread::panicking() {
+            if shared.booting.fetch_sub(1, Ordering::SeqCst) != 1 {
+                return;
+            }
+            // Every agent is running: time passes from now (a restore takes none from timers).
+            shared.clock.start();
+            if std::thread::panicking() {
                 return;
             }
             eprintln!(
                 "affordance: started {} agents on {} workers in {} ms{}",
                 shared.route.read().unwrap().len(),
                 shared.workers.len(),
-                shared.clock_started.elapsed().as_millis(),
+                shared.started.elapsed().as_millis(),
                 if std::env::var("AFFORDANCE_RESTORE_TIMING").is_ok() {
                     format!(" [{}]", restore_timing())
                 } else {
@@ -1963,7 +2001,7 @@ fn worker(
             .as_ref()
             .map(PathBuf::from)
             .unwrap_or_else(|| shared.cfg.view.clone());
-        let (id, journal) = (spec.id.clone(), resumed.contains(&spec.id));
+        let (id, journal) = (spec.id.clone(), restored.contains(&spec.id));
         // An agent that cannot start fails alone; the worker starts the rest.
         if let Err(error) = start_instance(
             &shared,
@@ -2056,8 +2094,8 @@ fn worker(
     }
     // Images and snapshots are of committed journals.
     shared.durable.wait(shared.durable.written())?;
-    // Then what was held for it: receipts are written; held requests are not issued while the
-    // runtime stops, so they stay outstanding for the resume.
+    // Then what was held for it: posts are answered; held requests are not issued while the
+    // runtime stops, so they stay outstanding for the restore.
     for slot in slots.values_mut() {
         release(&shared, w, slot, &mut timers, &mut local);
     }
@@ -2075,12 +2113,13 @@ fn worker(
         {
             images.push((slot.spec.id.clone(), image));
         }
-        if let Some(dir) = &shared.cfg.dir {
-            let value = json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error});
-            snapshots.push((
-                dir.join(&slot.spec.id).join("snapshot.json"),
-                value.to_string().into_bytes(),
-            ));
+        if let Some(dir) = shared.instance_dir(&slot.spec.id) {
+            // Secrets redacted, as in the trace: a snapshot is diagnostics, read by people.
+            let value = redact(
+                json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error}),
+                &slot.secrets,
+            );
+            snapshots.push((dir.join("snapshot.json"), value.to_string().into_bytes()));
         }
     }
     // An image may refer to blobs no committed line refers to yet: they are synced first.
@@ -2115,8 +2154,8 @@ fn worker(
     Ok(slots.values().map(|s| report_of(&shared, s)).collect())
 }
 
-fn report_of(shared: &Shared, s: &Slot) -> AgentReport {
-    AgentReport {
+fn report_of(shared: &Shared, s: &Slot) -> InstanceReport {
+    InstanceReport {
         id: s.spec.id.clone(),
         worker: shared.route.read().unwrap().get(&s.spec.id).copied().unwrap_or(0),
         diverged_at: s.agent.diverged_at(),
@@ -2153,17 +2192,6 @@ fn feed(
         }
         kind => kind,
     };
-    if let InputKind::Event { op: Some(op), .. } = &kind
-        && let Some(dir) = &shared.cfg.dir
-        && valid_op(op)
-        && dir
-            .join("control/receipts")
-            .join(id)
-            .join(format!("{op}.json"))
-            .exists()
-    {
-        return;
-    }
     match kind {
         InputKind::Mount {
             app,
@@ -2181,7 +2209,7 @@ fn feed(
             shared.retired.lock().unwrap().remove(id);
             // The child's bindings come from its parent: machines a subset, the model one that exists.
             let base = PathBuf::from(&app);
-            let mut spec = AgentSpec::new(id, props);
+            let mut spec = InstanceSpec::new(id, props);
             spec.max_new = p.spec.max_new;
             // Each child its own random sequence: from its parent's seed and its own id.
             spec.seed = p.spec.seed.wrapping_mul(31).wrapping_add(stable_hash(id));
@@ -2200,27 +2228,23 @@ fn feed(
             spec.capabilities = p.spec.capabilities.clone();
             spec.inspectable = p.spec.inspectable;
             let env = p.agent.cfg.env.clone();
-            let resumed = restore
+            let restored = restore
                 && shared
-                    .cfg
-                    .dir
-                    .as_ref()
-                    .is_some_and(|d| d.join(id).join("journal.jsonl").exists());
-            // A resumed child replays from the props it started with; the parent's current props,
+                    .instance_dir(id)
+                    .is_some_and(|d| d.join("journal.jsonl").exists());
+            // A restored child replays from the props it started with; the parent's current props,
             // if different, are then one more input.
             let current = spec.props.clone();
-            if resumed
+            if restored
                 && let Some(first) = shared
-                    .cfg
-                    .dir
-                    .as_ref()
-                    .and_then(|d| std::fs::read(d.join(id).join("agent.json")).ok())
+                    .instance_dir(id)
+                    .and_then(|d| std::fs::read(d.join("instance.json")).ok())
                     .and_then(|b| serde_json::from_slice::<J>(&b).ok())
                     .map(|v| v["props"].clone())
             {
                 spec.props = first;
             }
-            if let Err(e) = start_instance(shared, w, views, slots, spec, base, env, resumed, timers, local) {
+            if let Err(e) = start_instance(shared, w, views, slots, spec, base, env, restored, timers, local) {
                 // As for an instance that fails at boot: it is reported failed, so the run's
                 // report names it and a send to it says why it was not delivered.
                 lost(shared, w, id, e);
@@ -2263,10 +2287,13 @@ fn feed(
                 for e in entries {
                     trace(&mut slot, e);
                 }
-                if let Some(dir) = &shared.cfg.dir {
+                if let Some(dir) = shared.instance_dir(&k) {
                     let _ = atomic_value(
-                        &dir.join(&k).join("snapshot.json"),
-                        &json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error}),
+                        &dir.join("snapshot.json"),
+                        &redact(
+                            json!({"state": shared.expand_snapshot(&slot.agent.state()), "metrics": slot.agent.metrics, "clock_ms": slot.agent.clock_ms(), "error": slot.error}),
+                            &slot.secrets,
+                        ),
                     );
                 }
                 shared
@@ -2284,12 +2311,12 @@ fn feed(
     // A message the sender waits on: acknowledged once journaled here, refused if this instance
     // is gone or failed.
     let (ack, kind) = match kind {
-        InputKind::Event { name, payload, op, ack } => (
+        InputKind::Event { name, payload, id, ack } => (
             ack,
             InputKind::Event {
                 name,
                 payload,
-                op,
+                id,
                 ack: None,
             },
         ),
@@ -2338,8 +2365,7 @@ fn feed(
         } => Input::ModelError {
             task,
             error,
-            transient: kind.may_pass(),
-            kind: Some(kind),
+            kind,
             retry_after_ms,
             clock_ms,
         },
@@ -2348,10 +2374,10 @@ fn feed(
             outcome,
             clock_ms,
         },
-        InputKind::Event { name, payload, op, .. } => Input::Event {
+        InputKind::Event { name, payload, id, .. } => Input::Event {
             name,
             payload,
-            op,
+            id,
             clock_ms,
         },
         InputKind::Props { props } => Input::Props { props, clock_ms },
@@ -2367,7 +2393,24 @@ fn feed(
         }
     };
     let journaled = apply(shared, w, &view, &enc, slot, input, timers, local);
-    if let Some(ack) = ack {
+    settle(shared, w, slot, ack, journaled, timers, local);
+}
+
+/// Answer a delivery's sender once its event is journaled here: a `send` at once (its answer is
+/// itself an input, committed after this one), an embedder's post once the line is committed.
+fn settle(
+    shared: &Arc<Shared>,
+    w: usize,
+    slot: &mut Slot,
+    ack: Option<delivery::Ack>,
+    journaled: bool,
+    timers: &mut Timers,
+    local: &mut VecDeque<Msg>,
+) {
+    let Some(ack) = ack else { return };
+    if journaled && ack.waits_for_commit() && slot.journal.is_some() {
+        hold(shared, w, slot, Held::Answer(ack), timers, local);
+    } else {
         ack.finish(journaled);
     }
 }
@@ -2390,7 +2433,6 @@ fn apply(
         flush(shared, slot, timers);
         return false;
     }
-    let op = receipt_op(&input);
     // Journal first. The line is durable at its epoch's commit, before any effect it causes
     // leaves the process (`hold`).
     if let Some(journal) = slot.journal.as_mut() {
@@ -2425,15 +2467,11 @@ fn apply(
     if let Some(cache) = &mut slot.checkpoint {
         cache.handled(&slot.agent);
     }
-    if let Some(op) = op.filter(|_| shared.cfg.dir.is_some()) {
-        hold(shared, w, slot, Held::Receipt(op), timers, local);
-    }
     save_checkpoint(shared, slot, view, !was_stopped && slot.agent.stopped().is_some());
     true
 }
 
-/// The control operation an input carries, which gets a receipt once it is committed.
-/// One live call of an instance: what cancels it (a pause, the run ending, the agent no longer
+/// One live call of an instance: what cancels it (the run closing, the agent no longer
 /// needing it), and for a model call the flag its app's abort signal sets.
 struct Live {
     token: CancelToken,
@@ -2490,27 +2528,6 @@ impl Timers {
     }
 }
 
-/// An operator message's id, which names its receipt file: the one rule, for the coordinator
-/// that delivers it, the worker that journals it and the receipt written for it.
-fn valid_op(op: &str) -> bool {
-    (1..=128).contains(&op.len()) && op.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
-}
-
-fn receipt_op(input: &Input) -> Option<String> {
-    match input {
-        Input::Event { op: Some(op), .. } if valid_op(op) => Some(op.clone()),
-        _ => None,
-    }
-}
-
-fn write_receipt(shared: &Shared, id: &str, op: &str) -> Result<(), String> {
-    let Some(dir) = &shared.cfg.dir else { return Ok(()) };
-    atomic_value(
-        &dir.join("control/receipts").join(id).join(format!("{op}.json")),
-        &json!({"journaled":true,"agent":id,"operation_id":op}),
-    )
-}
-
 /// Run `item` once the input that caused it is committed: now if it is, otherwise after the
 /// effects held before it.
 fn hold(shared: &Arc<Shared>, w: usize, slot: &mut Slot, item: Held, timers: &mut Timers, local: &mut VecDeque<Msg>) {
@@ -2560,12 +2577,7 @@ fn run_held(
 ) {
     match item {
         Held::Command(cmd) => dispatch_now(shared, w, slot, cmd, timers, local),
-        Held::Receipt(op) => {
-            if let Err(error) = write_receipt(shared, &slot.spec.id, &op) {
-                slot.error = Some(error);
-                flush(shared, slot, timers);
-            }
-        }
+        Held::Answer(ack) => ack.finish(true),
     }
 }
 
@@ -2626,15 +2638,9 @@ fn dispatch(
     let waits = match &cmd {
         Command::Generate { .. } => true,
         Command::Call { name, .. } => name.starts_with("machine:"),
-        // A fresh mount over an old directory archives it, which no recovery undoes: the worker
+        // A fresh mount over an old instance retires it, which no recovery undoes: the worker
         // waits for the commit of the input that mounts it (rare, and in order with the tree).
-        Command::Mount { key, .. }
-            if shared
-                .cfg
-                .dir
-                .as_ref()
-                .is_some_and(|d| d.join(&slot.spec.id).join(key).exists()) =>
-        {
+        Command::Mount { key, .. } if shared.instance_dir(&format!("{}/{key}", slot.spec.id)).is_some() => {
             if let Err(error) = shared.durable.wait(slot.epoch) {
                 slot.error = Some(error);
                 return flush(shared, slot, timers);
@@ -2669,7 +2675,7 @@ fn dispatch(
                     cut_off: false,
                     aborted: true,
                     stats: json!({"t": "generate", "task": task, "tokens": 0, "aborted": true}),
-                    prompt: prompt_hash.unwrap_or_else(|| super::agent::prompt_hash(&ids)),
+                    prompt: prompt_hash.unwrap_or_else(|| super::instance::prompt_hash(&ids)),
                 };
                 return push_local(shared, local, (slot.spec.id.clone(), reply));
             }
@@ -2733,7 +2739,7 @@ fn dispatch_now(
                             name: format!("mount:{key}:{name}"),
                             payload: json!({"$args": args}),
                             ack: None,
-                            op: None,
+                            id: None,
                         },
                     ),
                 );
@@ -2767,10 +2773,10 @@ fn dispatch_now(
             images,
             media,
         } => {
-            if shared.quiescing.load(Ordering::SeqCst) {
+            if shared.closing.load(Ordering::SeqCst) {
                 return;
             }
-            let Some((_, model)) = slot
+            let Some((binding_enc, model)) = slot
                 .agent
                 .cfg
                 .model
@@ -2795,6 +2801,12 @@ fn dispatch_now(
             };
             // The call is live from here: one record, with its token and its abort flag.
             let (cancel, abort) = shared.model_token(&id, incarnation, task);
+            // Listed, then checked: the run's close either sees this call or this call sees the
+            // close (and stays outstanding for a restore), never neither.
+            if shared.closing.load(Ordering::SeqCst) {
+                shared.done(&id, incarnation, task);
+                return;
+            }
             let ranks = model.ranks();
             let rank = slot
                 .spec
@@ -2805,6 +2817,7 @@ fn dispatch_now(
                 tag: opts.tag,
                 images,
                 media,
+                diagnostics: shared.diagnostics.clone(),
                 ..GenRequest::new(&id, ids, max_new, stop, rank, cancel)
             };
             // A pipe: the machine its pieces are written to, which the agent must be bound to (the
@@ -2834,6 +2847,7 @@ fn dispatch_now(
                 };
                 let ctx = CallContext {
                     agent: id.clone(),
+                    instance: shared.instance_key(&id),
                     task,
                     env: slot.agent.cfg.env.clone(),
                     // The call's own token: cancelling the call stops the generation and the pipe.
@@ -2841,7 +2855,7 @@ fn dispatch_now(
                     blobs: None,
                     output: None,
                 };
-                Some(Pipe::new(exec, ctx, options))
+                Some(Pipe::new(exec, ctx, options, Some(binding_enc.clone())))
             } else {
                 None
             };
@@ -2893,8 +2907,8 @@ fn dispatch_now(
                             panicked(panic)
                         )))
                     });
-                    // A call the host cancelled (a pause, the run ending) is not the model's failure:
-                    // nothing is journaled, the call stays outstanding, and a resume issues it again.
+                    // A call the host cancelled (the run closing) is not the model's failure:
+                    // nothing is journaled, the call stays outstanding, and a restore issues it again.
                     if result.is_err() && req.cancel.cancelled_by_host() {
                         job_shared.done(&req.agent, incarnation, task);
                         job_shared.inflight.fetch_sub(1, Ordering::SeqCst);
@@ -2913,7 +2927,7 @@ fn dispatch_now(
                                 cut_off: r.cut_off,
                                 aborted,
                                 stats,
-                                prompt: prompt_hash.unwrap_or_else(|| super::agent::prompt_hash(&req.ids)),
+                                prompt: prompt_hash.unwrap_or_else(|| super::instance::prompt_hash(&req.ids)),
                             }
                         }
                         // A reply partly written to a pipe cannot be started again: whoever reads
@@ -2935,22 +2949,36 @@ fn dispatch_now(
                         },
                     };
                     job_shared.done(&req.agent, incarnation, task);
-                    job_shared.answer(
-                        w,
-                        Msg::Input(
-                            req.agent,
-                            InputKind::Completion {
-                                incarnation,
-                                input: Box::new(kind),
-                            },
-                        ),
-                    );
+                    let post = move || {
+                        job_shared.answer(
+                            w,
+                            Msg::Input(
+                                req.agent,
+                                InputKind::Completion {
+                                    incarnation,
+                                    input: Box::new(kind),
+                                },
+                            ),
+                        )
+                    };
+                    // The reply reaches the app after every piece piped before it reached its sink
+                    // (what the app writes next comes after them), on the pipe's own time: this
+                    // model thread is free for the next call.
+                    match pipe {
+                        Some(pipe) => {
+                            std::thread::spawn(move || {
+                                pipe.finish();
+                                post();
+                            });
+                        }
+                        None => post(),
+                    }
                 }),
             );
         }
         Command::Call { task, name, args } => {
             // Held requests remain outstanding and are reissued by journal recovery.
-            if shared.quiescing.load(Ordering::SeqCst) {
+            if shared.closing.load(Ordering::SeqCst) {
                 return;
             }
             let reply = |local: &mut VecDeque<Msg>, outcome: Outcome| {
@@ -3071,6 +3099,7 @@ fn dispatch_now(
                     Some(exec) => {
                         let ctx = CallContext {
                             agent: id.clone(),
+                            instance: shared.instance_key(&id),
                             task,
                             env: slot.agent.cfg.env.clone(),
                             cancel: shared.token(&id, incarnation, task),
@@ -3083,6 +3112,11 @@ fn dispatch_now(
                                 }))
                             }),
                         };
+                        // Listed (above), then checked, as a model call is.
+                        if shared.closing.load(Ordering::SeqCst) {
+                            shared.done(&id, incarnation, task);
+                            return;
+                        }
                         let limit = shared.cfg.call_timeout;
                         shared.inflight.fetch_add(1, Ordering::SeqCst);
                         let job_shared = shared.clone();
@@ -3095,9 +3129,9 @@ fn dispatch_now(
                                 Ok(args) => super::exec::with_deadline(move || exec.call(&ctx, &args), limit, &token),
                                 Err(e) => Err(e),
                             };
-                            // A call the host cancelled (a pause, the run ending) is not the app's
+                            // A call the host cancelled (the run closing) is not the app's
                             // failure: no result is journaled, the call stays outstanding, and a
-                            // resume issues it again.
+                            // restore issues it again.
                             if outcome.is_err() && token.cancelled_by_host() {
                                 job_shared.done(&agent, incarnation, task);
                                 job_shared.inflight.fetch_sub(1, Ordering::SeqCst);
@@ -3172,28 +3206,28 @@ export default function Main({panics}) {
     fn model() -> Arc<dyn Model> {
         Arc::new(FnModel(|_: &GenRequest| Ok(GenReply::default())))
     }
-    fn spec(id: &str, props: J) -> AgentSpec {
-        let mut s = AgentSpec::new(id, props);
+    fn spec(id: &str, props: J) -> InstanceSpec {
+        let mut s = InstanceSpec::new(id, props);
         s.model = None;
         s
     }
-    fn agent<'a>(report: &'a Report, id: &str) -> &'a AgentReport {
-        report.agents.iter().find(|a| a.id == id).unwrap()
+    fn agent<'a>(report: &'a Report, id: &str) -> &'a InstanceReport {
+        report.instances.iter().find(|a| a.id == id).unwrap()
     }
 
     /// A render that panics on a timer's input fails its agent alone: the worker it shares with
     /// a healthy agent goes on, and the run completes at once rather than at `max_wall` (a reply
     /// parser's panic once stalled a whole run until its stop deadline). The
-    /// panicking input is journaled, so a resume replays it and fails the agent again, and
+    /// panicking input is journaled, so a restore replays it and fails the agent again, and
     /// nothing else.
     #[test]
-    fn a_panicking_agent_fails_alone_and_again_on_resume() {
+    fn a_panicking_agent_fails_alone_and_again_on_restore() {
         let scratch = Scratch::new("handle");
         let cfg = scratch.config(1);
         let mut rt = Runtime::new(cfg.clone(), encoder(), model());
-        rt.add_agent(spec("crash", json!({"panics": true})))
+        rt.add_instance(spec("crash", json!({"panics": true})))
             .unwrap()
-            .add_agent(spec("healthy", json!({"panics": false})))
+            .add_instance(spec("healthy", json!({"panics": false})))
             .unwrap();
         let started = Instant::now();
         let report = rt.run().unwrap();
@@ -3210,10 +3244,10 @@ export default function Main({panics}) {
             ),
             (None, Some(json!({"n": 1})))
         );
-        let report = Runtime::resume(cfg, encoder(), model()).unwrap().run().unwrap();
+        let report = Runtime::restore(cfg, encoder(), model()).unwrap().run().unwrap();
         assert_eq!(
             agent(&report, "crash").error.as_deref(),
-            Some("resume failed: panicked: render failed")
+            Some("restore failed: panicked: render failed")
         );
         assert_eq!(agent(&report, "healthy").error, None);
     }
@@ -3224,11 +3258,11 @@ export default function Main({panics}) {
     fn an_agent_that_cannot_start_fails_alone() {
         let scratch = Scratch::new("boot");
         let mut rt = Runtime::new(scratch.config(1), encoder(), model());
-        rt.add_agent(spec("bad", json!("not an object")))
+        rt.add_instance(spec("bad", json!("not an object")))
             .unwrap()
-            .add_agent(spec("crash", json!({"panics": "start"})))
+            .add_instance(spec("crash", json!({"panics": "start"})))
             .unwrap()
-            .add_agent(spec("healthy", json!({"panics": false})))
+            .add_instance(spec("healthy", json!({"panics": false})))
             .unwrap();
         let started = Instant::now();
         let report = rt.run().unwrap();
@@ -3253,7 +3287,7 @@ export default function Main({panics}) {
             ),
             (None, Some(json!({"n": 1})))
         );
-        assert_eq!(report.agents.len(), 3);
+        assert_eq!(report.instances.len(), 3);
     }
 
     /// A worker that dies outside its agents' code (here a model binding that panics while an
@@ -3274,9 +3308,9 @@ export default function Main({panics}) {
         rt.bind_model("broken", encoder(), Arc::new(Broken));
         let mut dies = spec("dies", json!({"panics": false}));
         dies.model = Some("broken".into());
-        rt.add_agent(dies)
+        rt.add_instance(dies)
             .unwrap()
-            .add_agent(spec("healthy", json!({"panics": false})))
+            .add_instance(spec("healthy", json!({"panics": false})))
             .unwrap();
         let started = Instant::now();
         let report = rt.run().unwrap();

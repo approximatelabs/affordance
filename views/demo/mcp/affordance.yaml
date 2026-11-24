@@ -13,7 +13,7 @@ machines:
     url: https://mcp.example.com/mcp
     timeout_ms: 30000
     max_response_bytes: 8388608
-agents:
+instances:
   - id: assistant
     machines: [http]
     props:

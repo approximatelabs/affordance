@@ -219,7 +219,7 @@ fn renders_free_their_closures_and_closures_behave_as_in_javascript() {
         );
     }
     // A source editor need not call a model. Its recent scan caches must still release revisions.
-    use affordance::runtime::{Agent, AgentConfig, Input};
+    use affordance::runtime::{Input, Instance, InstanceConfig};
     let v = view(
         &enc,
         r#"import {loadModule} from 'affordance:compiler'; export function Main(){
@@ -227,7 +227,7 @@ fn renders_free_their_closures_and_closures_behave_as_in_javascript() {
       useEvent('install',({source})=>setCurrent(loadModule(source)));
       return current && <current.default/>;}"#,
     );
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -242,7 +242,7 @@ fn renders_free_their_closures_and_closures_behave_as_in_javascript() {
         machines: vec![],
         model: None,
     };
-    let mut agent = Agent::new(cfg).unwrap();
+    let mut agent = Instance::new(cfg).unwrap();
     agent.start(&v, &enc).unwrap();
     let mut install = |n: i64| {
         let source = format!(
@@ -256,7 +256,7 @@ fn renders_free_their_closures_and_closures_behave_as_in_javascript() {
                 Input::Event {
                     name: "install".into(),
                     payload: json!({"source":source}),
-                    op: None,
+                    id: None,
                     clock_ms: n,
                 },
             )

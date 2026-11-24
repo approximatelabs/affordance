@@ -5,7 +5,7 @@
 use affordance::View;
 use affordance::effects::Outcome;
 use affordance::emit::Encoder;
-use affordance::runtime::{Agent, AgentConfig, Command, Input};
+use affordance::runtime::{Command, Input, Instance, InstanceConfig};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -57,8 +57,8 @@ export default function Main({{ pinned }}) {{
     View::load(&path, "Main", enc).unwrap()
 }
 
-fn config(pinned: bool) -> AgentConfig {
-    AgentConfig {
+fn config(pinned: bool) -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -76,11 +76,11 @@ fn config(pinned: bool) -> AgentConfig {
 }
 
 /// Run an agent whose replies call `look` once, then end: the Generate commands it sent.
-fn run(pinned: bool) -> (Vec<(Vec<u32>, Vec<String>)>, Agent) {
+fn run(pinned: bool) -> (Vec<(Vec<u32>, Vec<String>)>, Instance) {
     let enc = encoder();
     let view = app(&enc, PNG);
     let eos = enc.token_id("<｜end▁of▁sentence｜>").unwrap();
-    let mut agent = Agent::new(config(pinned)).unwrap();
+    let mut agent = Instance::new(config(pinned)).unwrap();
     let mut queue: std::collections::VecDeque<Command> = agent.start(&view, &enc).unwrap().into();
     let (mut sent, mut clock) = (vec![], 1_791_000_000_000i64);
     while let Some(cmd) = queue.pop_front() {
@@ -118,7 +118,7 @@ fn run(pinned: bool) -> (Vec<(Vec<u32>, Vec<String>)>, Agent) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_tool_results_image_reaches_the_model_request() {
     let enc = encoder();
     let placeholder = enc.token_id("<｜deepseek_image｜>").unwrap();
@@ -140,7 +140,7 @@ fn a_tool_results_image_reaches_the_model_request() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_screens_image_stays_with_its_logged_screen() {
     let enc = encoder();
     let placeholder = enc.token_id("<｜deepseek_image｜>").unwrap();
@@ -318,7 +318,7 @@ fn a_tool_results_image_and_audio_reach_a_model_bound_by_name_and_a_video_withou
 /// server applies the model's template to them; a token endpoint that takes no media (vLLM's
 /// completions) is why a model with media is bound this way there.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn media_in_a_message_goes_to_a_chat_server_as_parts() {
     use affordance::emit::RunCache;
     use affordance::value::Value;
@@ -395,12 +395,12 @@ fn live_image_request() {
 /// A request carries an image's bytes: base64 is sent as a data URL; a URL or a path, which the
 /// model server would fetch or open, rejects the call before it is sent (`useLoop` stops with it).
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn an_image_source_is_data_never_a_url_or_a_path() {
     let enc = encoder();
     let start = |screen: &str| {
         let view = app(&enc, screen);
-        let mut agent = Agent::new(config(true)).unwrap();
+        let mut agent = Instance::new(config(true)).unwrap();
         let commands = agent.start(&view, &enc).unwrap();
         (commands, agent)
     };

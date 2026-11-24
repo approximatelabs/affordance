@@ -82,6 +82,14 @@ pub(super) fn submit_model(
 ) {
     {
         let mut lanes = shared.model_gate.lanes.lock().unwrap();
+        // Checked under the lanes' lock, which closing's `suspend_queued_models` also takes: a call
+        // queued after the run began closing would sit in a queue nothing drains any more.
+        if shared.closing.load(Ordering::SeqCst) {
+            drop(lanes);
+            shared.done(&agent, incarnation, task);
+            shared.inflight.fetch_sub(1, Ordering::SeqCst);
+            return;
+        }
         let n = lanes.len();
         let queued = QueuedModel {
             agent,
@@ -101,7 +109,7 @@ pub(super) fn submit_model(
 /// Start queued model calls in every lane that has room under its share of the limit.
 pub(super) fn pump_model(shared: &Arc<Shared>) {
     loop {
-        if shared.quiescing.load(Ordering::SeqCst) {
+        if shared.closing.load(Ordering::SeqCst) {
             return;
         }
         let Some((lane, job)) = shared.model_gate.take_next() else {
@@ -134,7 +142,7 @@ pub(super) fn suspend_queued_models(shared: &Shared) {
         .collect();
     for job in queued {
         // The journal still contains the outstanding Generate. Resuming submits it
-        // again without inventing an error or starting a new decode during pause.
+        // again without inventing an error or starting a new decode while the run closes.
         shared.done(&job.agent, job.incarnation, job.task);
         shared.inflight.fetch_sub(1, Ordering::SeqCst);
     }
@@ -294,9 +302,11 @@ mod model_gate_tests {
             model_pool: Pool::new(1, "gate-test"),
             exec_pool: Pool::new(1, "gate-test-exec"),
             model_gate: ModelGate::new(8, 0),
-            quiescing: AtomicBool::new(false),
-            clock_base: 0,
-            clock_started: Instant::now(),
+            closing: AtomicBool::new(false),
+            started: Instant::now(),
+            clock: Clock::new(0),
+            diagnostics: Default::default(),
+            damaged: Default::default(),
             retired: Default::default(),
             booting: Default::default(),
             durable: Default::default(),

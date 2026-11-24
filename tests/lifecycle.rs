@@ -3,7 +3,7 @@ use crate::tokenizer;
 use affordance::{
     View,
     effects::Outcome,
-    runtime::{Agent, AgentConfig, Command, Input},
+    runtime::{Command, Input, Instance, InstanceConfig},
 };
 use serde_json::{Value as J, json};
 use std::{
@@ -13,8 +13,8 @@ use std::{
 };
 
 struct Rig {
-    config: AgentConfig,
-    agent: Agent,
+    config: InstanceConfig,
+    agent: Instance,
     view: View,
     enc: affordance::emit::Encoder,
     clock: i64,
@@ -39,7 +39,7 @@ impl Rig {
         };
         let enc = tokenizer::encoder();
         let view = View::load(&path, "Main", &enc).unwrap();
-        let config = AgentConfig {
+        let config = InstanceConfig {
             context: None,
             retry: Default::default(),
             template: None,
@@ -54,7 +54,7 @@ impl Rig {
             machines: vec!["http".into()],
             model: Some("default".into()),
         };
-        let mut agent = Agent::new(config.clone()).unwrap();
+        let mut agent = Instance::new(config.clone()).unwrap();
         let commands = agent.start(&view, &enc).unwrap();
         (
             Self {
@@ -79,7 +79,7 @@ impl Rig {
         self.input(Input::Event {
             name: name.into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: self.clock,
         })
     }
@@ -108,7 +108,8 @@ impl Rig {
         })
     }
     fn check_restore(&self) {
-        let (restored, _) = Agent::restore(self.config.clone(), self.journal.clone(), &self.view, &self.enc).unwrap();
+        let (restored, _) =
+            Instance::restore(self.config.clone(), self.journal.clone(), &self.view, &self.enc).unwrap();
         assert_eq!(restored.state(), self.agent.state());
         assert_eq!(restored.metrics.handler_errors, 0);
         assert_eq!(self.agent.metrics.handler_errors, 0);
@@ -133,7 +134,7 @@ impl Rig {
         self.input(Input::Event {
             name: "message".into(),
             payload: json!({"text":"find it"}),
-            op: None,
+            id: None,
             clock_ms: self.clock,
         })
     }
@@ -309,7 +310,7 @@ useEffect(()=>{(async()=>{let caught;try{setN(()=>{throw {code:41};});}catch(e){
     assert_eq!(rig.agent.state()["__ui"]["@n"], 0);
     assert_eq!(rig.agent.state()["__ui"]["@seen"], 41);
     assert_eq!(rig.agent.metrics.handler_errors, 0);
-    let (restored, _) = Agent::restore(rig.config.clone(), vec![input], &rig.view, &rig.enc).unwrap();
+    let (restored, _) = Instance::restore(rig.config.clone(), vec![input], &rig.view, &rig.enc).unwrap();
     assert_eq!(restored.state(), rig.agent.state());
     assert_eq!(restored.metrics.handler_errors, 0);
 }
@@ -675,7 +676,7 @@ fn a_runtime_component_value_renders_and_registers_actions_inside_its_parent() {
 fn source_components_install_replace_undo_remove_and_recover_from_recorded_source() {
     let source = "import LiveComponents from '@ROOT@/views/demo/live_components.tsx'; export default function Main(){return <LiveComponents/>;}";
     let (mut rig, _) = Rig::new(Some(source), json!({}));
-    let screen = |view: &View, agent: &Agent, rig: &Rig| {
+    let screen = |view: &View, agent: &Instance, rig: &Rig| {
         let r = view
             .render_with_harness(
                 &rig.enc,
@@ -691,7 +692,7 @@ fn source_components_install_replace_undo_remove_and_recover_from_recorded_sourc
         rig.input(Input::Event {
             name: "install".into(),
             payload: json!({"source":source}),
-            op: None,
+            id: None,
             clock_ms: rig.clock + 1,
         });
         let trace = rig.agent.take_trace();
@@ -732,7 +733,7 @@ fn source_components_install_replace_undo_remove_and_recover_from_recorded_sourc
     rig.event("undo");
     rig.event("increment");
     let fresh = View::load(&rig.dir.join("app.tsx"), "Main", &rig.enc).unwrap();
-    let (restored, _) = Agent::restore(rig.config.clone(), rig.journal.clone(), &fresh, &rig.enc).unwrap();
+    let (restored, _) = Instance::restore(rig.config.clone(), rig.journal.clone(), &fresh, &rig.enc).unwrap();
     assert_eq!(screen(&fresh, &restored, &rig), format!("{controls}second1"));
     assert_eq!(restored.state(), rig.agent.state());
     assert_eq!(restored.metrics.handler_errors, 0);
@@ -867,7 +868,7 @@ fn failing_task_rejects_its_shared_async_result() {
     assert!(cancelled.iter().any(|c| matches!(c, Command::Cancel { .. })));
     assert_eq!(rig.agent.state()["__ui"]["@reason"], json!([0, "AbortError"]));
     assert_eq!(rig.agent.metrics.handler_errors, 1);
-    let (restored, _) = Agent::restore(rig.config.clone(), rig.journal.clone(), &rig.view, &rig.enc).unwrap();
+    let (restored, _) = Instance::restore(rig.config.clone(), rig.journal.clone(), &rig.view, &rig.enc).unwrap();
     assert_eq!(restored.state(), rig.agent.state());
     assert_eq!(restored.metrics.handler_errors, 1);
 }
@@ -947,7 +948,7 @@ export default function Main(){
     rig.input(Input::Event {
         name: "mount:worker:onDone".into(),
         payload: json!({"$args":["still mounted"]}),
-        op: None,
+        id: None,
         clock_ms: 2,
     });
     assert_eq!(rig.agent.state()["__ui"]["@seen"], "still mounted");
@@ -961,7 +962,7 @@ export default function Main(){
 }
 
 /// A page that fails to render rejects its `model()` call, as `fetch` rejects: the app catches it
-/// and goes on (the agent failed, on every resume too, since replay throws again).
+/// and goes on (the agent failed, on every restore too, since replay throws again).
 #[test]
 fn a_page_that_fails_to_render_rejects_its_model_call() {
     let source = r#"
@@ -1148,7 +1149,7 @@ fn a_rejection_nothing_awaits_is_reported() {
             .any(|e| e["t"] == "handler_error" && e["error"].as_str().unwrap().contains("late")),
         "{trace:?}"
     );
-    let (restored, _) = Agent::restore(rig.config.clone(), rig.journal.clone(), &rig.view, &rig.enc).unwrap();
+    let (restored, _) = Instance::restore(rig.config.clone(), rig.journal.clone(), &rig.view, &rig.enc).unwrap();
     assert_eq!(restored.metrics.handler_errors, 2);
 }
 

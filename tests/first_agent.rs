@@ -73,7 +73,7 @@ fn the_first_agent_runs_as_the_guide_writes_it() {
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let report: J = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(
-        report["per_agent"][0]["stopped"],
+        report["per_instance"][0]["stopped"],
         json!({"answer": "3 files"}),
         "{report}"
     );

@@ -5,10 +5,10 @@
 //! `runtime_bench <agents> <turns> [workers] [output_kib]` prints one JSON line:
 //! turns per second, render time per turn (mean and p95, from the traces), prompt size, prefix
 //! reuse, peak and per-agent memory (at the peak, and anonymous memory while running: what a
-//! cgroup cannot reclaim). With `AFFORDANCE_BENCH_REPLAY=1` it then resumes the run's directory (every agent has
-//! stopped, so the resume is a replay of every journal) and reports the replay's time and memory.
+//! cgroup cannot reclaim). With `AFFORDANCE_BENCH_REPLAY=1` it then restores the run's directory (every agent has
+//! stopped, so the restore is a replay of every journal) and reports the replay's time and memory.
 use affordance::emit::Encoder;
-use affordance::runtime::{AgentSpec, CallContext, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+use affordance::runtime::{CallContext, FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
 use serde_json::{Value as J, json};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -82,12 +82,12 @@ fn main() {
     let machine = move |_: &CallContext, _: &J| Ok(json!({"output": out, "exit": 0}));
     rt.bind_machine("home", Arc::new(machine.clone()));
     for i in 0..agents {
-        let mut spec = AgentSpec::new(
+        let mut spec = InstanceSpec::new(
             &format!("agent-{i:04}"),
             json!({"id": format!("agent-{i:04}"), "n_agents": agents, "task": "Keep the build green."}),
         );
         spec.max_turns = Some(turns as u64);
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     let rss0 = status_kib("VmRSS:");
     let anon0 = status_kib("RssAnon:");
@@ -112,13 +112,13 @@ fn main() {
     let samples = sampler.join().unwrap();
     // The last sample of the run proper: before the final 2% of wall time, when reports are built.
     let running = samples.get(samples.len() * 98 / 100).copied().unwrap_or(0);
-    let total: u64 = report.agents.iter().map(|a| a.metrics.turns).sum();
-    let prompt: u64 = report.agents.iter().map(|a| a.metrics.prompt_tokens).sum();
-    let uncached: u64 = report.agents.iter().map(|a| a.metrics.uncached_tokens).sum();
-    let max_prompt = report.agents.iter().map(|a| a.metrics.max_prompt).max().unwrap_or(0);
-    let errors = report.agents.iter().filter(|a| a.error.is_some()).count();
+    let total: u64 = report.instances.iter().map(|a| a.metrics.turns).sum();
+    let prompt: u64 = report.instances.iter().map(|a| a.metrics.prompt_tokens).sum();
+    let uncached: u64 = report.instances.iter().map(|a| a.metrics.uncached_tokens).sum();
+    let max_prompt = report.instances.iter().map(|a| a.metrics.max_prompt).max().unwrap_or(0);
+    let errors = report.instances.iter().filter(|a| a.error.is_some()).count();
     let mut render_ms: Vec<f64> = vec![];
-    for a in &report.agents {
+    for a in &report.instances {
         for l in std::fs::read_to_string(dir.join(&a.id).join("trace.jsonl"))
             .unwrap_or_default()
             .lines()
@@ -145,7 +145,7 @@ fn main() {
             "max_prompt_tokens": max_prompt, "prefix_reuse": ((1.0 - uncached as f64 / prompt.max(1) as f64) * 1000.0).round() / 1000.0,
             "rss_start_mib": rss0 / 1024, "peak_rss_mib": peak / 1024,
             "mib_per_agent": (((peak.saturating_sub(rss0)) as f64 / 1024.0 / agents as f64) * 100.0).round() / 100.0,
-            "log_records_mean": report.agents.iter().map(|a| a.state["__ui"]["@log"]["records"].as_array().map_or(0, |r| r.len())).sum::<usize>() / agents.max(1),
+            "log_records_mean": report.instances.iter().map(|a| a.state["__ui"]["@log"]["records"].as_array().map_or(0, |r| r.len())).sum::<usize>() / agents.max(1),
             "running_anon_mib_per_agent": (((running.saturating_sub(anon0)) as f64 / 1024.0 / agents as f64) * 100.0).round() / 100.0,
         })
     );
@@ -154,7 +154,7 @@ fn main() {
         let anon = status_kib("RssAnon:");
         let cfg = config();
         let t0 = Instant::now();
-        let mut rt = Runtime::resume(cfg, enc, model).unwrap();
+        let mut rt = Runtime::restore(cfg, enc, model).unwrap();
         rt.bind_machine("home", Arc::new(machine));
         let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let sampler = {
@@ -174,8 +174,8 @@ fn main() {
         println!(
             "{}",
             json!({
-                "replay_agents": replayed.agents.len(), "replay_s": (t0.elapsed().as_secs_f64() * 100.0).round() / 100.0,
-                "replay_errors": replayed.agents.iter().filter(|a| a.error.is_some() || a.diverged_at.is_some()).count(),
+                "replay_agents": replayed.instances.len(), "replay_s": (t0.elapsed().as_secs_f64() * 100.0).round() / 100.0,
+                "replay_errors": replayed.instances.iter().filter(|a| a.error.is_some() || a.diverged_at.is_some()).count(),
                 "replay_peak_anon_mib_per_agent": ((most.saturating_sub(anon) as f64 / 1024.0 / agents as f64) * 100.0).round() / 100.0,
             })
         );

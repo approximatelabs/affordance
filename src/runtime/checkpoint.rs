@@ -1,7 +1,7 @@
 //! Optional, verified recovery images. The complete input journal stays authoritative.
 use super::{
-    agent::{Agent, recovery::Image},
     blobs::Blobs,
+    instance::{Instance, recovery::Image},
 };
 use crate::View;
 use serde::{
@@ -29,7 +29,7 @@ struct Saved {
     offset: u64,
     /// The SHA-256 of the journal's last `TAIL` bytes before `offset`.
     tail: String,
-    /// Every blob the journal before `offset` refers to: a resume from the image checks they
+    /// Every blob the journal before `offset` refers to: a restore from the image checks they
     /// exist, as a full replay would, without reading the journal.
     blobs: Vec<String>,
     image: Image,
@@ -44,7 +44,7 @@ struct Envelope<'a> {
     #[serde(borrow)]
     data: Option<&'a RawValue>,
 }
-/// What a resume checks before it reads the image.
+/// What a restore checks before it reads the image.
 #[derive(Deserialize)]
 struct Header<'a> {
     #[serde(default)]
@@ -118,8 +118,6 @@ pub(super) struct Seed {
     pub saved: Option<usize>,
     pub bytes: u64,
     pub boundary: Option<(usize, u64)>,
-    /// The image's offset: the suffix replayed from it starts here (0: a full replay).
-    pub offset: u64,
     /// The blobs the journal refers to.
     pub refs: BTreeSet<String>,
 }
@@ -154,7 +152,7 @@ pub(super) fn refs_in(line: &str, into: &mut BTreeSet<String>) {
 }
 
 /// The journal's bytes just before `offset`, hashed: an image belongs to this journal when they
-/// match and `offset` ends a line. Reading the whole prefix would make every resume O(history);
+/// match and `offset` ends a line. Reading the whole prefix would make every restore O(history);
 /// the journal stays authoritative, and a full replay still reads all of it.
 fn tail_hash(path: &Path, offset: u64) -> Result<String, String> {
     let mut file = std::fs::File::open(path).map_err(|e| e.to_string())?;
@@ -258,7 +256,7 @@ impl Checkpoint {
         }
     }
     /// After an input: if the agent kept a step boundary in it, that is where the journal ends now.
-    pub fn handled(&mut self, agent: &Agent) {
+    pub fn handled(&mut self, agent: &Instance) {
         if let Some(n) = agent.boundary_inputs().filter(|n| *n == agent.journal_len())
             && self.boundary.map(|b| b.0) != Some(n)
         {
@@ -272,7 +270,7 @@ impl Checkpoint {
     /// Returns why the agent could not be imaged, the first time since its last image it could not.
     pub fn save(
         &mut self,
-        agent: &Agent,
+        agent: &Instance,
         view: &View,
         force: bool,
         before_write: &dyn Fn() -> Result<(), String>,
@@ -295,7 +293,7 @@ impl Checkpoint {
     /// The image that is due, ready to write, without writing it: a caller with several
     /// instances to image (a worker that is stopping) writes them all at once. The blobs it may
     /// name are synced before it is written.
-    pub fn prepare(&mut self, agent: &Agent, view: &View, force: bool) -> Result<Due, String> {
+    pub fn prepare(&mut self, agent: &Instance, view: &View, force: bool) -> Result<Due, String> {
         let count = agent.journal_len();
         let since = self.saved.max(self.refused).unwrap_or(0);
         if self.saved == Some(count)
@@ -335,11 +333,11 @@ impl Checkpoint {
         })
         .map_err(|e| e.to_string())?;
         // With AFFORDANCE_VERIFY_IMAGES set (the test suite sets it), an image of an idle agent
-        // is read back, as a resume would read it, and the agent it gives is compared with the
+        // is read back, as a restore would read it, and the agent it gives is compared with the
         // one it was taken from: the same state, the same outstanding work, the same counters.
         // Every image any test writes is checked this way, whatever the test is about.
         // (An image of a step boundary is of an earlier moment than the live agent, even within
-        // the same input: it is checked by the tests that resume from one.)
+        // the same input: it is checked by the tests that restore from one.)
         if why.is_none() && std::env::var_os("AFFORDANCE_VERIFY_IMAGES").is_some() {
             let read: Saved = serde_json::from_str(&data).map_err(|e| format!("image verification: {e}"))?;
             let blobs = agent.blobs_handle();

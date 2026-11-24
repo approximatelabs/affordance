@@ -3,7 +3,9 @@ use crate::tokenizer;
 use affordance::{
     View,
     emit::{Encoder, RunCache},
-    runtime::{Agent, AgentConfig, CallContext, CancelToken, Completions, Exec, Executor, GenRequest, Model, Target},
+    runtime::{
+        CallContext, CancelToken, Completions, Exec, Executor, GenRequest, Instance, InstanceConfig, Model, Target,
+    },
     value::{Coll, Obj, Value},
 };
 use serde_json::{Value as J, json};
@@ -46,8 +48,8 @@ fn enc() -> &'static Encoder {
     static E: OnceLock<Encoder> = OnceLock::new();
     E.get_or_init(tokenizer::encoder)
 }
-fn cfg() -> AgentConfig {
-    AgentConfig {
+fn cfg() -> InstanceConfig {
+    InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -80,8 +82,8 @@ fn store_autokeys_do_not_overwrite_user_keys() {
 #[test]
 fn store_rejects_invalid_complete_records() {
     let f = Files::new();
-    std::fs::create_dir_all(f.0.join("a")).unwrap();
-    std::fs::write(f.0.join("a/store.jsonl"), "{\"unrelated\":true}\n").unwrap();
+    crate::shared::new_instance(&f.0, "a");
+    std::fs::write(crate::shared::inst(&f.0, "a/store.jsonl"), "{\"unrelated\":true}\n").unwrap();
     let s = affordance::runtime::store::Store::new(Some(f.0.clone()));
     let r = s.load("a");
     eprintln!("load={r:?}");
@@ -182,13 +184,15 @@ fn local_instance_home_names_do_not_alias() {
     let f = Files::new();
     let e = Exec {
         target: Target::Local {
-            home: Some(format!("{}/{{agent}}", f.0.display())),
+            home: Some(f.0.display().to_string()),
+            per_instance: true,
         },
         default_timeout_s: 1,
         max_capture: 1024,
     };
     let context = |id: &str| CallContext {
         agent: id.into(),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),
@@ -296,7 +300,7 @@ fn lazy_hook_initializers_run_only_when_the_hook_mounts() {
     let view = f.app("export default function Main(){const [x,setX]=useState(()=>{if(fail)throw new Error('initializer repeated');return 42;},'x');return String(x);}");
     let mut config = cfg();
     config.props = json!({"fail": false});
-    let mut agent = Agent::new(config).unwrap();
+    let mut agent = Instance::new(config).unwrap();
     agent.start(&view, enc()).unwrap();
     assert_eq!(agent.kept_state()["__ui"].to_wire()["@x"], json!(42));
     agent
@@ -393,7 +397,7 @@ fn cyclic_collections_and_deep_source_return_errors_without_aborting() {
     assert!(affordance::runtime::inspect::encode(&v, false).is_err());
     let view =
         f.app("export default function Main(){const m=new Map();m.set('self',m);useState(m,'cycle');return 'ok';}");
-    let mut agent = Agent::new(cfg()).unwrap();
+    let mut agent = Instance::new(cfg()).unwrap();
     assert!(agent.start(&view, enc()).is_err());
     assert!(c.write().is_err());
 }
@@ -567,7 +571,7 @@ fn deep_and_cyclic_values_are_errors_not_stack_overflows() {
 fn native_functions_are_state_updaters_and_private_methods_survive_snapshots() {
     let f = Files::new();
     let view=f.app("class Box{#x=9;read(){return this.#x;}write(v){this.#x=v;}}export default function Main(){const [count,setCount]=useState('7','count');const [box]=useState(new Box(),'box');const [out,setOut]=useState('','out');useEvent('update',()=>{setCount(Number);try{box.write(11);}catch(e){setOut(`${box.read()}:${e.name}`);}});return String(count);}");
-    let mut a = Agent::new(cfg()).unwrap();
+    let mut a = Instance::new(cfg()).unwrap();
     a.start(&view, enc()).unwrap();
     a.handle(
         &view,
@@ -575,7 +579,7 @@ fn native_functions_are_state_updaters_and_private_methods_survive_snapshots() {
         affordance::runtime::Input::Event {
             name: "update".into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: 1,
         },
     )
@@ -621,6 +625,7 @@ fn docker_names_and_images_are_arguments_never_host_shell_source() {
     let marker = std::env::var("AFFORDANCE_DOCKER_MARKER").unwrap();
     let ctx = CallContext {
         agent: format!("root/child$(touch${{IFS}}{marker})"),
+        instance: String::new(),
         task: 0,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),
@@ -630,7 +635,7 @@ fn docker_names_and_images_are_arguments_never_host_shell_source() {
     let executor = Exec {
         target: Target::Docker {
             image: format!("unused$(touch${{IFS}}{marker})"),
-            name: "aff-{agent}".into(),
+            name: "aff".into(),
         },
         default_timeout_s: 1,
         max_capture: 1000,
@@ -706,8 +711,8 @@ fn complete_invalid_store_records_are_not_treated_as_torn_tails() {
         json!({"key":"x","text":"y","next":-1}),
     ] {
         let f = Files::new();
-        std::fs::create_dir_all(f.0.join("a")).unwrap();
-        let path = f.0.join("a/store.jsonl");
+        crate::shared::new_instance(&f.0, "a");
+        let path = crate::shared::inst(&f.0, "a/store.jsonl");
         let bytes = record.to_string();
         std::fs::write(&path, &bytes).unwrap();
         let store = affordance::runtime::store::Store::new(Some(f.0.clone()));
@@ -724,21 +729,21 @@ fn persisted_auto_keys_survive_reload_and_explicit_collisions() {
     let first = affordance::runtime::store::Store::new(Some(f.0.clone()));
     put(&first, json!({"key":"b1","text":"first"}));
     assert_eq!(put(&first, json!({"text":"second"}))["key"], "b2");
-    let resumed = affordance::runtime::store::Store::new(Some(f.0.clone()));
-    resumed.load("a").unwrap();
-    resumed.load("a").unwrap();
+    let restored = affordance::runtime::store::Store::new(Some(f.0.clone()));
+    restored.load("a").unwrap();
+    restored.load("a").unwrap();
     assert_eq!(
-        resumed.call("a", "store.get", &json!({"key":"b1"})).unwrap()["text"],
+        restored.call("a", "store.get", &json!({"key":"b1"})).unwrap()["text"],
         "first"
     );
-    assert_eq!(put(&resumed, json!({"text":"third"}))["key"], "b3");
+    assert_eq!(put(&restored, json!({"text":"third"}))["key"], "b3");
 }
 
 #[test]
 fn a_backwards_store_counter_is_rejected_before_completing_its_line() {
     let f = Files::new();
-    std::fs::create_dir_all(f.0.join("a")).unwrap();
-    let path = f.0.join("a/store.jsonl");
+    crate::shared::new_instance(&f.0, "a");
+    let path = crate::shared::inst(&f.0, "a/store.jsonl");
     let bytes = b"{\"key\":\"saved\",\"text\":\"first\",\"next\":2}\n{\"key\":\"bad\",\"text\":\"second\",\"next\":1}";
     std::fs::write(&path, bytes).unwrap();
     let store = affordance::runtime::store::Store::new(Some(f.0.clone()));

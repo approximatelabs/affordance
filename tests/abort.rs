@@ -1,10 +1,10 @@
 //! `AbortController`: a model call stopped by its signal keeps what it generated; a machine call or
-//! `fetch` rejects with `AbortError`; the journal decides a race; replay and resume agree.
+//! `fetch` rejects with `AbortError`; the journal decides a race; replay and restore agree.
 use crate::tokenizer;
 use affordance::{
     View,
     effects::Outcome,
-    runtime::{Agent, AgentConfig, Command, Input},
+    runtime::{Command, Input, Instance, InstanceConfig},
 };
 use serde_json::{Value as J, json};
 use std::{
@@ -39,6 +39,11 @@ export default function Main(){
     try{await harness.machine.get('http').call({path:'/slow'},{signal:c.signal});setOut('answered');}
     catch(e){setOut([e.name,c.signal.aborted]);}
   });
+  useEvent('piped',async()=>{
+    const o=await model(<Ask/>,{pipe:{machine:'sink',call:{},text:'[\uE000]'}});
+    await harness.machine.get('sink').call({after:true});
+    setOut({text:o.text});
+  });
   useEvent('stop',()=>{turn().abort();});
   useEvent('early',async()=>{
     const c=new AbortController();
@@ -57,8 +62,8 @@ export default function Main(){
 }"#;
 
 struct Rig {
-    config: AgentConfig,
-    agent: Agent,
+    config: InstanceConfig,
+    agent: Instance,
     view: View,
     enc: affordance::emit::Encoder,
     clock: i64,
@@ -79,7 +84,7 @@ impl Rig {
         let enc = tokenizer::encoder();
         let view = View::load(&path, "Main", &enc).unwrap();
         let _ = std::fs::remove_dir_all(&dir);
-        let config = AgentConfig {
+        let config = InstanceConfig {
             context: None,
             retry: Default::default(),
             template: None,
@@ -94,7 +99,7 @@ impl Rig {
             machines: vec!["http".into()],
             model: Some("default".into()),
         };
-        let mut agent = Agent::new(config.clone()).unwrap();
+        let mut agent = Instance::new(config.clone()).unwrap();
         // The page's own first turn is not this test's: the app has no loop.
         agent.start(&view, &enc).unwrap();
         Self {
@@ -120,7 +125,7 @@ impl Rig {
         self.input(Input::Event {
             name: name.into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: self.clock,
         })
     }
@@ -143,8 +148,8 @@ impl Rig {
     fn out(&self) -> J {
         self.agent.state()["__ui"]["@out"].clone()
     }
-    fn restored(&self) -> (Agent, Vec<Command>) {
-        Agent::restore(self.config.clone(), self.journal.clone(), &self.view, &self.enc).unwrap()
+    fn restored(&self) -> (Instance, Vec<Command>) {
+        Instance::restore(self.config.clone(), self.journal.clone(), &self.view, &self.enc).unwrap()
     }
 }
 
@@ -205,7 +210,7 @@ fn a_reply_that_wins_the_race_is_whole() {
 }
 
 #[test]
-fn an_aborted_call_is_stopped_again_on_resume_not_reissued_whole() {
+fn an_aborted_call_is_stopped_again_on_restore_not_reissued_whole() {
     let mut rig = Rig::new();
     let (task, _) = generate(&rig.event("ask"));
     rig.event("stop");
@@ -241,8 +246,7 @@ fn an_aborted_model_call_that_fails_ends_as_stopped_not_retried() {
     let commands = rig.input(Input::ModelError {
         task,
         error: "HTTP 503".into(),
-        transient: true,
-        kind: None,
+        kind: affordance::runtime::model::FailureKind::Interrupted,
         retry_after_ms: None,
         clock_ms: rig.clock,
     });
@@ -308,7 +312,7 @@ fn an_already_aborted_signal_rejects_at_once_and_issues_nothing() {
 struct Streaming {
     opener: Vec<u32>,
     word: u32,
-    inbox: std::sync::Mutex<Option<affordance::runtime::Inbox>>,
+    control: std::sync::Mutex<Option<affordance::runtime::Control>>,
 }
 impl affordance::runtime::Model for Streaming {
     fn generate(
@@ -331,8 +335,8 @@ impl affordance::runtime::Model for Streaming {
                 break;
             }
             if n == 4 {
-                let inbox = self.inbox.lock().unwrap();
-                inbox.as_ref().unwrap().post(&req.agent, "stop", json!({})).unwrap();
+                let control = self.control.lock().unwrap();
+                drop(control.as_ref().unwrap().post(&req.agent, "stop", json!({}), None));
             }
         }
         Ok(affordance::runtime::GenReply {
@@ -344,7 +348,7 @@ impl affordance::runtime::Model for Streaming {
 
 #[test]
 fn escape_stops_a_streaming_reply_and_the_journal_keeps_it() {
-    use affordance::runtime::{AgentSpec, Runtime, RuntimeConfig};
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
     use std::sync::Arc;
     let dir = std::env::temp_dir().join(format!("aff-abort-run-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
@@ -356,21 +360,21 @@ fn escape_stops_a_streaming_reply_and_the_journal_keeps_it() {
     let model = Arc::new(Streaming {
         opener: enc.tok.encode("</think>", false).unwrap().get_ids().to_vec(),
         word,
-        inbox: Default::default(),
+        control: Default::default(),
     });
     let mut cfg = RuntimeConfig::new(app.clone());
     cfg.dir = Some(dir.join("run"));
     cfg.library = Some(std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/views")));
     cfg.max_wall = Some(std::time::Duration::from_secs(30));
     let mut rt = Runtime::new(cfg, enc, model.clone());
-    let inbox = rt.inbox();
-    *model.inbox.lock().unwrap() = Some(inbox.clone());
-    inbox.post("a", "ask", json!({})).unwrap();
-    let mut spec = AgentSpec::new("a", json!({}));
+    let control = rt.control();
+    *model.control.lock().unwrap() = Some(control.clone());
+    drop(control.post("a", "ask", json!({}), None));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.machines = Some(vec![]);
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    let a = &report.agents[0];
+    let a = &report.instances[0];
     assert_eq!(a.error, None);
     let out = &a.state["__ui"]["@out"];
     assert_eq!(out["aborted"], true, "{out}");
@@ -378,7 +382,104 @@ fn escape_stops_a_streaming_reply_and_the_journal_keeps_it() {
     let text = out["text"].as_str().unwrap();
     let words = text.matches('a').count();
     assert!((5..50).contains(&words), "stopped soon after the Escape: {text:?}");
-    let journal = std::fs::read_to_string(dir.join("run/a/journal.jsonl")).unwrap();
+    let journal = std::fs::read_to_string(crate::shared::inst(&dir, "run/a/journal.jsonl")).unwrap();
     assert!(journal.contains(r#""aborted":true"#), "{journal}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A native model that streams its reply's ids in five quick pieces.
+struct QuickIds {
+    pieces: Vec<Vec<u32>>,
+    took: std::sync::Mutex<Option<std::time::Duration>>,
+}
+impl affordance::runtime::Model for QuickIds {
+    fn generate(
+        &self,
+        _: &affordance::runtime::GenRequest,
+    ) -> Result<affordance::runtime::GenReply, affordance::runtime::model::ModelError> {
+        panic!("a piped call streams")
+    }
+    fn generate_stream(
+        &self,
+        _: &affordance::runtime::GenRequest,
+        on_tokens: &mut dyn FnMut(affordance::runtime::Delta<'_>) -> bool,
+    ) -> Result<affordance::runtime::GenReply, affordance::runtime::model::ModelError> {
+        let started = std::time::Instant::now();
+        let mut ids = vec![];
+        for piece in &self.pieces {
+            ids.extend_from_slice(piece);
+            on_tokens(affordance::runtime::Delta::Ids(piece));
+        }
+        *self.took.lock().unwrap() = Some(started.elapsed());
+        Ok(affordance::runtime::GenReply {
+            ids,
+            ..Default::default()
+        })
+    }
+}
+
+/// "A native model's reply is piped as text, a slow sink never holds the model call, and what the
+/// app writes after the reply comes after it." The sink takes 150 ms a piece; the model streams
+/// five pieces at once and is done long before the sink; the app's own write after `model()`
+/// resolves reaches the sink after every piece.
+#[test]
+fn a_native_reply_is_piped_without_waiting_on_a_slow_sink() {
+    use affordance::runtime::{InstanceSpec, Runtime, RuntimeConfig};
+    use std::sync::{Arc, Mutex};
+    let dir = std::env::temp_dir().join(format!("aff-pipe-native-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let app = dir.join("app.tsx");
+    std::fs::write(&app, APP.replace("@ROOT@", env!("CARGO_MANIFEST_DIR"))).unwrap();
+    let enc = Arc::new(tokenizer::encoder());
+    let mut pieces: Vec<Vec<u32>> = ["</think>", "one ", "two ", "three ", "four"]
+        .iter()
+        .map(|t| enc.tok.encode(*t, false).unwrap().get_ids().to_vec())
+        .collect();
+    pieces.push(enc.tok.encode("<|user|>", false).unwrap().get_ids().to_vec());
+    let model = Arc::new(QuickIds {
+        pieces,
+        took: Mutex::new(None),
+    });
+    let written: Arc<Mutex<Vec<J>>> = Arc::default();
+    let log = written.clone();
+    let mut cfg = RuntimeConfig::new(app.clone());
+    cfg.dir = Some(dir.join("run"));
+    cfg.library = Some(std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/views")));
+    cfg.max_wall = Some(std::time::Duration::from_secs(30));
+    let mut rt = Runtime::new(cfg, enc, model.clone());
+    rt.bind_machine(
+        "sink",
+        Arc::new(move |_: &affordance::runtime::CallContext, args: &J| {
+            if args.get("chunk").is_some() {
+                std::thread::sleep(std::time::Duration::from_millis(150));
+            }
+            log.lock().unwrap().push(args.clone());
+            Ok(json!({}))
+        }),
+    );
+    drop(rt.control().post("a", "piped", json!({}), None));
+    let mut spec = InstanceSpec::new("a", json!({}));
+    spec.machines = Some(vec!["sink".into()]);
+    rt.add_instance(spec).unwrap();
+    let report = rt.run().unwrap();
+    assert_eq!(report.instances[0].error, None);
+    let took = model.took.lock().unwrap().unwrap();
+    assert!(
+        took < std::time::Duration::from_millis(300),
+        "the model call waited on the sink: {took:?}"
+    );
+    let written = written.lock().unwrap();
+    let chunks: Vec<&str> = written.iter().filter_map(|a| a["chunk"].as_str()).collect();
+    let text: String = chunks
+        .iter()
+        .map(|c| c.trim_start_matches('[').trim_end_matches(']'))
+        .collect();
+    assert!(text.contains("one two three four"), "{chunks:?}");
+    assert_eq!(
+        written.last().unwrap()["after"],
+        true,
+        "the app's own write came after every piece: {written:?}"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

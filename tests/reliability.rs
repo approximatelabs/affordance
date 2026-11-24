@@ -3,7 +3,7 @@ use crate::tokenizer;
 use affordance::{
     View,
     emit::{Encoder, RunCache},
-    runtime::{AgentSpec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig, store::Store},
+    runtime::{FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig, store::Store},
 };
 use serde_json::{Value as J, json};
 use std::{
@@ -98,20 +98,20 @@ export default function Main({{denied,reverse,name}}){{
     ));
     let mut cfg = config(&app);
     cfg.dir = Some(dir.0.join("run"));
-    let run = |resume| {
-        let mut rt = if resume {
-            Runtime::resume(cfg.clone(), encoder(), model()).unwrap()
+    let run = |restore| {
+        let mut rt = if restore {
+            Runtime::restore(cfg.clone(), encoder(), model()).unwrap()
         } else {
             Runtime::new(cfg.clone(), encoder(), model())
         };
-        if !resume {
+        if !restore {
             for (id, denied, reverse) in [
                 ("saved", false, false),
                 ("reversed", false, true),
                 ("named", false, false),
                 ("denied", true, false),
             ] {
-                let mut spec = AgentSpec::new(
+                let mut spec = InstanceSpec::new(
                     id,
                     json!({"denied":denied,"reverse":reverse,"name":if id=="named" {"archive"} else {"log"}}),
                 );
@@ -119,13 +119,13 @@ export default function Main({{denied,reverse,name}}){{
                 if denied {
                     spec.capabilities = Some(vec![]);
                 }
-                rt.add_agent(spec).unwrap();
+                rt.add_instance(spec).unwrap();
             }
         }
         rt.run().unwrap()
     };
     let report = run(false);
-    for agent in &report.agents {
+    for agent in &report.instances {
         assert!(agent.error.is_none(), "{:?}", agent.error);
         let denied = agent.id == "denied";
         let records = if denied {
@@ -141,10 +141,11 @@ export default function Main({{denied,reverse,name}}){{
             )
         );
         // Exercise complete journal replay as well as the normal cache-based stop path.
-        let _ = std::fs::remove_file(dir.0.join("run").join(&agent.id).join("checkpoint.json"));
+        let _ =
+            std::fs::remove_file(crate::shared::instance_dir(&dir.0.join("run"), &agent.id).join("checkpoint.json"));
     }
-    let resumed = run(true);
-    for (before, after) in report.agents.iter().zip(&resumed.agents) {
+    let restored = run(true);
+    for (before, after) in report.instances.iter().zip(&restored.instances) {
         assert!(after.error.is_none(), "{:?}", after.error);
         assert_eq!(after.stopped, before.stopped);
         assert_eq!(after.state, before.state);
@@ -152,7 +153,7 @@ export default function Main({{denied,reverse,name}}){{
 }
 
 #[test]
-fn busy_local_calls_allow_timers_inspection_pause_and_shutdown() {
+fn busy_local_calls_allow_timers_inspection_close_and_shutdown() {
     const CHILD: &str = "AFFORDANCE_FAIR_WORKER_CHILD";
     if std::env::var_os(CHILD).is_none() {
         // The scenario runs in a child with a 15 s limit: a runtime that cannot shut down would
@@ -160,7 +161,7 @@ fn busy_local_calls_allow_timers_inspection_pause_and_shutdown() {
         let mut child = std::process::Command::new(std::env::current_exe().unwrap())
             .args([
                 "--exact",
-                "reliability::busy_local_calls_allow_timers_inspection_pause_and_shutdown",
+                "reliability::busy_local_calls_allow_timers_inspection_close_and_shutdown",
                 "--test-threads=1",
             ])
             .env(CHILD, "1")
@@ -183,20 +184,20 @@ fn busy_local_calls_allow_timers_inspection_pause_and_shutdown() {
         );
         return;
     }
-    for pause in [false, true] {
+    for close in [false, true] {
         let dir = Scratch::new();
         let app = dir.app(
             r#"
 export default function Main(){
   const [n,setN]=useState(0,'n');
   useEffect(()=>{(async()=>{
-    if(harness.agent==='busy'){
+    if(harness.instance==='busy'){
       for(;;){await harness.store.put({key:'same',text:'value'});setN(x=>x+1);}
     }else{
       await harness.wait({ms:0});
       const seen=await harness.inspect('busy',{select:['n']});
       await harness.machine.call({});
-      harness.stop(seen.agents.busy.version);
+      harness.stop(seen.instances.busy.version);
     }
   })();},[]);
   return String(n);
@@ -204,65 +205,62 @@ export default function Main(){
         );
         let mut cfg = config(&app);
         cfg.dir = Some(dir.0.join("run"));
-        cfg.max_wall = if pause { None } else { Some(Duration::from_secs(1)) };
-        let control = dir.0.join("run/control");
-        std::fs::create_dir_all(&control).unwrap();
+        cfg.max_wall = if close { None } else { Some(Duration::from_secs(1)) };
         let mut rt = Runtime::new(cfg.clone(), encoder(), model());
+        let control = rt.control();
         rt.bind_machine(
             "control",
             Arc::new(move |_: &affordance::runtime::CallContext, _: &J| {
-                if pause {
-                    std::fs::write(control.join("pause.json"), r#"{"mode":"immediate"}"#).unwrap();
+                if close {
+                    control.close(Duration::ZERO);
                 }
                 Ok(json!({}))
             }),
         );
         for id in ["busy", "watcher"] {
-            let mut spec = AgentSpec::new(id, json!({}));
+            let mut spec = InstanceSpec::new(id, json!({}));
             spec.model = None;
             if id == "watcher" {
                 spec.inspect = vec!["busy".into()];
             }
-            rt.add_agent(spec).unwrap();
+            rt.add_instance(spec).unwrap();
         }
         let report = rt.run().unwrap();
         assert!(!report.complete);
-        let watcher = report.agents.iter().find(|a| a.id == "watcher").unwrap();
+        let watcher = report.instances.iter().find(|a| a.id == "watcher").unwrap();
         assert!(watcher.error.is_none(), "{:?}", watcher.error);
         assert!(watcher.stopped.as_ref().and_then(J::as_u64).is_some_and(|n| n > 0));
-        if pause {
-            let before = report.agents.iter().find(|a| a.id == "busy").unwrap();
-            let pause_file = dir.0.join("run/control/pause.json");
-            std::fs::remove_file(&pause_file).unwrap();
-            // The resumed run ends as soon as the busy agent's journal has grown (a graceful
-            // pause from the controller); the wall limit only bounds a failure, so a slow
-            // restore under load cannot end the run before the held work continues.
+        if close {
+            let before = report.instances.iter().find(|a| a.id == "busy").unwrap();
+            // The restored run ends as soon as the busy agent's journal has grown (a close from
+            // the controller); the wall limit only bounds a failure, so a slow restore under load
+            // cannot end the run before the held work continues.
             cfg.max_wall = Some(Duration::from_secs(2));
-            let journal = dir.0.join("run/busy/journal.jsonl");
+            let journal = crate::shared::inst(&dir.0, "run/busy/journal.jsonl");
             let lines = |p: &std::path::Path| std::fs::read(p).map_or(0, |b| b.iter().filter(|&&c| c == b'\n').count());
             let start = lines(&journal).max(before.journal_len);
             let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let mut rt = Runtime::restore(cfg, encoder(), model()).unwrap();
             let watch = {
-                let done = done.clone();
+                let (done, control) = (done.clone(), rt.control());
                 std::thread::spawn(move || {
                     while !done.load(Ordering::SeqCst) {
                         if lines(&journal) > start {
-                            std::fs::write(&pause_file, r#"{"mode":"graceful"}"#).unwrap();
+                            control.close(Duration::from_secs(150));
                             return;
                         }
                         std::thread::sleep(Duration::from_millis(5));
                     }
                 })
             };
-            let mut rt = Runtime::resume(cfg, encoder(), model()).unwrap();
             rt.bind_machine(
                 "control",
                 Arc::new(|_: &affordance::runtime::CallContext, _: &J| Ok(json!({}))),
             );
-            let resumed = rt.run().unwrap();
+            let restored = rt.run().unwrap();
             done.store(true, Ordering::SeqCst);
             watch.join().unwrap();
-            let after = resumed.agents.iter().find(|a| a.id == "busy").unwrap();
+            let after = restored.instances.iter().find(|a| a.id == "busy").unwrap();
             assert!(after.error.is_none(), "{:?}", after.error);
             assert!(
                 after.journal_len > before.journal_len,
@@ -280,12 +278,14 @@ fn child_keys_cannot_alias_persisted_instance_paths() {
         let mut cfg = config(&app);
         cfg.dir = Some(dir.0.join("run"));
         let mut rt = Runtime::new(cfg, encoder(), model());
-        rt.add_agent(AgentSpec::new("parent", json!({}))).unwrap();
+        rt.add_instance(InstanceSpec::new("parent", json!({}))).unwrap();
         let report = rt.run().unwrap();
-        assert!(report.agents[0].error.as_deref().unwrap().contains("key"));
-        let saved: J = serde_json::from_slice(&std::fs::read(dir.0.join("run/parent/agent.json")).unwrap()).unwrap();
+        assert!(report.instances[0].error.as_deref().unwrap().contains("key"));
+        let saved: J =
+            serde_json::from_slice(&std::fs::read(crate::shared::inst(&dir.0, "run/parent/instance.json")).unwrap())
+                .unwrap();
         assert_eq!(saved["id"], "parent");
-        assert_eq!(report.agents.len(), 1);
+        assert_eq!(report.instances.len(), 1);
     }
 }
 
@@ -304,16 +304,16 @@ export default function Main() { const [phase,setPhase]=useState(0,'phase'); use
     cfg.dir = Some(dir.0.join("run"));
     let enc = encoder();
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     for report in [
         rt.run().unwrap(),
-        Runtime::resume(cfg, enc, model()).unwrap().run().unwrap(),
+        Runtime::restore(cfg, enc, model()).unwrap().run().unwrap(),
     ] {
-        let kid = report.agents.iter().find(|a| a.id == "a/kid").unwrap();
+        let kid = report.instances.iter().find(|a| a.id == "a/kid").unwrap();
         assert!(kid.error.is_none(), "{:?}", kid.error);
         assert_eq!(kid.state["__ui"]["@n"], 101);
     }
-    assert!(dir.0.join("run/.retired").is_dir());
+    assert!(dir.0.join("run/retired").is_dir());
 }
 
 #[test]
@@ -347,9 +347,9 @@ export default function Main(){const [phase,setPhase]=useState(0,'phase');useEff
     let mut cfg = config(&app);
     cfg.model_threads = 2;
     let mut rt = Runtime::new(cfg, enc, model);
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let report = rt.run().unwrap();
-    let kid = report.agents.iter().find(|a| a.id == "a/kid").unwrap();
+    let kid = report.instances.iter().find(|a| a.id == "a/kid").unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     assert_eq!(kid.state["__ui"]["@value"], "new");
 }
@@ -366,9 +366,9 @@ export default function Main(){const [o,setO]=useState({a:1,b:2},'o');const [v,s
 "#,
     );
     let mut rt = Runtime::new(config(&app), encoder(), model());
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let report = rt.run().unwrap();
-    let state = &report.agents[0].state["__ui"];
+    let state = &report.instances[0].state["__ui"];
     assert_eq!(
         state["@o"]
             .as_object()
@@ -422,7 +422,7 @@ fn store_recovers_partial_utf8_tail_and_preserves_committed_records() {
     let dir = Scratch::new();
     let store = Store::new(Some(dir.0.clone()));
     store.call("a", "store.put", &json!({"text":"saved"})).unwrap();
-    let file = dir.0.join("a/store.jsonl");
+    let file = crate::shared::inst(&dir.0, "a/store.jsonl");
     use std::io::Write;
     std::fs::OpenOptions::new()
         .append(true)
@@ -447,7 +447,7 @@ fn store_recovers_partial_utf8_tail_and_preserves_committed_records() {
         "next"
     );
     assert!(
-        std::fs::read_dir(dir.0.join("a"))
+        std::fs::read_dir(crate::shared::instance_dir(&dir.0, "a"))
             .unwrap()
             .any(|e| { e.unwrap().file_name().to_string_lossy().starts_with("torn-store-") })
     );
@@ -477,40 +477,40 @@ export default function Main(){
     cfg.env.insert("DEMO".into(), "left".into());
     let enc = encoder();
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let first = rt.run().unwrap();
-    assert!(first.agents.iter().all(|a| a.error.is_none()));
+    assert!(first.instances.iter().all(|a| a.error.is_none()));
     let read = |path: &std::path::Path| -> J { serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap() };
     let append = |id: &str, name: &str, payload: J, clock: i64| {
         let input = affordance::runtime::Input::Event {
             name: name.into(),
             payload,
-            op: None,
+            id: None,
             clock_ms: clock,
         };
         writeln!(
             std::fs::OpenOptions::new()
                 .append(true)
-                .open(run.join(id).join("journal.jsonl"))
+                .open(crate::shared::instance_dir(&run, id).join("journal.jsonl"))
                 .unwrap(),
             "{}",
             serde_json::to_string(&input).unwrap()
         )
         .unwrap();
     };
-    let checkpoint = run.join("a/checkpoint.json");
-    let child_checkpoint = run.join("a/kid/checkpoint.json");
+    let checkpoint = crate::shared::inst(&run, "a/checkpoint.json");
+    let child_checkpoint = crate::shared::inst(&run, "a/kid/checkpoint.json");
     assert!(checkpoint.exists() && child_checkpoint.exists());
     let clock = read(&run.join("clock.json"))["clock_ms"].as_i64().unwrap() + 10;
     append("a", "advance", json!({"label":"second"}), clock);
     append("a/kid", "bump", json!({}), clock + 1);
-    let second = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let second = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
-    assert!(second.agents.iter().all(|a| a.error.is_none()), "{second:?}");
+    assert!(second.instances.iter().all(|a| a.error.is_none()), "{second:?}");
     assert_eq!(
-        second.agents.iter().find(|a| a.id == "a/kid").unwrap().state["__ui"]["@n"],
+        second.instances.iter().find(|a| a.id == "a/kid").unwrap().state["__ui"]["@n"],
         12
     );
     let saved = read(&checkpoint);
@@ -518,12 +518,12 @@ export default function Main(){
     let from = saved["data"]["image"]["journaled"].as_u64().unwrap();
     let child_from = child_saved["data"]["image"]["journaled"].as_u64().unwrap();
     assert!(from > 0 && child_from > 0);
-    let root_prefix = std::fs::read(run.join("a/journal.jsonl")).unwrap();
-    let child_prefix = std::fs::read(run.join("a/kid/journal.jsonl")).unwrap();
+    let root_prefix = std::fs::read(crate::shared::inst(&run, "a/journal.jsonl")).unwrap();
+    let child_prefix = std::fs::read(crate::shared::inst(&run, "a/kid/journal.jsonl")).unwrap();
     let clock = read(&run.join("clock.json"))["clock_ms"].as_i64().unwrap() + 10;
     append("a", "advance", json!({"label":"third"}), clock);
     append("a/kid", "bump", json!({}), clock + 1);
-    let child_journal = run.join("a/kid/journal.jsonl");
+    let child_journal = crate::shared::inst(&run, "a/kid/journal.jsonl");
     let boundary = std::fs::metadata(&child_journal).unwrap().len();
     std::fs::OpenOptions::new()
         .append(true)
@@ -531,19 +531,19 @@ export default function Main(){
         .unwrap()
         .write_all(b"{\"input\":\"event\",\"name\":\"bad\",\"payload\":\"\xf0\x9f")
         .unwrap();
-    let third = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let third = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
-    assert!(third.agents.iter().all(|a| a.error.is_none()), "{third:?}");
-    let parent = third.agents.iter().find(|a| a.id == "a").unwrap();
-    let child = third.agents.iter().find(|a| a.id == "a/kid").unwrap();
+    assert!(third.instances.iter().all(|a| a.error.is_none()), "{third:?}");
+    let parent = third.instances.iter().find(|a| a.id == "a").unwrap();
+    let child = third.instances.iter().find(|a| a.id == "a/kid").unwrap();
     assert_eq!(parent.state["__ui"]["@label"], "third");
     assert_eq!(parent.state["__ui"]["@runs"], 1);
     assert_eq!(child.state["__ui"]["@n"], 13);
     assert_eq!(child.state["label"], "third");
     for (id, from, prefix) in [("a", from, root_prefix), ("a/kid", child_from, child_prefix)] {
-        let records = std::fs::read_to_string(run.join(id).join("trace.jsonl"))
+        let records = std::fs::read_to_string(crate::shared::instance_dir(&run, id).join("trace.jsonl"))
             .unwrap()
             .lines()
             .map(|line| serde_json::from_str::<J>(line).unwrap())
@@ -552,38 +552,42 @@ export default function Main(){
         assert_eq!(restored["from_input"], from);
         assert_eq!(restored["replayed_inputs"], 1);
         assert!(
-            std::fs::read(run.join(id).join("journal.jsonl"))
+            std::fs::read(crate::shared::instance_dir(&run, id).join("journal.jsonl"))
                 .unwrap()
                 .starts_with(&prefix)
         );
     }
-    assert!(run.join("a/kid").join(format!("torn-journal-{boundary}.bin")).exists());
+    assert!(
+        crate::shared::instance_dir(&run, "a/kid")
+            .join(format!("torn-journal-{boundary}.bin"))
+            .exists()
+    );
     // A valid edit of the same byte length must invalidate the certified prefix.
-    let root_journal = run.join("a/journal.jsonl");
+    let root_journal = crate::shared::inst(&run, "a/journal.jsonl");
     let before = std::fs::read_to_string(&root_journal).unwrap();
     let edited = before.replace("\"label\":\"third\"", "\"label\":\"other\"");
     assert_ne!(before, edited);
     assert_eq!(before.len(), edited.len());
     std::fs::write(&root_journal, edited).unwrap();
-    let edited = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let edited = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
-    let expected = edited.agents.iter().find(|a| a.id == "a").unwrap().state.clone();
+    let expected = edited.instances.iter().find(|a| a.id == "a").unwrap().state.clone();
     assert_eq!(expected["__ui"]["@label"], "other");
     // A broken cache is disposable; recovery still has the entire original journal.
     std::fs::write(&checkpoint, b"{broken checkpoint").unwrap();
-    let restored = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let restored = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
-    assert_eq!(restored.agents.iter().find(|a| a.id == "a").unwrap().state, expected);
+    assert_eq!(restored.instances.iter().find(|a| a.id == "a").unwrap().state, expected);
     // Configuration changes must rerun initialization under the requested environment.
     cfg.env.insert("DEMO".into(), "right".into());
-    let changed = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
-    assert!(changed.agents.iter().all(|a| a.error.is_none()), "{changed:?}");
+    let changed = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
+    assert!(changed.instances.iter().all(|a| a.error.is_none()), "{changed:?}");
     assert_eq!(
-        changed.agents.iter().find(|a| a.id == "a").unwrap().state["__ui"]["@initial"],
+        changed.instances.iter().find(|a| a.id == "a").unwrap().state["__ui"]["@initial"],
         "right"
     );
 }
@@ -620,19 +624,19 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
         .unwrap()
     };
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), template(json!({"reasoning_effort":"high"})));
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
-    assert!(rt.run().unwrap().agents[0].error.is_none());
-    assert!(run.join("a/checkpoint.json").exists());
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
+    assert!(rt.run().unwrap().instances[0].error.is_none());
+    assert!(crate::shared::inst(&run, "a/checkpoint.json").exists());
     let restores = || {
-        std::fs::read_to_string(run.join("a/trace.jsonl"))
+        std::fs::read_to_string(crate::shared::inst(&run, "a/trace.jsonl"))
             .unwrap()
             .lines()
             .filter(|l| serde_json::from_str::<J>(l).unwrap()["t"] == "checkpoint_restore")
             .count()
     };
     let mut bumps = 1;
-    // One more input each time, so each resume has a suffix to replay after the image.
-    let mut resume = |cfg: &RuntimeConfig, options: J| {
+    // One more input each time, so each restore has a suffix to replay after the image.
+    let mut restore = |cfg: &RuntimeConfig, options: J| {
         let clock = serde_json::from_slice::<J>(&std::fs::read(run.join("clock.json")).unwrap()).unwrap()["clock_ms"]
             .as_i64()
             .unwrap()
@@ -640,26 +644,26 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
         let input = affordance::runtime::Input::Event {
             name: "bump".into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: clock,
         };
         writeln!(
             std::fs::OpenOptions::new()
                 .append(true)
-                .open(run.join("a/journal.jsonl"))
+                .open(crate::shared::inst(&run, "a/journal.jsonl"))
                 .unwrap(),
             "{}",
             serde_json::to_string(&input).unwrap()
         )
         .unwrap();
         bumps += 1;
-        let report = Runtime::resume(cfg.clone(), enc.clone(), template(options))
+        let report = Runtime::restore(cfg.clone(), enc.clone(), template(options))
             .unwrap()
             .run()
             .unwrap();
-        assert!(report.agents[0].error.is_none(), "{report:?}");
-        assert_eq!(report.agents[0].state["__ui"]["@n"], bumps);
-        report.agents[0].state["__ui"]["@env"].clone()
+        assert!(report.instances[0].error.is_none(), "{report:?}");
+        assert_eq!(report.instances[0].state["__ui"]["@n"], bumps);
+        report.instances[0].state["__ui"]["@env"].clone()
     };
     let before = restores();
     // The release switch (the same files under another real path) and every operational knob.
@@ -673,7 +677,7 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
     operational.restore_concurrency = Some(1);
     operational.call_timeout = Duration::from_secs(17);
     operational.max_wall = Some(Duration::from_secs(6));
-    resume(&operational, json!({"reasoning_effort":"high"}));
+    restore(&operational, json!({"reasoning_effort":"high"}));
     assert_eq!(
         restores(),
         before + 1,
@@ -687,15 +691,15 @@ fn checkpoints_survive_a_moved_app_and_operational_changes_but_not_semantic_ones
         format!("{source}\n// changed code\n"),
     )
     .unwrap();
-    resume(&operational, json!({"reasoning_effort":"high"}));
+    restore(&operational, json!({"reasoning_effort":"high"}));
     refused(n);
-    resume(&operational, json!({"reasoning_effort":"high"}));
+    restore(&operational, json!({"reasoning_effort":"high"}));
     assert_eq!(restores(), n + 1);
-    resume(&operational, json!({"reasoning_effort":"low"}));
+    restore(&operational, json!({"reasoning_effort":"low"}));
     refused(n + 1);
     let mut environment = operational.clone();
     environment.env.insert("DEMO".into(), "right".into());
-    assert_eq!(resume(&environment, json!({"reasoning_effort":"low"})), "right");
+    assert_eq!(restore(&environment, json!({"reasoning_effort":"low"})), "right");
     refused(n + 1);
 }
 
@@ -715,13 +719,13 @@ fn recovery_caches_skip_secret_environments_and_live_source_values() {
         }
         let enc = encoder();
         let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
-        rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+        rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
         let first = rt.run().unwrap();
-        assert!(first.agents[0].error.is_none());
-        assert!(!run.join("a/checkpoint.json").exists());
-        let second = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
-        assert!(second.agents[0].error.is_none());
-        assert_eq!(first.agents[0].state, second.agents[0].state);
+        assert!(first.instances[0].error.is_none());
+        assert!(!crate::shared::inst(&run, "a/checkpoint.json").exists());
+        let second = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
+        assert!(second.instances[0].error.is_none());
+        assert_eq!(first.instances[0].state, second.instances[0].state);
     }
 }
 
@@ -736,20 +740,20 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
     let fresh = |cfg: RuntimeConfig| {
         let mut rt = Runtime::new(cfg, enc.clone(), model());
         for id in ["a", "b"] {
-            rt.add_agent(AgentSpec::new(id, json!({}))).unwrap();
+            rt.add_instance(InstanceSpec::new(id, json!({}))).unwrap();
         }
         rt.run().unwrap()
     };
     fresh(cfg.clone());
-    let path = run.join("a/store.jsonl");
+    let path = crate::shared::inst(&run, "a/store.jsonl");
     std::fs::write(&path, b"{broken record}\n").unwrap();
-    let resumed = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let restored = Runtime::restore(cfg.clone(), enc.clone(), model())
         .unwrap()
         .run()
         .unwrap();
     assert!(
-        resumed
-            .agents
+        restored
+            .instances
             .iter()
             .find(|a| a.id == "a")
             .unwrap()
@@ -758,14 +762,14 @@ fn corrupt_stores_fail_only_their_instance_and_fresh_starts_archive_them() {
             .unwrap()
             .contains("store recovery failed")
     );
-    let b = resumed.agents.iter().find(|a| a.id == "b").unwrap();
+    let b = restored.instances.iter().find(|a| a.id == "b").unwrap();
     assert!(b.error.is_none());
     assert_eq!(b.state["__ui"]["@n"], 1);
     assert_eq!(std::fs::read(&path).unwrap(), b"{broken record}\n");
     let restarted = fresh(cfg);
-    assert!(restarted.agents.iter().all(|a| a.error.is_none()));
+    assert!(restarted.instances.iter().all(|a| a.error.is_none()));
     assert!(!path.exists());
-    assert!(run.join(".retired").is_dir());
+    assert!(run.join("retired").is_dir());
 }
 
 #[test]
@@ -786,27 +790,32 @@ export function Sender(){const [seen,setSeen]=useState([],'seen');
     cfg.dir = Some(run.clone());
     let enc = encoder();
     let mut rt = Runtime::new(cfg, enc, model());
-    let checkpoint = run.join("halt/checkpoint.json");
-    let observed = checkpoint.clone();
+    let observed = run.clone();
     rt.bind_machine(
         "home",
         Arc::new(move |_: &affordance::runtime::CallContext, _: &J| {
-            let image: J = serde_json::from_slice(&std::fs::read(&observed).map_err(|e| e.to_string())?)
+            let image = crate::shared::find_instance(&observed, "halt")
+                .ok_or("no instance halt")?
+                .join("checkpoint.json");
+            let image: J = serde_json::from_slice(&std::fs::read(&image).map_err(|e| e.to_string())?)
                 .map_err(|e| e.to_string())?;
             Ok(json!({"inputs":image["data"]["image"]["journaled"]}))
         }),
     );
     for (id, entry) in [("halt", "Halt"), ("sender", "Sender")] {
-        let mut spec = AgentSpec::new(id, json!({}));
+        let mut spec = InstanceSpec::new(id, json!({}));
         spec.entry = Some(entry.into());
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     let report = rt.run().unwrap();
-    assert!(report.agents.iter().all(|a| a.error.is_none()), "{report:?}");
-    let sender = report.agents.iter().find(|a| a.id == "sender").unwrap();
+    assert!(report.instances.iter().all(|a| a.error.is_none()), "{report:?}");
+    let sender = report.instances.iter().find(|a| a.id == "sender").unwrap();
     assert_eq!(sender.state["__ui"]["@seen"], json!([0, 0, 0]));
     assert_eq!(sender.metrics.handler_errors, 0);
-    let saved: J = serde_json::from_slice(&std::fs::read(checkpoint).unwrap()).unwrap();
+    let saved: J = serde_json::from_slice(
+        &std::fs::read(crate::shared::instance_dir(&run, "halt").join("checkpoint.json")).unwrap(),
+    )
+    .unwrap();
     assert_eq!(saved["data"]["image"]["journaled"], 3);
 }
 
@@ -820,15 +829,15 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
     cfg.max_wall = Some(Duration::from_millis(100));
     let enc = encoder();
     let mut first = Runtime::new(cfg.clone(), enc.clone(), model());
-    first.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    first.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let first_report = first.run().unwrap();
     assert!(
-        first_report.agents.iter().all(|a| a.error.is_none()),
+        first_report.instances.iter().all(|a| a.error.is_none()),
         "{first_report:?}"
     );
-    let child = cfg.dir.as_ref().unwrap().join("a/child/journal.jsonl");
-    let root = cfg.dir.as_ref().unwrap().join("a/journal.jsonl");
-    let mut last = first_report.agents.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
+    let child = crate::shared::inst(cfg.dir.as_ref().unwrap(), "a/child/journal.jsonl");
+    let root = crate::shared::inst(cfg.dir.as_ref().unwrap(), "a/journal.jsonl");
+    let mut last = first_report.instances.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
         .as_u64()
         .unwrap();
     for attempt in 0..3 {
@@ -845,12 +854,12 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
             .unwrap();
             f.sync_all().unwrap();
         }
-        let report = Runtime::resume(cfg.clone(), enc.clone(), model())
+        let report = Runtime::restore(cfg.clone(), enc.clone(), model())
             .unwrap()
             .run()
             .unwrap();
-        assert!(report.agents.iter().all(|a| a.error.is_none()), "{report:?}");
-        let n = report.agents.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
+        assert!(report.instances.iter().all(|a| a.error.is_none()), "{report:?}");
+        let n = report.instances.iter().find(|a| a.id == "a/child").unwrap().state["__ui"]["@n"]
             .as_u64()
             .unwrap();
         assert!(
@@ -870,10 +879,10 @@ fn root_and_child_journals_recover_repeatedly_before_new_appends() {
     bytes.extend_from_slice(b"{\"input\":\"result\"}");
     std::fs::write(&root, &bytes).unwrap();
     // A bad record is not torn: the agent's own restore refuses it, and its journal is kept.
-    let report = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
-    let a = report.agents.iter().find(|a| a.id == "a").unwrap();
+    let report = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
+    let a = report.instances.iter().find(|a| a.id == "a").unwrap();
     assert!(
-        a.error.as_deref().is_some_and(|e| e.contains("resume failed")),
+        a.error.as_deref().is_some_and(|e| e.contains("restore failed")),
         "{report:?}"
     );
     assert_eq!(std::fs::read(&root).unwrap(), bytes);
@@ -893,10 +902,10 @@ fn one_unreadable_journal_does_not_stop_the_fleet() {
     let enc = encoder();
     let mut first = Runtime::new(cfg.clone(), enc.clone(), model());
     for id in ["a", "b", "c"] {
-        first.add_agent(AgentSpec::new(id, json!({}))).unwrap();
+        first.add_instance(InstanceSpec::new(id, json!({}))).unwrap();
     }
-    assert!(first.run().unwrap().agents.iter().all(|a| a.error.is_none()));
-    let journal = dir.0.join("run/b/journal.jsonl");
+    assert!(first.run().unwrap().instances.iter().all(|a| a.error.is_none()));
+    let journal = crate::shared::inst(&dir.0, "run/b/journal.jsonl");
     std::fs::OpenOptions::new()
         .append(true)
         .open(&journal)
@@ -904,11 +913,11 @@ fn one_unreadable_journal_does_not_stop_the_fleet() {
         .write_all(b"{\"input\":\"unknown-variant\",\"clock_ms\":1}\n")
         .unwrap();
     let bytes = std::fs::read(&journal).unwrap();
-    let report = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
-    for agent in &report.agents {
+    let report = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
+    for agent in &report.instances {
         if agent.id == "b" {
             assert!(
-                agent.error.as_deref().is_some_and(|e| e.contains("resume failed")),
+                agent.error.as_deref().is_some_and(|e| e.contains("restore failed")),
                 "{report:?}"
             );
         } else {
@@ -919,7 +928,7 @@ fn one_unreadable_journal_does_not_stop_the_fleet() {
     assert_eq!(std::fs::read(&journal).unwrap(), bytes);
 }
 
-/// One runtime owns a run directory: a second one over it (a resume, or a fresh run) is refused
+/// One runtime owns a run directory: a second one over it (a restore, or a fresh run) is refused
 /// before it recovers anything, and the first runs on unaffected. The lock goes with its owner.
 #[test]
 fn a_second_runtime_cannot_take_a_live_run_directory() {
@@ -930,21 +939,21 @@ fn a_second_runtime_cannot_take_a_live_run_directory() {
     cfg.max_wall = Some(Duration::from_millis(600));
     let enc = encoder();
     let mut first = Runtime::new(cfg.clone(), enc.clone(), model());
-    first.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    first.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     let running = std::thread::spawn(move || first.run());
-    let journal = dir.0.join("run/a/journal.jsonl");
-    while std::fs::metadata(&journal).map_or(true, |m| m.len() == 0) {
+    let journal = || crate::shared::find_instance(&dir.0.join("run"), "a").map(|d| d.join("journal.jsonl"));
+    while journal().is_none_or(|j| std::fs::metadata(j).map_or(true, |m| m.len() == 0)) {
         std::thread::sleep(Duration::from_millis(5));
     }
-    let err = Runtime::resume(cfg.clone(), enc.clone(), model())
+    let err = Runtime::restore(cfg.clone(), enc.clone(), model())
         .err()
-        .expect("a resume over a live directory must fail");
+        .expect("a restore over a live directory must fail");
     assert!(
         err.contains("in use by another runtime") && err.contains(&cfg.dir.as_ref().unwrap().display().to_string()),
         "{err}"
     );
     let mut fresh = Runtime::new(cfg.clone(), enc.clone(), model());
-    fresh.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    fresh.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     assert!(
         fresh
             .run()
@@ -952,12 +961,12 @@ fn a_second_runtime_cannot_take_a_live_run_directory() {
             .is_some_and(|e| e.contains("in use by another runtime"))
     );
     let report = running.join().unwrap().unwrap();
-    assert!(report.agents.iter().all(|a| a.error.is_none()), "{report:?}");
-    let n = report.agents[0].state["__ui"]["@n"].as_u64().unwrap();
-    let resumed = Runtime::resume(cfg, enc, model()).unwrap().run().unwrap();
+    assert!(report.instances.iter().all(|a| a.error.is_none()), "{report:?}");
+    let n = report.instances[0].state["__ui"]["@n"].as_u64().unwrap();
+    let restored = Runtime::restore(cfg, enc, model()).unwrap().run().unwrap();
     assert!(
-        resumed.agents[0].error.is_none() && resumed.agents[0].state["__ui"]["@n"].as_u64().unwrap() > n,
-        "{resumed:?}"
+        restored.instances[0].error.is_none() && restored.instances[0].state["__ui"]["@n"].as_u64().unwrap() > n,
+        "{restored:?}"
     );
 }
 
@@ -966,11 +975,11 @@ fn inspection_grants_are_independent_of_other_api_capabilities() {
     let dir = Scratch::new();
     let app=dir.app("export default function Main(){useEffect(()=>{(async()=>{try{await harness.inspect('*');harness.stop('allowed');}catch(e){harness.stop(e.message);}})()},[]);return 'reader';}");
     let mut rt = Runtime::new(config(&app), encoder(), model());
-    let mut spec = AgentSpec::new("reader", json!({}));
+    let mut spec = InstanceSpec::new("reader", json!({}));
     spec.inspect = vec!["*".into()];
     spec.capabilities = Some(vec!["store.*".into()]);
-    rt.add_agent(spec).unwrap();
-    assert_eq!(rt.run().unwrap().agents[0].stopped, Some(json!("allowed")));
+    rt.add_instance(spec).unwrap();
+    assert_eq!(rt.run().unwrap().instances[0].stopped, Some(json!("allowed")));
 }
 
 // Counts this process's threads in `/proc`.
@@ -1004,7 +1013,7 @@ fn completed_runtimes_release_their_background_threads() {
             cfg.max_wall = Some(Duration::from_millis(30));
         }
         let mut rt = Runtime::new(cfg, enc.clone(), model());
-        rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+        rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
         rt.run().unwrap();
     }
     for _ in 0..100 {
@@ -1016,24 +1025,34 @@ fn completed_runtimes_release_their_background_threads() {
     assert!(threads() <= before, "threads before={before}, after={}", threads());
 }
 
+/// A saved name is only a name: it never becomes a path (instances live under ids the runtime
+/// assigned), and one that is not a valid name is refused on restore, with nothing written outside
+/// the run.
 #[test]
-fn resume_rejects_a_saved_identity_that_escapes_its_directory() {
+fn restore_refuses_a_saved_name_that_is_not_a_name() {
     let dir = Scratch::new();
     let app = dir.app("export default function Main(){return 'idle';}");
     let mut cfg = config(&app);
     cfg.dir = Some(dir.0.join("run"));
     let enc = encoder();
     let mut rt = Runtime::new(cfg.clone(), enc.clone(), model());
-    rt.add_agent(AgentSpec::new("a", json!({}))).unwrap();
+    rt.add_instance(InstanceSpec::new("a", json!({}))).unwrap();
     rt.run().unwrap();
-    let path = dir.0.join("run/a/agent.json");
+    let path = crate::shared::inst(&dir.0, "run/a/instance.json");
     let mut saved: J = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-    saved["id"] = json!("../outside");
+    saved["id"] = json!("..");
     std::fs::write(&path, saved.to_string()).unwrap();
-    let err = Runtime::resume(cfg, enc, model())
+    let err = Runtime::restore(cfg, enc, model())
         .err()
-        .expect("invalid saved identity must fail");
-    assert!(err.contains("does not match its directory"), "{err}");
+        .expect("an invalid saved name must fail");
+    assert!(err.contains("is not a name"), "{err}");
+    let mut beside: Vec<String> = std::fs::read_dir(&dir.0)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    beside.sort();
+    assert_eq!(beside, ["app.tsx", "run"], "nothing was written outside the run");
 }
 
 #[test]
@@ -1047,7 +1066,7 @@ export default function Main() {
  useEffect(()=>{(async()=>{
   await harness.wait({ms:30}); const first=await harness.inspect('a/kid',{select:['n']});
   setPhase(1); await harness.wait({ms:30}); setPhase(2); await harness.wait({ms:30});
-  const second=await harness.inspect('a/kid',{select:['n'],since:first.since}); setSeen(second.agents['a/kid']);
+  const second=await harness.inspect('a/kid',{select:['n'],since:first.since}); setSeen(second.instances['a/kid']);
  })()},[]);
  return phase===1?'off':<Mount key="kid"><Kid initial={phase===0?1:2}/></Mount>;
 }
@@ -1056,11 +1075,11 @@ export default function Main() {
     let mut cfg = config(&app);
     cfg.dir = Some(dir.0.join("run"));
     let mut rt = Runtime::new(cfg, encoder(), model());
-    let mut spec = AgentSpec::new("a", json!({}));
+    let mut spec = InstanceSpec::new("a", json!({}));
     spec.inspect = vec!["a/kid".into()];
-    rt.add_agent(spec).unwrap();
+    rt.add_instance(spec).unwrap();
     let report = rt.run().unwrap();
-    let parent = report.agents.iter().find(|a| a.id == "a").unwrap();
+    let parent = report.instances.iter().find(|a| a.id == "a").unwrap();
     let seen = &parent.state["__ui"]["@seen"];
     assert_eq!(seen["version"], 0, "both incarnations have empty journals");
     assert_eq!(seen["changed"], true);

@@ -18,7 +18,7 @@ It defines no app-specific tool vocabulary, state schema, template tokens or fol
 
 ```sh
 affordance run              # the deployment in affordance.yaml (here or in a parent directory)
-affordance run --resume     # continue from its journals
+affordance run --restore     # continue from its journals
 affordance config           # print the deployment a run would use
 ```
 
@@ -40,8 +40,8 @@ deployment is valid YAML too); unknown keys are errors.
   `dir`, and local machines' homes. Paths given on the command line are relative to the current
   directory, so a deployment runs the same from anywhere.
 - **The journal directory** is `dir`, by default `.affordance/` beside the file. A run that
-  finds an earlier run there stops and asks for `--resume` (continue it) or `--fresh` (start over;
-  the earlier run's files move under `.retired/`).
+  finds an earlier run there stops and asks for `--restore` (continue it) or `--fresh` (start over;
+  the earlier run's instances move under `retired/`).
 - **`affordance config`** prints the resolved deployment (same arguments as `run`), with the
   values of `secrets` hidden.
 
@@ -62,7 +62,7 @@ export default function Main({ task }) {
   /** Replace your notes. */
   function set_notes({text}: {text: string}) { setNotes(text); return "saved"; }
   const app = <>
-    <box label="status">{`${harness.agent} | notes: ${notes}\n`}</box>
+    <box label="status">{`${harness.instance} | notes: ${notes}\n`}</box>
     <Tool fn={shell}>{"[shell]"}</Tool>
     <Tool fn={set_notes}>{" [set_notes]\n"}</Tool>
     <aff event="message" onCallback={async ({ from, text }) => {
@@ -93,7 +93,7 @@ The contract:
 | The model | The app calls it: `model(view?, opts)` sends the page's own view (or an element) and resolves with the output; `dispatch(output)` runs its calls on the view the model saw. `log.step()` does both and writes the records. `views/lib/loop.tsx` has the common loops: `useLoop(log, {before?})` (ask, act, repeat: an autonomous agent) and `useConversation(log)` (answer whatever is unanswered: a chat). The runtime never calls the model on its own. |
 | Effects | In a task: `await harness.machine.call(args)`, `harness.store.*`, `harness.send`, `harness.wait`, `model`, `dispatch`, ... (below); `Promise.all([...])` runs several concurrently. `harness.now()`, `harness.random()` and `harness.stop(value)` are also available. `useEffect(setup, deps)` runs `setup` after a render whose deps changed (by `Object.is`, as in React). |
 | Events | `useEvent("message", listener)` (or `<aff event="message" onCallback={...}/>`, zero tokens). A listener runs when its event arrives, even while tools wait. |
-| Context window | Layout's: the binding's `context` (the model's context length, which a native binding's server reports when the runtime validates it; configured, it may only lower that; `"none"` opts out; logged per binding and in `observed.json` `models`) less `max_new` is every prompt's window; sheets cap boxes in it (`history { max-tokens: 75win; overflow: drop-start; drop-step: 25% }`, `result { ... clip-middle }`), and a prompt that does not fit is never sent (`ContextError`). An app that summarizes reacts to `useEvent("layout")`. `max_prompt` stays as a hard ceiling. |
+| Context window | Layout's: the binding's `context` (the model's context length, which a native binding's server reports when the runtime validates it; configured, it may only lower that; `"none"` opts out; logged per binding and in the run status's `models`) less `max_new` is every prompt's window; sheets cap boxes in it (`history { max-tokens: 75win; overflow: drop-start; drop-step: 25% }`, `result { ... clip-middle }`), and a prompt that does not fit is never sent (`ContextError`). An app that summarizes reacts to `useEvent("layout")`. `max_prompt` stays as a hard ceiling. |
 | Reading replies | The template adapter's `protocol` span: the syntax, the stop tokens, and whether the prompt ends inside thinking. Every stock template app declares it: GLM53App (`glm`), Qwen3App and Qwen3BaseApp (`hermes`), Qwen36App, MiMo25App and Nemotron3App (`xml`), Llama31App (`llama31`). Parsers exist for every rendered family (`docs/REPLY_PARSING.md`). |
 | Language | TypeScript/JSX with JavaScript semantics (`spec/LANGUAGE.md` §7), in apps and template adapters alike. |
 
@@ -113,8 +113,8 @@ For a fleet with bursty messages, set deployment `"input_batch": 64` and use
 `harness.send(memberIds, payload)` for one durable multicast result. A hub that is a top-level
 spec can set `"dedicated_worker": true`; its descendants share the isolated worker. The
 shared `workers` pool remains available to other roots. Channels and membership stay app code.
-Batching is opt-in because listeners keep one frame's captures; use functional state updates
-when combining multiple events. Details and replay rules are in [HARNESS.md §3](../spec/HARNESS.md#3-the-loop).
+Batching groups journal writes only: each event still takes its own turn, so an app computes the
+same with or without it. Details and replay rules are in [HARNESS.md §3](../spec/HARNESS.md#3-the-loop).
 
 The runtime keeps no conversation. `useLog()` keeps one
 in app state, writing records from `model()`'s output and `dispatch()`'s results:
@@ -163,7 +163,7 @@ tool call is never run.
 | `harness.machine.call(args)` | executor-specific JSON | The agent's first machine (below). Shell executors take `{cmd, timeout_s?, env?, stdin?}` and return `{output, exit, seconds, timed_out, truncated}`. `harness.machine.get(role).call(args)` picks a named executor. |
 | `model(opts?)` | an output: `{text, reasoning, calls, problems, cut_off, ids, screen, usage}` | the agent's model: the page's own view, laid out once, at the call. |
 | `model(<App .../>, opts?)` | an output (no `screen`; not dispatchable) | the agent's model, through the harness: the component is laid out to exact ids and run once; its `protocol` span reads the reply. |
-| `dispatch(output)` | `[{name, id, result, error?, ...meta}]` | agent: runs a page output's calls on the view the model saw, concurrently; results in call order. |
+| `dispatch(output, {calls?})` | `[{name, id, result, error?, ...meta}]` | agent: runs a page output's calls (or those at the indices in `calls`) on the view the model saw; each call runs once, and a later dispatch of it gives its result again. `log.dispatch(out, {order, stop_on_error})` runs them one after another by default. |
 | `harness.send(to, payload, {event?})` | `{to, delivered}` | runtime: event `message` (or `event`) to agent `to`, with `payload.from` set by the runtime. |
 | `harness.wait({ms?, events?})` | `{woke: "timeout"}` or `{woke: "event", event, payload}` | agent: parks the handler (no model calls) until `ms` passes or an event in `events` arrives. |
 | `harness.store.put/get/search/list(args)` | `{key}`; `{text, total}`; `{hits}`; `{keys}` | runtime: per-agent storage (persisted with `dir`). |
@@ -178,15 +178,17 @@ machine.
 
 | Kind | Config | Runs |
 |---|---|---|
-| `local` | (none) | `bash` on this host, with only the agent's environ. |
+| `local` | `home?`, `per_instance?` | `bash` on this host, with only the agent's environ, in `home` when given (with `per_instance`, each instance its own directory under it, `home/<instance id>`). |
 | `ssh` | `target`, `key?`, `control_dir?`, `known_hosts?` | `bash` on a VM over a shared SSH connection. A host's key is accepted the first time it is seen and checked from then on. The known-hosts file and the connection sockets are kept in `~/.config/affordance/ssh`, which only this user can enter, unless the deployment names other places. |
-| `docker` | `image`, `name?` (default `aff-{agent}`) | `bash` in a container per agent, started on first use and kept. |
-| `bwrap` | `home`, `network?` (default false), `read?` | `bash` in a bubblewrap sandbox. The command sees the system's programs and libraries read-only (`/usr`, `/bin`, `/sbin`, `/lib*`, `/etc`, `/opt`), its `home` writable and a private /tmp. No other file on the host is there for it: not a home directory, not mounted data. `read` lists more paths to show read-only. Linux, where the kernel lets an ordinary user make a sandbox. |
+| `docker` | `image`, `name?` (default `aff`) | `bash` in a container per instance, `<name>-<instance id>`, started on first use and kept. |
+| `bwrap` | `home`, `per_instance?`, `network?` (default false), `read?` | `bash` in a bubblewrap sandbox. The command sees the system's programs and libraries read-only (`/usr`, `/bin`, `/sbin`, `/lib*`, `/etc`, `/opt`), its `home` writable and a private /tmp. No other file on the host is there for it: not a home directory, not mounted data. `read` lists more paths to show read-only. Linux, where the kernel lets an ordinary user make a sandbox. |
 | `command` | `argv` | An external executor: JSON requests on stdin, JSON responses on stdout. |
 | `http` | `url`, `headers?`, `timeout_ms?`, byte limits | HTTP requests on a bound origin. Grant the role `http` for global `fetch(input, init)`. See [Fetch and MCP](HTTP_AND_MCP.md). |
 
-`{n}` (the agent's index) and `{id}` in a machine's config make one machine per agent. An agent
-spec's `machines` lists the roles it is bound to; without it, every deployment machine.
+An instance's place on a machine is named by the id the runtime gave it, never by its name. An
+instance's `machines` lists the roles it is bound to; without it, every deployment machine. A
+pool, `"vm-{n:03}": {..., count: 512}`, binds the roles `vm-000` to `vm-511`, with `{n}` (the
+member's number) filled in each member's fields; a root app hands them out (`<Mount machine>`).
 
 ## Folding (context policy in the app)
 
@@ -231,7 +233,7 @@ agent's own `env`. The runtime process's real environment is never visible.
 - An app may read its secrets and use them, the way a page reads its cookies. Showing a secret to
   the model is the app's choice.
 - Values of keys listed in `secrets` are redacted (`[secret:KEY]`) in `trace.jsonl` and
-  `agent.json`, as values (a PEM key with newlines and quotes is found). On resume they come
+  `instance.json`, as values (a PEM key with newlines and quotes is found). On restore they come
   from the config again. A secret under 4 bytes is refused: it cannot be told from text.
 - `journal.jsonl` stores inputs verbatim (replay needs them). Treat it as sensitive.
 - The runtime's own credentials (SSH keys, endpoints, API keys) are machine and model
@@ -241,9 +243,10 @@ agent's own `env`. The runtime process's real environment is never visible.
 
 `affordance run`, or `Runtime` from Rust. The contract is `spec/HARNESS.md`; this section is how
 to run it.
-- **A root app or a list.** `{"root": {"app": "fleet.tsx", "props": {...}}}` runs a root app that
-  mounts the rest (`views/demo/tree/fleet.tsx` mounts one agent per machine of a pool);
-  `{"app": {...}, "agents": ...}` runs one app as a list of agents.
+- **The instances.** `instances` lists them: `[{"id": "root", "app": "fleet.tsx", "props": {...}}]`
+  runs a root app that mounts the rest (`views/demo/tree/fleet.tsx` mounts one agent per machine
+  of a pool), and `[{"id": "a"}, {"id": "b"}]` runs the deployment's `app` twice. An entry with
+  `count: N` is N copies, `<id>-0` to `<id>-(N-1)`, with the same fields.
 - **Where apps import from.** An app's own directory (and below), and the library, which
   `@affordance/...` imports name: `library` in the deployment; else the library checkout the app
   lives in (the nearest directory above it holding `index.json`, or a checkout's `views/`); else
@@ -280,7 +283,8 @@ to run it.
   See [the configuration contract](../spec/HARNESS.md#6-models) and
   [multi-binding examples, sessions and recovery](MODEL_BINDINGS.md).
 - **Files in the journal directory (`dir`):**
-  - `<dir>/<agent>/agent.json`: its spec;
+  - `<dir>/instances/<id>/instance.json`: its name and spec (each instance lives under an id the
+    runtime assigned, never under its name);
   - `journal.jsonl`: every input, appended before it takes effect (durable at the next
     commit, below);
   - `trace.jsonl`: renders with prompt size, append check and render time; replies with
@@ -292,7 +296,7 @@ to run it.
   - `<dir>/blobs/<sha256>`: large strings (below);
   - `<dir>/commit.jsonl`: the journals' commits (below);
   - `<dir>/runtime.lock`: locked by the one runtime that owns the directory. A second runtime
-    over it (`--resume` or a fresh run) fails before it recovers anything; a crash releases it.
+    over it (`--restore` or a fresh run) fails before it recovers anything; a crash releases it.
 - **Large strings live on disk.** With `dir`, a string of at least `spill_bytes` (default 64 KiB)
   is written once to `<dir>/blobs/<sha256>` and travels through state, journal,
   store and commands as a short reference. The app sees an ordinary string: the language reads
@@ -308,29 +312,29 @@ to run it.
   length to `commit.jsonl`. It commits as soon as something waits on a commit or a worker has
   nothing queued, and otherwise at most 2 ms after the first line it covers. Whatever leaves the
   process waits for the commit of the input that caused it: model requests, machine calls,
-  control receipts, and `observed.json`. A `harness.send` to another instance, timers, the
+  and the answer to an embedder's post. A `harness.send` to another instance, timers, the
   instance tree and `store.*` operations do not wait. Store records and blob files are written
   without a sync too. A commit syncs them with the journals, before the record that commits
   any line referring to them, and the commit records each store's length beside its journal's. A model-free round trip between two instances costs a fraction of a millisecond instead
   of four disk syncs. This is the browser's IndexedDB with relaxed durability: a transaction
   completes before it reaches the disk, and the platform flushes in the background. Here,
   though, nothing outside the process sees a result before it is durable.
-- **A crash resumes from the last commit.** Resume first truncates every journal and store to
+- **A crash restores from the last commit.** A restore first truncates every journal and store to
   the last committed length (bytes past it are kept in `uncommitted-journal-<offset>.bin` or
   `uncommitted-store-<offset>.bin`). A file the commit does not name for its instance's
   incarnation is emptied. A blob a committed line refers to was synced by that commit. A blob
   file a crash left without its content is rewritten when its text is next stored: a put checks
   an existing file's content once per process before reusing it. A line is written only after
   every line that caused it, in any journal, so a commit never holds a delivery without the
-  send that caused it, nor a sender's acknowledgement without the delivery. The run resumes in
+  send that caused it, nor a sender's acknowledgement without the delivery. The run restores in
   a state it passed through. The work after the last commit (a few milliseconds of in-process
   work) is computed again, and nothing outside the process saw it. A recovery image taken after
   the last commit is ignored, and that agent replays its journal in full. A clean shutdown
-  commits everything and closes the log, so the next resume truncates nothing. Only the log's
+  commits everything and closes the log, so the next restore truncates nothing. Only the log's
   last line may be torn: a bad line before it is damage, not an older commit, and recovery
   refuses it (naming its byte offset) rather than cut every journal back. Each truncation is
   printed with the instance id and byte counts.
-- **Resume.** `--resume` rebuilds every agent from its journal (same renders, same state) and
+- **Restore.** `--restore` rebuilds every agent from its journal (same renders, same state) and
   resubmits its outstanding work. External work in flight at the crash is submitted again, so
   machine commands with durable side effects should deduplicate by agent and task id.
 
@@ -346,13 +350,12 @@ model:
   ranks: 8
   sampling: {temperature: 0.6}
 machines:
-  home: {kind: ssh, target: "agent@10.0.1.{n}", key: keys/agent_ed25519, timeout_s: 60}
-agents:
-  count: 512
-  id: "agent-{n:04}"
-  max_new: 4096
-  max_turns: 300
-  props: {id: "{id}", n_agents: 512, task: "...", c_hi: 48000, c_lo: 20000}
+  "vm-{n:03}": {kind: ssh, target: "agent@10.0.1.{n}", key: keys/agent_ed25519, timeout_s: 60, count: 512}
+instances:
+  - id: root
+    app: fleet.tsx            # mounts one session per machine of the pool, as views/demo/tree/fleet.tsx does
+    max_new: 4096
+    props: {task: "...", c_hi: 48000, c_lo: 20000}
 env: {SUB_MODEL_KEY: "${SUB_MODEL_KEY}"}
 secrets: [SUB_MODEL_KEY]
 workers: 8
@@ -361,7 +364,7 @@ exec_threads: 1024
 max_wall_s: 86400
 ```
 
-`{n}` and `{id}` are filled per agent in agent fields and machine configs: one VM per agent.
+The pool binds 512 roles, one VM each; the root app gives each mounted session its own.
 
 `ranks` is the model server's data-parallel size: each agent is pinned to one rank, so its prefix
 stays in one engine's cache (`sglang`: `routed_dp_rank`; `completions`, vLLM: the
@@ -369,9 +372,9 @@ stays in one engine's cache (`sglang`: `routed_dp_rank`; `completions`, vLLM: th
 its engines and most of each prompt is prefilled again.
 
 The Rust API: `Runtime::new(config, Arc<Encoder>, Arc<dyn Model>)` (the `default` model), then
-`.bind_model(name, enc, model)` and `.bind_machine(role, machine)`, then `.add_agent(spec)` or
-`Runtime::resume`, then `.run() -> Report`.
-`runtime::Agent` is the single-agent core with no I/O (`start`, `handle(input) -> commands`,
+`.bind_model(name, enc, model)` and `.bind_machine(role, machine)`, then `.add_instance(spec)` or
+`Runtime::restore`, then `.run() -> Report`.
+`runtime::Instance` is one instance's core with no I/O (`start`, `handle(input) -> commands`,
 `restore(journal)`), for custom hosts and tests. Its one exception: with `set_blobs`, it writes
 large strings as content-addressed blob files (idempotent, so replay is unchanged).
 
@@ -401,9 +404,11 @@ timeout_s}` in the deployment), and keeps running.
   piece substituted (escaped as the inside of a JSON string) for the placeholder; a kind with
   no frame is not written. The platform writes the chunks: no app code runs for a piece, nothing
   of a piece is journaled, and the call resolves with the same whole reply as without a pipe. On
-  a replay nothing is written. A sink that fails (the client went away) closes the pipe; the
-  model call goes on unless its `signal` stops it. Pieces come from a hosted binding's stream;
-  a native binding's reply is not piped yet.
+  a replay nothing is written. A sink that fails (the client went away), or falls more than 1024
+  pieces behind, closes the pipe; the model call goes on unless its `signal` stops it, and no
+  model call ever waits on a sink. The call resolves after every piece written has reached the
+  sink, so what the app writes next comes after them. A hosted binding's pieces are its stream's;
+  a native binding's are its new token ids, decoded with its tokenizer.
 
 `views/lib/http_server.tsx` gives an app `useRequests(async (req, res) => ...)` with `res.json`,
 `res.text` and `res.stream` (whose `out.pipe(frames)` makes the `pipe` option, with `PIECE` as the
@@ -412,7 +417,7 @@ placeholder); `views/lib/openai_server.tsx` builds an OpenAI-compatible
 call, so the reply streams as it is generated) and `/v1/models` on it. `views/demo/memory_server` is a
 chat model with a memory longer than its context behind that endpoint, and `views/demo/serve` the
 smallest served app. An embedding program posts its own events into a running runtime with
-`Runtime::inbox()`.
+`Control::post` (see "Controlling a run").
 
 ## Driving an app from a frontend
 
@@ -420,32 +425,33 @@ smallest served app. An embedding program posts its own events into a running ru
 one JSON object a line, as a browser's DevTools protocol drives a page. It takes `run`'s options
 and keeps running; stdout carries only the protocol (the summary goes to stderr).
 
-- **In** (stdin): `{"type": "prompt", "text"}` posts the event `user` (`{text}`) to the first
-  instance; `{"type": "abort"}` posts the event `abort`; `{"type": "history"}` posts the event `history`;
-  `{"type": "event", "name", "payload"}` posts any event; `{"type": "answer", "request", "value"}` answers a question;
-  `{"type": "shutdown"}`, or the end of stdin, ends the run (`--resume` continues it).
-- **Out** (stdout): `ready {agent}`; `delta {agent, task, text, reasoning?}` (or `delta {agent, task, call: {index, id?, name?, arguments}}`,
+- **In** (stdin): the control protocol (see "Controlling a run"): `{"type": "event", "name",
+  "payload"}` posts an event to the first instance (or to `target`), and `close`, `status`,
+  `set_model_limit` and `subscribe` work as there; `{"type": "answer", "request", "value"}`
+  answers a question. The end of stdin closes the run (`--restore` continues it).
+- **Out** (stdout): `ready {instance}` once the agents are running; `delta {instance, task, text, reasoning?}` (or `delta {instance, task, call: {index, id?, name?, arguments}}`,
   more of a hosted reply's tool call: its place in the reply, its id and name when they arrive, and more of
   its arguments' JSON text), a model's reply as it
-  is generated; `output {agent, task, text}`, a command's output as it is written;
-  `trace {agent, record}`, the trace records (renders, replies, each model call's `generate`
+  is generated; `output {instance, task, text}`, a command's output as it is written;
+  `trace {instance, record}`, the trace records (renders, replies, each model call's `generate`
   statistics such as `first_token_ms` and `tokens_per_s`, finished tools, handler errors, the
   app's `console` lines);
-  `ui {agent, value}` and `question {agent, request, ...}`; `error {message}`; `exit {error?}`.
+  `ui {instance, value}` and `question {instance, request, ...}`; answers to requests that had an `id`
+  (`result {id, value}`, `error {id, message}`), and `error {message}` for a failed one without;
+  `exit {error?}`.
 - **The machine `ui` is the frontend.** A call with `ask` (`{ask: {kind: "permission", ...}}`)
   becomes a `question`, and waits for the frontend's `answer`, whose value it returns; any other
   call is shown as `ui` and returns null at once. What to ask, and when, is the app's.
 
 The deltas and output are what the observer sees (`RuntimeConfig.observer`); they are never
-journaled. Prompts, aborts and answers are: a prompt and an abort are events, an answer is the
-`ui` call's result.
+journaled. Events and answers are: an event is an input, an answer is the `ui` call's result.
 
 `views/lib/frontend.tsx` is the chat loop: `useFrontend(log)` answers each `user` message, runs
 the model's calls until it replies without one, and aborts the turn in progress on `abort`.
 It tells the frontend what it is doing as `ui` values: `{state: "working" | "idle"}`,
 `{calls: [{id, name, args}]}` as the model's tool calls start, `{results: [...]}` when they end,
 and, in answer to the event `history`, `{history: [...]}`: the conversation so far, for a frontend
-that connects to a resumed run. These are the app's own messages, not the protocol's: another app
+that connects to a restored run. These are the app's own messages, not the protocol's: another app
 tells its frontend whatever it likes.
 Through `turn.signal`, a tool's command stops with it. `ask(question)` asks the frontend.
 `views/tools/files.tsx` has `read`, `write` and `edit` tools over a machine's shell.
@@ -453,10 +459,10 @@ Through `turn.signal`, a tool's command stops with it. `ask(question)` asks the 
 
 ```sh
 cd views/demo/host && affordance host --set model.url=http://127.0.0.1:8080/v1
-{"type":"prompt","text":"What is in this directory?"}
+{"type":"event","name":"user","payload":{"text":"What is in this directory?"}}
 ```
 
-An embedding program does the same with `Runtime::inbox()` (`post`, and `close` to end the run),
+An embedding program does the same with `Runtime::control()` (`post`, and `close` to end the run),
 `Runtime::observe`, and a machine of its own.
 
 **As another harness's model layer.** A harness that keeps its own loop, tools and sessions can use
@@ -467,23 +473,44 @@ the conversation through the bound model's template, calls the model and answers
 as `delta` events, and the event `abort` (`{id}`) stops a call. The tools are declared for the model
 and never run here: the caller runs them. Nothing of the app's own is added to the conversation.
 
-## Staying up and draining
+## Controlling a run
 
-`affordance run --keep-running` (or `keep_running: true`; `RuntimeConfig.serve` in Rust) keeps the run up while
-instances are idle, a chat waiting for its user for example, and keeps reading the control
-inbox. The run then ends when every instance stops, at `max_wall`, or on a pause. Without it (the
-default, for batches) the run returns once nothing is in flight and no instance waits on
-anything. `observed.json` reports an instance with nothing outstanding as `idle`. A control-inbox
-file may name its event (`"event": "ping"`, default `message`), and so may a send:
+A program outside the run controls it the way a browser's embedder controls a page: through one
+handle, over whichever channel it has. It never writes files into the run directory.
+
+| Operation | What it does |
+|---|---|
+| `event {target?, name, payload?, key?}` | Posts an event, as `postMessage` does. The answer comes once the target's journal line is committed, or says why the event was not delivered (no such instance, the run is closing). With a `key`, a second post of the same key is journaled but not taken again, so a controller can post again after a lost answer or a restore. |
+| `close {timeout_ms?}` | Closes the run. The clock stops and no new model or machine call starts. Calls still running get `timeout_ms` to finish (default 0), then are cancelled. The journals are committed and the run can be restored with `--restore`. |
+| `status` | The run's `state` (`starting`, `running`, `closing`, `closed`), its `clock_ms`, each agent's state, the model bindings' windows, and the model queue. |
+| `set_model_limit {limit}` | How many model calls may run at once. 0 holds every model call while the rest of the run goes on. |
+| `subscribe {streams: ["status"]}` | Pushes `{type: "status", value}` each time the status changes. |
+
+The same operations are available four ways:
+
+- **In Rust:** `Runtime::control()` returns a `Control` before the run starts. It has `post` (whose `Delivery` you can `wait` on), `close`, `set_model_limit` and `status`. `Runtime::run` returns a `Report` whose `ended` says how the run ended: `stopped`, `idle`, `closed`, `max_wall` or `worker_lost`.
+- **Over stdio:** through `affordance host` (above).
+- **Over a Unix socket:** for a run started on its own, with `affordance run|serve|host --control PATH`. The protocol is the same JSON lines. A request with an `id` is answered `{type: "result", id, value}` or `{type: "error", id, message}`. Several controllers may connect, and one that disconnects leaves the run as it is. The socket is the user's alone, and it is removed when the run ends, after telling each client `{type: "exit", ended}`.
+- **With signals:** SIGINT (Ctrl-C) and SIGTERM close the run with 30 seconds for running calls. A second signal closes it at once.
+
+`affordance run --keep-running` (or `keep_running: true`; `RuntimeConfig.serve` in Rust) keeps the
+run up while instances are idle, a chat waiting for its user for example. It then ends when every
+instance stops, at `max_wall`, or when it is closed. Without it (the default, for batches) the run
+returns once nothing is in flight and no instance waits on anything. The status reports an
+instance with nothing outstanding as `idle`. A send may name its event too:
 `harness.send(to, payload, {event: "ping"})`.
 
-Workers give local completions, due timers and incoming/control messages a turn between
-atomic inputs. During draining, newly requested model and host calls remain outstanding
-instead of starting more work. A resumed run reissues them from the journal. Calls already
-running retain the selected pause mode's completion/cancellation behavior. A model or machine
-call that the host cancels (an immediate or fast pause, the run ending) is not recorded as a
-failure: nothing is journaled for it, it stays outstanding, and a resumed run issues it again.
-A call the app cancels, or one whose instance is unmounted, is recorded as before.
+Every end goes through closing:
+- every instance stopped,
+- a batch with nothing left,
+- `max_wall` (no time for running calls),
+- a lost render worker,
+- `close`.
+
+While the run closes:
+- **New calls do not start.** Model and machine calls that instances ask for stay outstanding in their journals, and a restored run issues them.
+- **Calls that the host cancels are not failures.** Calls still running when the timeout passes are cancelled by the host. Nothing is journaled for them, and a restored run issues them again. A call the app cancels, or one whose instance is unmounted, is recorded as before.
+- **The clock stands still.** It stays at the moment closing began, so a timer neither fires nor loses time while running calls finish, and a restore continues each timer with what it had left. The clock also stands still while a run's agents restore, so a slow restore takes no time from them.
 
 Errors never name a model server's address: transport failures say the binding and endpoint
 (`sglang /generate: the server closed the connection without a response`), and a hosted
@@ -493,19 +520,15 @@ configuration, not in journals, traces, captures or what an app sees.
 An instance's failure is its own, as a crashed tab's is. An error or a panic in its own code
 (loading its app, starting, replaying its journal, handling an input) fails that instance alone:
 it is reported with the error, never run or imaged again, and its worker serves the others. A
-resume replays the same journal and fails it the same way. A render worker that dies outside
-its instances' code ends the run at once: its instances are reported failed, the others paused
-for a resume.
+restore replays the same journal and fails it the same way. A render worker that dies outside
+its instances' code ends the run at once: its instances are reported failed, the others can be
+restored.
 
-A drain does not wait behind queued inputs that will be issued again on resume. A queued
-`harness.send` delivery is not applied: the receiver does not journal it and the sender gets no
-answer (not `delivered: false`), so the send stays outstanding in the sender's journal and the
-resumed run delivers it. A queued control-inbox message is not applied either: with no receipt,
-it is posted again on resume. Everything else still queued (model and machine completions,
-timers, mounts, props, callbacks) is applied as before. A multicast send whose delivery reached
-some targets before the pause stays pending and is resent to all of them on resume; a target
-that already journaled it journals the copy but does not take it twice (its `_msg` id), the same
-at-least-once delivery as after a crash. This is a page being unloaded: its queued messages are
+Closing does not wait behind queued deliveries that will be issued again on restore.
+- **A queued `harness.send` is not applied.** The receiver does not journal it and the sender gets no answer (not `delivered: false`), so the send stays outstanding in the sender's journal and the restored run delivers it.
+- **A queued post is answered that the run is closing,** so the controller posts it again after the restore.
+- **Everything else still queued is applied as before:** model and machine completions, timers, mounts, props, callbacks.
+- **A multicast send that reached some targets before closing stays pending.** It is resent to all of them on restore. A target that already journaled it journals the copy but does not take it twice (its delivery id), the same at-least-once delivery as after a crash. This is a page being unloaded: its queued messages are
 not delivered, and the sender's request stays pending and is retried.
 
 ## Cancellation and streaming

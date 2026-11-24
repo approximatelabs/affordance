@@ -207,18 +207,20 @@ fn blocks(content: &J) -> Vec<J> {
 }
 
 /// Every image, audio and video part of the turns as the data URL a request may carry
-/// (`agent::image_source`, `agent::clip_source`): a provider never fetches a URL for an agent.
+/// (`instance::image_source`, `instance::clip_source`): a provider never fetches a URL for an agent.
 pub(super) fn images(doc: &mut J) -> Result<(), String> {
     for turn in doc["messages"].as_array_mut().into_iter().flatten() {
         for part in turn["content"].as_array_mut().into_iter().flatten() {
             match part["type"].as_str() {
                 Some("image_url") => {
                     let url = &mut part["image_url"]["url"];
-                    *url = J::String(crate::runtime::agent::image_source(url.as_str().unwrap_or_default())?);
+                    *url = J::String(crate::runtime::instance::image_source(
+                        url.as_str().unwrap_or_default(),
+                    )?);
                 }
                 Some(kind @ ("audio_url" | "video_url")) => {
                     let url = part[kind]["url"].as_str().unwrap_or_default();
-                    crate::runtime::agent::clip_source(url, &kind[..5])?;
+                    crate::runtime::instance::clip_source(url, &kind[..5])?;
                 }
                 _ => {}
             }

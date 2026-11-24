@@ -82,7 +82,7 @@ behavior, schemas, source loading, mounts and effect replay. `tests/lifecycle.rs
 source revision changes and recovery, and `tests/closures_freed.rs` checks reclamation. `tests/features.rs`, `tests/chat_tools.rs` and
 `tests/adapter_contract.rs` check document boundaries and action visibility. `tests/page.rs`,
 `tests/effects.rs` and `tests/promises.rs` check task, model and dispatch semantics.
-`tests/reliability.rs`, `tests/spill.rs` and `tests/pause_latency.rs` check recovery and lifetime
+`tests/reliability.rs`, `tests/spill.rs` and `tests/pause_latency.rs` (closing) check recovery and lifetime
 boundaries. Storage/checkpoint tests also cover append rollback, per-instance locks,
 identity-preserving images, cache invalidation and parent/child suffix recovery. `tests/conformance.rs` compares exact IDs against cached official templates;
 `tests/js_differential.rs` compares the supported language subset against Node.

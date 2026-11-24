@@ -14,7 +14,7 @@ pub struct CancelToken(Arc<Inner>);
 #[derive(Default)]
 struct Inner {
     cancelled: AtomicBool,
-    /// Cancelled by the host (a controller pause, the run's shutdown), not by the work's owner.
+    /// Cancelled by the host (the run closing), not by the work's owner.
     by_host: AtomicBool,
     cleanups: Mutex<Vec<Cleanup>>,
     reason: Mutex<String>,
@@ -47,7 +47,7 @@ impl CancelToken {
         self.cancel_as(reason, false)
     }
 
-    /// Cancel on the host's behalf (a pause, a shutdown): the work did not fail and its owner did
+    /// Cancel on the host's behalf (the run closing): the work did not fail and its owner did
     /// not abandon it, so its failure is not the owner's to record.
     pub fn cancel_by_host(&self, reason: &str) {
         self.cancel_as(reason, true)
@@ -116,16 +116,16 @@ mod tests {
             let called = Arc::new(std::sync::atomic::AtomicUsize::new(0));
             let (cleanup_token, count) = (token.clone(), called.clone());
             token.on_cancel(move || {
-                assert_eq!(cleanup_token.reason(), "controller pause");
+                assert_eq!(cleanup_token.reason(), "the run is closing");
                 cleanup_token.on_cancel(move || {
                     count.fetch_add(1, Ordering::SeqCst);
                 });
             });
             send.send(token.clone()).unwrap();
-            token.cancel("controller pause");
+            token.cancel("the run is closing");
             token.cancel("a later reason");
-            assert_eq!(answers.recv().unwrap(), "controller pause");
-            assert_eq!(token.check(), Err("cancelled: controller pause".into()));
+            assert_eq!(answers.recv().unwrap(), "the run is closing");
+            assert_eq!(token.check(), Err("cancelled: the run is closing".into()));
             assert_eq!(called.load(Ordering::SeqCst), 1);
         }
         drop(send);

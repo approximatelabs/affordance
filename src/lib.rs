@@ -605,7 +605,7 @@ impl View {
     }
 
     /// Render a handler's start snapshot once and find the handler. `run` reconstructs execution
-    /// against an arrival-ordered transcript. Use `runtime::Agent` to retain live continuations.
+    /// against an arrival-ordered transcript. Use `runtime::Instance` to retain live continuations.
     pub fn prepare_handler<'v>(
         &'v self,
         enc: &'v Encoder,

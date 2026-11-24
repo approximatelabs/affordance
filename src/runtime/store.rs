@@ -40,14 +40,16 @@ struct Space {
 #[derive(Default)]
 pub struct Store {
     spaces: Mutex<BTreeMap<String, Arc<Mutex<Space>>>>,
-    dir: Option<PathBuf>,
+    /// Where each instance's store file lives (in its own directory), with a run directory.
+    layout: Option<Arc<super::layout::Layout>>,
     blobs: Option<Arc<Blobs>>,
     /// A put's record is synced by the runtime's journal commit, not by the put.
     deferred: bool,
 }
 
 impl Store {
-    /// A store in `dir`, or in memory without one.
+    /// A store in the run directory `dir` (each instance's file in its own directory), or in
+    /// memory without one.
     pub fn new(dir: Option<PathBuf>) -> Store {
         Store::with_blobs(dir, None)
     }
@@ -55,10 +57,14 @@ impl Store {
     pub fn with_blobs(dir: Option<PathBuf>, blobs: Option<Arc<Blobs>>) -> Store {
         Store {
             spaces: Mutex::new(BTreeMap::new()),
-            dir,
+            layout: dir.map(|d| Arc::new(super::layout::Layout::open(&d))),
             blobs,
             deferred: false,
         }
+    }
+    /// The run directory's layout this store uses (the runtime uses the same one).
+    pub(crate) fn layout(&self) -> Option<Arc<super::layout::Layout>> {
+        self.layout.clone()
     }
     /// Leave syncing a put's record to the caller (the runtime commits it with the journals,
     /// using `file_len`).
@@ -125,10 +131,10 @@ impl Store {
     }
 
     fn file(&self, agent: &str) -> Option<PathBuf> {
-        self.dir.as_ref().map(|d| d.join(agent).join("store.jsonl"))
+        self.layout.as_ref()?.dir(agent).map(|d| d.join("store.jsonl"))
     }
 
-    /// Load an agent's persisted blobs (on resume).
+    /// Load an agent's persisted blobs (on restore).
     pub fn load(&self, agent: &str) -> Result<(), String> {
         let handle = self.space(agent);
         let mut current = handle.lock().unwrap();
@@ -178,9 +184,12 @@ impl Store {
                         }
                     },
                 };
-                let at = match self.file(agent) {
+                let file = match &self.layout {
+                    Some(layout) => Some(layout.dir_or_new(agent)?.join("store.jsonl")),
+                    None => None,
+                };
+                let at = match file {
                     Some(path) => {
-                        std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
                         let mut f = std::fs::OpenOptions::new()
                             .create(true)
                             .append(true)
@@ -344,7 +353,10 @@ mod tests {
             let dir = Scratch::new();
             let store = Store::new(Some(dir.0.clone()));
             store.call("a", "store.put", &json!({"text":"saved"})).unwrap();
-            let path = dir.0.join("a/store.jsonl");
+            let home = store.layout().unwrap().dir("a").unwrap();
+            // In a run, every instance's directory has its record, which names it.
+            std::fs::write(home.join("instance.json"), json!({"id": "a"}).to_string()).unwrap();
+            let path = home.join("store.jsonl");
             let prefix = std::fs::read(&path).unwrap();
             let mut file = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
             let failed = append_or_rollback(&mut file, |file| {
@@ -397,7 +409,7 @@ mod tests {
         worker.join().unwrap();
         assert_eq!(answer.unwrap()["text"], "independent");
         // An open failure must leave the automatic key/counter uncommitted.
-        let path = dir.0.join("a/store.jsonl");
+        let path = store.layout().unwrap().dir_or_new("a").unwrap().join("store.jsonl");
         std::fs::create_dir_all(&path).unwrap();
         assert!(store.call("a", "store.put", &json!({"text":"failed"})).is_err());
         std::fs::remove_dir(&path).unwrap();

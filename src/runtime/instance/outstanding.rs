@@ -16,7 +16,7 @@ pub struct OutstandingSummary {
     pub retrying: Option<(u32, &'static str)>,
 }
 
-pub(super) fn agent_outstanding_summary(agent: &Agent) -> OutstandingSummary {
+pub(super) fn agent_outstanding_summary(agent: &Instance) -> OutstandingSummary {
     let mut timers: Vec<i64> = agent
         .tasks
         .values()
@@ -58,9 +58,9 @@ pub(super) fn agent_outstanding_summary(agent: &Agent) -> OutstandingSummary {
     }
 }
 
-pub(super) fn agent_outstanding(agent: &Agent) -> Vec<Command> {
+pub(super) fn agent_outstanding(agent: &Instance) -> Vec<Command> {
     let mut out: Vec<Command> = agent.tasks.values().map(|(_, c)| c.clone()).collect();
-    // A model call told to stop is told again: on resume it answers at once, with what it has.
+    // A model call told to stop is told again: on restore it answers at once, with what it has.
     out.extend(
         agent
             .aborting

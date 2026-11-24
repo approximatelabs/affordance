@@ -5,9 +5,7 @@
 #[cfg(feature = "http")]
 use affordance::connectors::http::{Http, HttpConfig};
 use affordance::emit::Encoder;
-use affordance::runtime::{
-    AgentSpec, CallContext, CommandMachine, Exec, Executor, Model, Runtime, RuntimeConfig, Target,
-};
+use affordance::runtime::{CommandMachine, Exec, Executor, InstanceSpec, Model, Runtime, RuntimeConfig, Target};
 use serde_json::{Value as J, json};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -134,11 +132,27 @@ pub fn with_profile(f: impl FnOnce() -> Result<(), String>) -> Result<(), String
     result
 }
 
-/// `{n}`, `{n:04}` and `{id}` in every string of a JSON value.
-fn fill(v: &J, n: usize, id: &str) -> J {
+/// A machine pool's role names: `{n}` and `{n:04}` in a role (`"vm-{n:02}": {count: 3}`).
+fn pool_role(role: &str, n: usize) -> String {
+    match fill(&J::String(role.into()), n) {
+        J::String(r) => r,
+        other => other.to_string(),
+    }
+}
+
+/// `{n}` and `{n:04}` in every string of a pool member's fields.
+fn fill_all(v: &J, n: usize) -> J {
+    match v {
+        J::Array(a) => J::Array(a.iter().map(|x| fill_all(x, n)).collect()),
+        J::Object(o) => J::Object(o.iter().map(|(k, x)| (k.clone(), fill_all(x, n))).collect()),
+        other => fill(other, n),
+    }
+}
+
+fn fill(v: &J, n: usize) -> J {
     match v {
         J::String(s) => {
-            let mut out = s.replace("{id}", id).replace("{n}", &n.to_string());
+            let mut out = s.replace("{n}", &n.to_string());
             while let Some(i) = out.find("{n:0") {
                 let Some(j) = out[i..].find('}') else { break };
                 // A width is a few digits; anything else is left as written.
@@ -149,8 +163,6 @@ fn fill(v: &J, n: usize, id: &str) -> J {
             }
             J::String(out)
         }
-        J::Array(a) => J::Array(a.iter().map(|x| fill(x, n, id)).collect()),
-        J::Object(o) => J::Object(o.iter().map(|(k, x)| (k.clone(), fill(x, n, id))).collect()),
         other => other.clone(),
     }
 }
@@ -195,7 +207,10 @@ fn machine(role: &str, spec: &J) -> Result<Arc<dyn Executor>, String> {
                 return Err(format!("machine {role}: timeout_s must be a whole number of seconds"));
             }
             match kind {
-                "local" => Target::Local { home: s("home") },
+                "local" => Target::Local {
+                    home: s("home"),
+                    per_instance: spec["per_instance"].as_bool().unwrap_or(false),
+                },
                 "ssh" => Target::Ssh {
                     target: s("target").ok_or("an ssh machine needs target")?,
                     key: s("key"),
@@ -210,10 +225,11 @@ fn machine(role: &str, spec: &J) -> Result<Arc<dyn Executor>, String> {
                 },
                 "docker" => Target::Docker {
                     image: s("image").ok_or("a docker machine needs image")?,
-                    name: s("name").unwrap_or_else(|| "aff-{agent}".into()),
+                    name: s("name").unwrap_or_else(|| "aff".into()),
                 },
                 _ => Target::Bwrap {
-                    home: s("home").ok_or("a bwrap machine needs home (a directory per agent)")?,
+                    home: s("home").ok_or("a bwrap machine needs home")?,
+                    per_instance: spec["per_instance"].as_bool().unwrap_or(false),
                     network: spec["network"].as_bool().unwrap_or(false),
                     read: spec["read"]
                         .as_array()
@@ -235,22 +251,6 @@ fn machine(role: &str, spec: &J) -> Result<Arc<dyn Executor>, String> {
         default_timeout_s: spec["timeout_s"].as_u64().unwrap_or(60),
         max_capture: 16 << 20,
     }))
-}
-
-/// A machine spec with `{n}`/`{id}`: one binding per agent (e.g. each agent's own VM). A mounted
-/// child (`root/child`) uses its root's, as `<Mount>` hands a child a subset of its parent's machines.
-struct PerAgent {
-    by_agent: BTreeMap<String, Arc<dyn Executor>>,
-}
-
-impl Executor for PerAgent {
-    fn call(&self, ctx: &CallContext, args: &J) -> Result<J, String> {
-        let root = ctx.agent.split('/').next().unwrap_or_default();
-        self.by_agent
-            .get(root)
-            .ok_or_else(|| format!("no machine for {}", ctx.agent))?
-            .call(ctx, args)
-    }
 }
 
 /// A model server from the config: `{kind: sglang | completions | chat | anthropic | responses, url, ...}`. `ranks` (sglang
@@ -285,14 +285,16 @@ fn duration(value: &J, name: &str) -> Result<Duration, String> {
     Duration::try_from_secs_f64(seconds).map_err(|_| format!("{name} must be finite and nonnegative"))
 }
 
-/// Run a loaded deployment (`deploy::load`): fresh, or `resume` from its journals. `prepare` sees
-/// the runtime before it starts (`serve` binds its `client` machine and takes an inbox there).
+/// Run a loaded deployment (`deploy::load`): fresh, or `restore` from its journals. `prepare` sees
+/// the runtime before it starts (`serve` binds its `client` machine and takes its control there).
 /// The summary at the end goes to stdout, or to stderr when stdout is a protocol's (`host`).
+/// SIGINT and SIGTERM close the run; with `control_socket`, controllers connect there.
 pub fn run(
     cfg: J,
-    resume: bool,
+    restore: bool,
     keep_running: bool,
     summary_on_stdout: bool,
+    control_socket: Option<&std::path::Path>,
     prepare: impl FnOnce(&mut Runtime) -> Result<(), String>,
 ) -> Result<(), String> {
     crate::format::validate(&cfg)?;
@@ -318,18 +320,24 @@ pub fn run(
     if cfg.get("keep_running").is_some_and(|v| !v.is_boolean()) {
         return Err("keep_running must be a boolean".into());
     }
-    for key in ["root", "app", "models", "machines", "env"] {
+    for key in ["app", "models", "machines", "env"] {
         if cfg.get(key).is_some_and(|v| !v.is_object()) {
             return Err(format!("{key} must be an object"));
         }
     }
-    // The app: a root app that mounts the rest ({root: {app, props?, model?}}), or one app run as
-    // a list of agents ({app: {view, tokenizer}, agents: ...}).
-    let (root, app) = (&cfg["root"], &cfg["app"]);
-    let view = root["app"]
+    // The instances: `instances: [{id, app?, ...}]`, each running its own `app` or the deployment's
+    // (`app: {view, entry?}`); an entry with `count: N` is N copies, `<id>-0` .. `<id>-(N-1)`.
+    let app = &cfg["app"];
+    let listed = cfg["instances"]
+        .as_array()
+        .ok_or("instances missing: a deployment lists its instances")?;
+    if listed.is_empty() {
+        return Err("instances is empty".into());
+    }
+    let view = app["view"]
         .as_str()
-        .or_else(|| app["view"].as_str())
-        .ok_or("root.app or app.view missing")?;
+        .or_else(|| listed.iter().find_map(|i| i["app"].as_str()))
+        .ok_or("no app: give app.view, or an app for each instance")?;
     // A chat server tokenizes the messages itself, so a hosted binding may name no tokenizer and
     // size its layout with the bundled default; a token-id binding needs its model's own.
     let default_tokenizer;
@@ -376,10 +384,11 @@ pub fn run(
     rc.strict_replay = cfg["replay"].as_str() == Some("strict");
     rc.call_timeout = Duration::from_secs(cfg["call_timeout_s"].as_u64().unwrap_or(3600));
     rc.max_wall = cfg.get("max_wall_s").map(|v| duration(v, "max_wall_s")).transpose()?;
-    // Keep running (stay up while instances are idle, reading the inbox), or run the batch to quiescence.
+    // Keep running (stay up while instances are idle), or run the batch until nothing is left to do.
     // The summary printed at the end reads no state (each agent's snapshot.json has it).
     rc.report_state = false;
     rc.serve = keep_running || cfg["keep_running"].as_bool().unwrap_or(false);
+    rc.capture_dir = std::env::var_os("AFFORDANCE_CAPTURE_DIR").map(Into::into);
     rc.env = cfg["env"]
         .as_object()
         .into_iter()
@@ -410,100 +419,87 @@ pub fn run(
         named_models.push((name.clone(), enc, client));
     }
 
-    let mut specs: Vec<(usize, AgentSpec)> = vec![];
-    if root.is_object() {
-        crate::format::check(root, crate::format::AGENT, &[], "root")?;
-        let mut base = json!({"id": "root", "props": {}, "max_new": MAX_NEW, "model": null});
-        for (key, value) in root.as_object().unwrap() {
-            base[key] = value.clone();
-        }
-        let spec: AgentSpec = serde_json::from_value(base).map_err(|e| format!("root: {e}"))?;
-        specs.push((0, spec));
-    } else {
-        // Agents: an explicit list, or {count, id, ...template}.
-        let list: Vec<J> = match &cfg["agents"] {
-            J::Array(a) => a.clone(),
-            J::Object(t) => {
-                let count = t.get("count").and_then(J::as_u64).ok_or("agents.count missing")? as usize;
-                (0..count)
-                    .map(|n| {
-                        let id = match fill(t.get("id").unwrap_or(&json!("agent-{n:04}")), n, "") {
-                            J::String(id) => id,
-                            other => other.to_string(),
-                        };
-                        let mut a = fill(&J::Object(t.clone()), n, &id);
-                        a["id"] = json!(id);
-                        a.as_object_mut().unwrap().remove("count");
-                        a
-                    })
-                    .collect()
-            }
-            _ => return Err("agents must be a list or {count, ...}".into()),
+    let mut specs: Vec<InstanceSpec> = vec![];
+    for (n, entry) in listed.iter().enumerate() {
+        crate::format::check(entry, crate::format::INSTANCE, &[], &format!("instance {n}"))?;
+        let id = entry["id"]
+            .as_str()
+            .ok_or_else(|| format!("instance {n}: id missing"))?;
+        let copies: Vec<String> = match &entry["count"] {
+            J::Null => vec![id.to_string()],
+            J::Number(c) if c.as_u64().is_some() => (0..c.as_u64().unwrap()).map(|i| format!("{id}-{i}")).collect(),
+            other => return Err(format!("instance {id}: count must be a whole number, not {other}")),
         };
-        for (n, a) in list.into_iter().enumerate() {
-            crate::format::check(&a, crate::format::AGENT, &[], &format!("agent {n}"))?;
-            let mut base = json!({"max_new": MAX_NEW, "props": {}, "seed": n + 1, "index": n});
-            for (k, v) in a.as_object().ok_or("agent must be an object")? {
-                base[k] = v.clone();
+        for name in copies {
+            let mut base = json!({"max_new": MAX_NEW, "props": {}, "seed": specs.len() + 1});
+            for (k, v) in entry.as_object().unwrap() {
+                if k != "count" {
+                    base[k] = v.clone();
+                }
             }
-            specs.push((n, serde_json::from_value(base).map_err(|e| format!("agent {n}: {e}"))?));
+            base["id"] = json!(name);
+            specs.push(serde_json::from_value(base).map_err(|e| format!("instance {name}: {e}"))?);
         }
     }
-    let mut rt = if resume {
-        Runtime::resume(rc, enc, model)?
+    let mut rt = if restore {
+        Runtime::restore(rc, enc, model)?
     } else {
         Runtime::new(rc, enc, model)
     };
-    if resume {
-        rt.membership(specs.into_iter().map(|(_, s)| s).collect())?;
+    if restore {
+        rt.set_instances(specs)?;
     } else {
-        for (_, spec) in specs {
-            rt.add_agent(spec)?;
+        for spec in specs {
+            rt.add_instance(spec)?;
         }
     }
     for (name, enc, client) in named_models {
         rt.bind_model(&name, enc, client);
     }
-    let agents: Vec<(usize, String)> = rt.specs().iter().map(|s| (s.index, s.id.clone())).collect();
     for (role, spec) in cfg["machines"].as_object().into_iter().flatten() {
-        // A pool: {"vm-{n:04}": {..., "count": 1024}} binds roles vm-0000 .. vm-1023, `{n}` filled in each.
+        // A pool: {"vm-{n:04}": {..., "count": 1024}} binds roles vm-0000 .. vm-1023, `{n}` (the
+        // member's number, never an instance's name) filled in each member's role and fields.
         if let Some(count) = spec["count"].as_u64() {
             let mut one = spec.clone();
             one.as_object_mut().unwrap().remove("count");
             for n in 0..count as usize {
-                let r = fill(&json!(role), n, "").as_str().unwrap().to_string();
-                rt.bind_machine(&r, machine(&r, &fill(&one, n, &r))?);
+                let r = pool_role(role, n);
+                rt.bind_machine(&r, machine(&r, &fill_all(&one, n))?);
             }
             continue;
         }
-        let per_agent = spec.to_string().contains("{n") || spec.to_string().contains("{id}");
-        let bound: Arc<dyn Executor> = if per_agent {
-            let mut by_agent = BTreeMap::new();
-            for (n, id) in &agents {
-                by_agent.insert(id.clone(), machine(role, &fill(spec, *n, id))?);
-            }
-            Arc::new(PerAgent { by_agent })
-        } else {
-            machine(role, spec)?
-        };
-        rt.bind_machine(role, bound);
+        rt.bind_machine(role, machine(role, spec)?);
     }
     affordance::runtime::host::tune_allocator(cfg["workers"].as_u64().unwrap_or(WORKERS) as usize);
     prepare(&mut rt)?;
-    let report = rt.run()?;
+    let control = rt.control();
+    crate::control::close_on_signals(control.clone());
+    let socket = match control_socket {
+        Some(path) => {
+            let target = rt.specs().first().map(|s| s.id.clone()).unwrap_or_default();
+            Some(crate::control::listen(path, control, target)?)
+        }
+        None => None,
+    };
+    let report = rt.run();
+    if let (Some(socket), Ok(report)) = (&socket, &report) {
+        *socket.ended.lock().unwrap() = json!(report.ended);
+    }
+    drop(socket);
+    let report = report?;
     let total =
-        |f: &dyn Fn(&affordance::runtime::Metrics) -> u64| report.agents.iter().map(|a| f(&a.metrics)).sum::<u64>();
+        |f: &dyn Fn(&affordance::runtime::Metrics) -> u64| report.instances.iter().map(|a| f(&a.metrics)).sum::<u64>();
     let prompt = total(&|m| m.prompt_tokens);
     let summary = serde_json::to_string_pretty(&json!({
-        "complete": report.complete, "wall_s": report.wall_s, "agents": report.agents.len(),
+        "complete": report.complete, "ended": report.ended, "wall_s": report.wall_s, "instances": report.instances.len(),
         "turns": total(&|m| m.turns), "exact_appends": total(&|m| m.exact_appends), "rewrites": total(&|m| m.rewrites),
         "prompt_tokens": prompt, "uncached_tokens": total(&|m| m.uncached_tokens), "generated_tokens": total(&|m| m.generated_tokens),
         "prefix_reuse": if prompt > 0 { 1.0 - total(&|m| m.uncached_tokens) as f64 / prompt as f64 } else { 0.0 },
         "handler_errors": total(&|m| m.handler_errors), "model_errors": total(&|m| m.model_errors),
-        "capture_errors": affordance::runtime::model::capture_errors(),
-        "token_mismatches": affordance::runtime::model::token_mismatches(),
-        "render_stats": {"evaluations": report.agents.iter().map(|a| a.render_stats.evaluations).sum::<u64>(), "reused": report.agents.iter().map(|a| a.render_stats.reused).sum::<u64>()},
-        "per_agent": report.agents.iter().map(|a| json!({"id": a.id, "worker":a.worker, "turns": a.metrics.turns, "stopped": a.stopped, "error": a.error})).collect::<Vec<_>>(),
+        "capture_errors": report.capture_errors,
+        "token_mismatches": report.token_mismatches,
+        "render_stats": {"evaluations": report.instances.iter().map(|a| a.render_stats.evaluations).sum::<u64>(), "reused": report.instances.iter().map(|a| a.render_stats.reused).sum::<u64>()},
+        "per_instance": report.instances.iter().map(|a| json!({"id": a.id, "worker":a.worker, "turns": a.metrics.turns, "stopped": a.stopped, "error": a.error})).collect::<Vec<_>>(),
     })).unwrap();
     if summary_on_stdout {
         println!("{summary}");
@@ -514,7 +510,7 @@ pub fn run(
     // So does one whose app stopped it on an error (`useLoop` stops with `loop_error` when its
     // model call fails for good): a script running the command must be able to tell.
     let failed: Vec<String> = report
-        .agents
+        .instances
         .iter()
         .filter_map(|a| {
             let stopped_on_error = a.stopped.as_ref().and_then(|s| {
@@ -529,9 +525,9 @@ pub fn run(
         .collect();
     if !failed.is_empty() {
         return Err(format!(
-            "{} of {} agents failed:\n  {}",
+            "{} of {} instances failed:\n  {}",
             failed.len(),
-            report.agents.len(),
+            report.instances.len(),
             failed.join("\n  ")
         ));
     }

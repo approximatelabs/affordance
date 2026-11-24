@@ -4,7 +4,7 @@ use affordance::{
     View,
     effects::Outcome,
     emit::{Encoder, RunCache},
-    runtime::{Agent, AgentConfig, Command, Input},
+    runtime::{Command, Input, Instance, InstanceConfig},
 };
 use serde_json::json;
 use std::{
@@ -62,7 +62,7 @@ fn encoder() -> &'static Encoder {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn function_values_compose_through_props_members_and_returned_closures() {
     let f = Files::new();
     f.write(
@@ -90,7 +90,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn imports_keep_functions_closures_classes_and_defaults_in_their_defining_file() {
     let f = Files::new();
     f.write(
@@ -130,7 +130,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn side_effect_imports_and_transitive_dependencies_do_not_leak_names() {
     let f = Files::new();
     f.write(
@@ -151,7 +151,7 @@ fn side_effect_imports_and_transitive_dependencies_do_not_leak_names() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn diamond_imports_share_binding_identity_and_export_aliases() {
     let f = Files::new();
     f.write(
@@ -171,7 +171,7 @@ fn diamond_imports_share_binding_identity_and_export_aliases() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn jsx_aliases_and_mounts_keep_the_declared_child_entry() {
     let f = Files::new();
     f.write(
@@ -200,7 +200,7 @@ fn jsx_aliases_and_mounts_keep_the_declared_child_entry() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn schema_aliases_are_resolved_in_the_functions_own_module() {
     let f = Files::new();
     f.write(
@@ -218,7 +218,7 @@ fn schema_aliases_are_resolved_in_the_functions_own_module() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn imports_fail_explicitly_for_ambiguous_or_unsupported_graphs() {
     let f = Files::new();
     f.write("lib.tsx", "export function value(){return 1;}");
@@ -266,7 +266,7 @@ fn imports_fail_explicitly_for_ambiguous_or_unsupported_graphs() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn module_constants_have_a_temporal_dead_zone_and_imports_are_read_only() {
     let f = Files::new();
     f.write(
@@ -293,7 +293,7 @@ fn module_constants_have_a_temporal_dead_zone_and_imports_are_read_only() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn standard_library_internals_are_isolated_and_public_globals_can_be_shadowed() {
     let f = Files::new();
     f.write("app.tsx", "function headerName(){return 'broken';} function fetch(){return 'local';} export default function Main(){return new Headers({HELLO:'world'}).get('hello')+':'+fetch()+':'+typeof fetchBound;}");
@@ -303,13 +303,13 @@ fn standard_library_internals_are_isolated_and_public_globals_can_be_shadowed() 
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn imported_async_closures_keep_their_scope_across_effect_replay() {
     let f = Files::new();
     f.write("lib.tsx", "const label='library'; function helper(){return label;} export function make(){return async()=>{const first=await harness.machine.call({cmd:helper()}); return helper()+':'+first.output;};}");
     f.write("app.tsx", "import {make} from './lib.tsx'; function helper(){return 'app';} export default function Main(){useEffect(()=>{(async()=>{harness.stop(await make()());})();},[]);return 'waiting';}");
     let view = f.load().unwrap();
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -324,7 +324,7 @@ fn imported_async_closures_keep_their_scope_across_effect_replay() {
         machines: vec!["local".into()],
         model: None,
     };
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     let commands = agent.start(&view, encoder()).unwrap();
     let task = match commands.iter().find(|c| matches!(c, Command::Call { .. })).unwrap() {
         Command::Call { task, args, .. } => {
@@ -341,14 +341,14 @@ fn imported_async_closures_keep_their_scope_across_effect_replay() {
     agent.handle(&view, encoder(), input.clone()).unwrap();
     assert_eq!(agent.stopped().unwrap(), "library:result");
     let restored_view = f.load().unwrap();
-    let mut replay = Agent::new(cfg).unwrap();
+    let mut replay = Instance::new(cfg).unwrap();
     replay.start(&restored_view, encoder()).unwrap();
     replay.handle(&restored_view, encoder(), input).unwrap();
     assert_eq!(replay.stopped(), agent.stopped());
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn source_modules_keep_private_bindings_imports_types_and_distinct_identity() {
     let f = Files::new();
     f.write(
@@ -390,7 +390,7 @@ export default function Main() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn source_module_errors_are_catchable_and_initializers_cannot_use_the_caller() {
     let f = Files::new();
     let cases = [
@@ -425,7 +425,7 @@ fn source_module_errors_are_catchable_and_initializers_cannot_use_the_caller() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn replaced_source_keeps_its_imports_and_helpers_for_pending_work_and_replay() {
     let f = Files::new();
     f.write(
@@ -459,7 +459,7 @@ export default function Panel(){{return helper();}}
         )
     };
     let view = f.load().unwrap();
-    let cfg = AgentConfig {
+    let cfg = InstanceConfig {
         context: None,
         retry: Default::default(),
         template: None,
@@ -474,10 +474,10 @@ export default function Panel(){{return helper();}}
         machines: vec!["local".into()],
         model: None,
     };
-    let mut agent = Agent::new(cfg.clone()).unwrap();
+    let mut agent = Instance::new(cfg.clone()).unwrap();
     agent.start(&view, encoder()).unwrap();
     let mut journal = vec![];
-    let mut input = |agent: &mut Agent, value: Input| {
+    let mut input = |agent: &mut Instance, value: Input| {
         journal.push(value.clone());
         agent.handle(&view, encoder(), value).unwrap()
     };
@@ -486,7 +486,7 @@ export default function Panel(){{return helper();}}
         Input::Event {
             name: "install".into(),
             payload: json!({"source":module("old")}),
-            op: None,
+            id: None,
             clock_ms: 1,
         },
     );
@@ -495,7 +495,7 @@ export default function Panel(){{return helper();}}
         Input::Event {
             name: "start".into(),
             payload: json!({}),
-            op: None,
+            id: None,
             clock_ms: 2,
         },
     );
@@ -517,7 +517,7 @@ export default function Panel(){{return helper();}}
         Input::Event {
             name: "install".into(),
             payload: json!({"source":module("new")}),
-            op: None,
+            id: None,
             clock_ms: 3,
         },
     );
@@ -537,7 +537,7 @@ export default function Panel(){{return helper();}}
             clock_ms: 5,
         },
     );
-    let render = |view: &View, agent: &Agent| {
+    let render = |view: &View, agent: &Instance| {
         let r = view
             .render_with_harness(
                 encoder(),
@@ -553,7 +553,7 @@ export default function Panel(){{return helper();}}
     let trace = agent.take_trace();
     assert_eq!(agent.metrics.handler_errors, 0, "{trace:?}");
     let fresh = f.load().unwrap();
-    let (restored, _) = Agent::restore(cfg, journal, &fresh, encoder()).unwrap();
+    let (restored, _) = Instance::restore(cfg, journal, &fresh, encoder()).unwrap();
     assert_eq!(render(&fresh, &restored), render(&view, &agent));
     assert_eq!(restored.metrics.handler_errors, 0);
 }
@@ -562,7 +562,7 @@ export default function Panel(){{return helper();}}
 /// of it, not an absolute path elsewhere, not through a symlink pointing out (the ticket's attack:
 /// an inline app reaching a fleet's shared directory).
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_served_app_imports_only_from_its_directory_and_the_library() {
     let enc = encoder();
     let base = std::env::temp_dir().join(format!("aff-contain-{}", std::process::id()));

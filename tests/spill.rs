@@ -5,7 +5,7 @@ use crate::each;
 use affordance::View;
 use affordance::emit::{Encoder, RunCache};
 use affordance::runtime::blobs::Blobs;
-use affordance::runtime::{AgentSpec, Exec, FnModel, GenReply, GenRequest, Runtime, RuntimeConfig};
+use affordance::runtime::{Exec, FnModel, GenReply, GenRequest, InstanceSpec, Runtime, RuntimeConfig};
 use affordance::value::with_host_text;
 use serde_json::{Value as J, json};
 use std::path::{Path, PathBuf};
@@ -30,7 +30,7 @@ fn tmp(name: &str) -> PathBuf {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn host_text_behaves_exactly_like_heap_text() {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/Qwen__Qwen3-4B-Instruct-2507.json"));
     let dir = tmp("semantics");
@@ -98,7 +98,7 @@ fn host_text_behaves_exactly_like_heap_text() {
 /// the language take a non-ASCII blob for ASCII and slice it mid-character (a panic). From
 /// outside, the forged reference is stored as the text it is; read as one, it is not a blob.
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_reference_with_a_forged_char_count_is_not_a_blob() {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/Qwen__Qwen3-4B-Instruct-2507.json"));
     let dir = tmp("forged");
@@ -174,7 +174,7 @@ fn script(n: usize, prompt: &str) -> String {
     }
 }
 
-fn session(dir: &Path, resume: bool) -> affordance::runtime::Report {
+fn session(dir: &Path, restore: bool) -> affordance::runtime::Report {
     let enc = shared::tokenizer(&root().join("ref/tokenizers/zai-org__GLM-5.3.json"));
     let mut cfg = RuntimeConfig::new(root().join("views/agents/session.tsx"));
     cfg.workers = 1;
@@ -202,17 +202,17 @@ fn session(dir: &Path, resume: bool) -> affordance::runtime::Report {
         affordance::runtime::model::ModelTemplate::new("glm53", json!({})).unwrap(),
     )
     .unwrap();
-    let mut rt = if resume {
-        Runtime::resume(cfg, enc, model).unwrap()
+    let mut rt = if restore {
+        Runtime::restore(cfg, enc, model).unwrap()
     } else {
         Runtime::new(cfg, enc, model)
     };
     rt.bind_machine("home", Arc::new(Exec::local()));
-    if !resume {
-        let mut spec = AgentSpec::new("agent-0", json!({"id": "agent-0", "task": "Migrate the build."}));
+    if !restore {
+        let mut spec = InstanceSpec::new("agent-0", json!({"id": "agent-0", "task": "Migrate the build."}));
         spec.max_turns = Some(4);
         spec.max_new = 256;
-        rt.add_agent(spec).unwrap();
+        rt.add_instance(spec).unwrap();
     }
     rt.run().unwrap()
 }
@@ -222,11 +222,11 @@ fn size(p: &Path) -> u64 {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_twelve_megabyte_tool_output_is_one_blob_and_reads_back_exactly() {
     let dir = tmp("session");
     let report = session(&dir, false);
-    let a = &report.agents[0];
+    let a = &report.instances[0];
     assert!(a.error.is_none(), "{:?}", a.error);
     assert_eq!(a.metrics.turns, 4);
     // One blob: exec's output, shared by the journal and the app's log record.
@@ -239,9 +239,9 @@ fn a_twelve_megabyte_tool_output_is_one_blob_and_reads_back_exactly() {
     assert!(text.len() > 12_000_000 && text.trim_end().ends_with(MARK));
     for f in ["journal.jsonl", "store.jsonl", "snapshot.json"] {
         assert!(
-            size(&dir.join("agent-0").join(f)) < 256 << 10,
+            size(&crate::shared::instance_dir(&dir, "agent-0").join(f)) < 256 << 10,
             "{f}: {} bytes",
-            size(&dir.join("agent-0").join(f))
+            size(&crate::shared::instance_dir(&dir, "agent-0").join(f))
         );
     }
     let records = affordance::scenario::log_records(&a.state);
@@ -264,7 +264,7 @@ fn a_twelve_megabyte_tool_output_is_one_blob_and_reads_back_exactly() {
 
     // Resume replays the journal against the same blobs and reaches the same state.
     let again = session(&dir, true);
-    let b = &again.agents[0];
+    let b = &again.instances[0];
     assert!(b.error.is_none(), "{:?}", b.error);
     assert_eq!(b.state, a.state);
     assert_eq!(
@@ -314,13 +314,17 @@ fn a_spooled_exec_output_equals_the_in_memory_one_even_cut_mid_character() {
     let blobs = Arc::new(Blobs::new(dir.join("blobs"), 1024).unwrap());
     // 2-byte characters, capped at an odd byte count: the cut splits the last character.
     let exec = Exec {
-        target: Target::Local { home: None },
+        target: Target::Local {
+            home: None,
+            per_instance: false,
+        },
         default_timeout_s: 30,
         max_capture: 100_001,
     };
     let args = json!({"cmd": "for i in $(seq 1 1000); do printf 'é%.0s' $(seq 1 100); done; exit 3"});
     let ctx = |b: Option<Arc<Blobs>>| CallContext {
         agent: "a".into(),
+        instance: String::new(),
         task: 0,
         env: Default::default(),
         cancel: Default::default(),
@@ -344,7 +348,7 @@ fn a_spooled_exec_output_equals_the_in_memory_one_even_cut_mid_character() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn a_journal_whose_blob_is_missing_fails_to_resume_by_name() {
     let dir = tmp("missing-blob");
     session(&dir, false);
@@ -352,6 +356,6 @@ fn a_journal_whose_blob_is_missing_fails_to_resume_by_name() {
         std::fs::remove_file(e.unwrap().path()).unwrap();
     }
     let again = session(&dir, true);
-    let e = again.agents[0].error.as_deref().unwrap_or("");
+    let e = again.instances[0].error.as_deref().unwrap_or("");
     assert!(e.contains("missing blob") && e.contains("blob:"), "{e}");
 }

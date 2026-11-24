@@ -21,7 +21,7 @@ model:
   template: d1
   sampling: {temperature: 0}
   provider_options: {allowed_token_ids: [...]}   # the ids of "A".."I", " A".." I" and <|im_end|>
-agents:
+instances:
   - id: desk
     max_new: 2
     props: {tickets: ["I want my money back for order 123", "..."]}

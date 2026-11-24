@@ -32,7 +32,7 @@ fn view(source: &str) -> (Encoder, View) {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn spike_two_awaits_replay_and_reject_changed_request() {
     let (enc, v) = view(
         r#"export function Main({q}) {
@@ -96,7 +96,7 @@ fn spike_two_awaits_replay_and_reject_changed_request() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn all_starts_every_call_before_parking_and_keeps_order() {
     let (enc, v) = view(
         r#"export function Main({}) { return <aff name="go" onGo={async () => {
@@ -125,7 +125,7 @@ fn all_starts_every_call_before_parking_and_keeps_order() {
 }
 
 #[test]
-#[cfg_attr(not(feature = "reference-tests"), ignore = "needs ref/ data: docs/DEVELOPING.md")]
+#[cfg_attr(not(feature = "test-tokenizers"), ignore = "needs tools/fetch-test-tokenizers.sh")]
 fn fire_and_forget_is_recorded_without_await() {
     let (enc, v) = view(
         r#"export function Main({}) { return <aff name="go" onGo={() => {

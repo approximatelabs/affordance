@@ -12,6 +12,8 @@
 #[global_allocator]
 static ALLOCATOR: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+#[path = "support/controller.rs"]
+pub mod controller;
 #[path = "support/each.rs"]
 pub mod each;
 #[path = "support/http_fixture.rs"]
@@ -33,6 +35,7 @@ mod cli_app;
 mod cli_run;
 mod conformance;
 mod conformance_inventory;
+mod control;
 mod courier;
 mod decision;
 mod effects;

@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 #[derive(Default)]
-struct Agent {
+struct Instance {
     /// Busts so far, and the count at which the next is printed (1, 2, 4, ...).
     busts: u64,
     next_bust: u64,
@@ -38,7 +38,7 @@ const LINES: u64 = 12;
 
 #[derive(Default)]
 struct Run {
-    agents: HashMap<String, Agent>,
+    agents: HashMap<String, Instance>,
     /// Model call problems reported so far (`problem`).
     problems: u64,
     /// Lines printed, and warnings since the last summary line once past `LINES`.
@@ -50,7 +50,7 @@ struct Run {
 /// What a person at the terminal must be told about a model call, as a browser's console reports
 /// a failed request: the call failed and what happens next, or the reply wrote a tool call as
 /// text. A failing call is reported at its 1st, 2nd, 4th, 8th.. failure.
-fn problem(id: &str, a: &mut Agent, rec: &J) -> Option<String> {
+fn problem(id: &str, a: &mut Instance, rec: &J) -> Option<String> {
     match rec["t"].as_str()? {
         "model_error" | "render_error" => {
             let failures = rec["failures"].as_u64()?;
@@ -126,7 +126,7 @@ pub fn observer(warn: Option<CacheWarn>) -> Observer {
 }
 
 /// One trace record: a line to print, if it calls for one.
-fn check(warn: &CacheWarn, id: &str, a: &mut Agent, rec: &J) -> Option<String> {
+fn check(warn: &CacheWarn, id: &str, a: &mut Instance, rec: &J) -> Option<String> {
     let task = rec["task"].as_u64();
     match rec["t"].as_str()? {
         "render" => {
@@ -190,12 +190,12 @@ mod tests {
 
     #[test]
     fn a_large_early_rewrite_warns_and_repeats_are_rate_limited() {
-        let mut a = Agent::default();
+        let mut a = Instance::default();
         let bust = |turn| json!({"t": "render", "turn": turn, "task": turn, "prompt_tokens": 5000, "shared": 40, "append": {"rewrite_at": 40, "of": 4800}});
         let printed: Vec<bool> = (1..=9).map(|t| check(&W, "e0", &mut a, &bust(t)).is_some()).collect();
         // The 1st, 2nd, 4th and 8th are printed.
         assert_eq!(printed, [true, true, false, true, false, false, false, true, false]);
-        let line = check(&W, "e0", &mut Agent::default(), &bust(3)).unwrap();
+        let line = check(&W, "e0", &mut Instance::default(), &bust(3)).unwrap();
         assert!(
             line.contains("changed at token 40 of 4800") && line.contains("recomputes 4760"),
             "{line}"
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn exact_appends_late_rewrites_and_short_prompts_are_quiet() {
-        let mut a = Agent::default();
+        let mut a = Instance::default();
         for rec in [
             json!({"t": "render", "turn": 1, "task": 1, "prompt_tokens": 5000, "shared": 4900, "append": "exact"}),
             json!({"t": "render", "turn": 2, "task": 2, "prompt_tokens": 5000, "shared": 4000, "append": {"rewrite_at": 4000, "of": 4800}}),
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn the_server_reusing_much_less_than_expected_is_noted() {
-        let mut a = Agent::default();
+        let mut a = Instance::default();
         check(
             &W,
             "e0",
