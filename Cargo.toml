@@ -126,7 +126,7 @@ path = "tests/closures_freed.rs"
 # built once and cached). Release builds are unchanged.
 [profile.ci]
 inherits = "dev"
-opt-level = 0
+opt-level = 1
 debug = false
 incremental = false
 
