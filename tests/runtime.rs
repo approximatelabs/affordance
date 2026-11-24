@@ -389,9 +389,9 @@ fn scripted(
         // restored run continues the same script).
         let asst = enc.token_id("<|assistant|>").unwrap();
         let n = req.ids.iter().filter(|&&t| t == asst).count();
-        counts.lock().unwrap().insert(req.agent.clone(), n);
+        counts.lock().unwrap().insert(req.client.clone(), n);
         std::thread::sleep(std::time::Duration::from_millis(delay_ms));
-        let text = script(&req.agent, n);
+        let text = script(&req.client, n);
         let stop = if text.contains("<tool_call>") {
             "<|observation|>"
         } else {
@@ -571,9 +571,11 @@ fn exec_over_ssh_localhost() {
         max_capture: 1 << 20,
     };
     let ctx = CallContext {
-        agent: "agent-0001".into(),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "agent-0001".into(),
+        },
+        call: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
         blobs: None,
@@ -804,9 +806,11 @@ fn cancelled_exec_kills_the_process_group() {
     let marker = format!("aff-cancel-{}", std::process::id());
     let token = CancelToken::new();
     let ctx = CallContext {
-        agent: "a".into(),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "a".into(),
+        },
+        call: 0,
         env: BTreeMap::new(),
         cancel: token.clone(),
         blobs: None,
@@ -1380,9 +1384,11 @@ fn a_docker_machine_is_one_container_per_agent() {
         max_capture: 1 << 20,
     };
     let ctx = |agent: &str| CallContext {
-        agent: agent.into(),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: agent.into(),
+        },
+        call: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
         blobs: None,
@@ -1467,9 +1473,11 @@ fn a_bwrap_machine_shows_a_command_the_system_and_its_home_and_no_other_files() 
         max_capture: 1 << 20,
     };
     let ctx = CallContext {
-        agent: "a".into(),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "a".into(),
+        },
+        call: 0,
         env: BTreeMap::new(),
         cancel: Default::default(),
         blobs: None,
@@ -2381,9 +2389,11 @@ fn a_long_run_keeps_store_payloads_on_disk_and_resumes_exactly() {
 fn a_command_machine_runs_its_program_per_call() {
     use affordance::runtime::{CallContext, CommandMachine, Executor};
     let ctx = CallContext {
-        agent: "a".into(),
-        instance: String::new(),
-        task: 7,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "a".into(),
+        },
+        call: 7,
         env: BTreeMap::from([("K".into(), "v".into())]),
         cancel: Default::default(),
         blobs: None,
@@ -2393,7 +2403,7 @@ fn a_command_machine_runs_its_program_per_call() {
     let r = echo.call(&ctx, &json!({"cmd": "ls"})).unwrap();
     assert_eq!(
         r,
-        json!({"agent": "a", "task": 7, "env": {"K": "v"}, "args": {"cmd": "ls"}})
+        json!({"client": {"id": "i-a", "name": "a"}, "call": 7, "env": {"K": "v"}, "args": {"cmd": "ls"}})
     );
     let fails = CommandMachine::new(vec!["sh".into(), "-c".into(), "echo nope >&2; exit 3".into()]);
     assert!(fails.call(&ctx, &json!({})).unwrap_err().contains("nope"));
@@ -2405,9 +2415,11 @@ fn a_command_machine_runs_its_program_per_call() {
 fn a_command_reply_past_its_bound_fails_the_call() {
     use affordance::runtime::{CallContext, CommandMachine, Executor};
     let ctx = CallContext {
-        agent: "a".into(),
-        instance: String::new(),
-        task: 1,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "a".into(),
+        },
+        call: 1,
         env: BTreeMap::new(),
         cancel: Default::default(),
         blobs: None,
@@ -2473,9 +2485,11 @@ fn a_cancelled_command_call_lets_the_command_clean_up() {
     ]);
     let cancel = CancelToken::new();
     let ctx = CallContext {
-        agent: "a".into(),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "a".into(),
+        },
+        call: 0,
         env: BTreeMap::new(),
         cancel: cancel.clone(),
         blobs: None,
@@ -2514,9 +2528,11 @@ fn a_cancelled_command_call_reaps_a_stubborn_descendant() {
     ]);
     let cancel = CancelToken::new();
     let ctx = CallContext {
-        agent: "a".into(),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "a".into(),
+        },
+        call: 0,
         env: BTreeMap::new(),
         cancel: cancel.clone(),
         blobs: None,

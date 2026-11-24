@@ -181,8 +181,8 @@ fn main() {
                 .map(|i| {
                     format!(
                         "test suite::case_{:04}_{i:03} ... ok ({} ms)\n",
-                        ctx.task % 10000,
-                        (ctx.task as usize * 7 + i * 13) % 97
+                        ctx.call % 10000,
+                        (ctx.call as usize * 7 + i * 13) % 97
                     )
                 })
                 .collect();

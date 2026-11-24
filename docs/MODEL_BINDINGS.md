@@ -298,7 +298,7 @@ dispatched or replayed as unanswered native calls. Valid reasoning state remains
 
 `provider_options` accepts `reasoning`, `text`, `parallel_tool_calls`, `service_tier`, cache
 options and other provider extensions. A stable default `prompt_cache_key` hashes binding
-identity plus instance ID. It contains no credential path in clear text. An explicit nonempty
+identity plus the instance's name. It contains no credential path in clear text. An explicit nonempty
 key of at most 64 bytes may be supplied in provider options. Keep it stable across turns.
 Current models use `prompt_cache_options.ttl`; see the official
 [caching contract](https://developers.openai.com/api/docs/guides/prompt-caching).
@@ -331,7 +331,7 @@ file with an `OPENAI_API_KEY=` line. Provider reasoning rules are documented by
 
 A SGLang session belongs to one client identity. A changed endpoint, provider options,
 credential source or binding defaults requires a fresh client or `Sessions` value. Per-call
-sampling can vary. Two clients using the same server and instance ID still have separate sessions.
+sampling can vary. Two clients using the same server and instance name still have separate sessions.
 Server session loss retains the existing fallback to a full prompt; sockets and server sessions
 are never serialized into a journal.
 

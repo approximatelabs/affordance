@@ -20,9 +20,11 @@ fn tmp(name: &str) -> PathBuf {
 }
 fn ctx() -> CallContext {
     CallContext {
-        agent: "a".into(),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "a".into(),
+        },
+        call: 0,
         env: Default::default(),
         cancel: Default::default(),
         blobs: None,

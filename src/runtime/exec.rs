@@ -11,17 +11,14 @@ use std::time::{Duration, Instant};
 /// Who is calling, as the runtime knows it (never taken from the app's arguments).
 #[derive(Debug, Clone)]
 pub struct CallContext {
-    /// The instance that calls (its name).
-    pub agent: String,
-    /// The instance's id in its run: a safe path component the runtime assigned, never derived from
-    /// the name (empty outside a run: the name, escaped, stands in). A machine's per-instance place
-    /// is named by it.
-    pub instance: String,
-    /// The call's task, unique within the instance.
-    pub task: u64,
-    /// The agent's environ (plain and secret values).
+    /// The instance that calls, as a Service Worker's fetch event names its client.
+    pub client: Client,
+    /// The call's number within its client. `(client.id, call)` names the same call after a
+    /// restore, so a machine doing something that cannot be undone can recognise one it has seen.
+    pub call: u64,
+    /// The client's environ (plain and secret values).
     pub env: BTreeMap<String, String>,
-    /// Cancelled when the agent no longer needs the result (or the runtime shuts down).
+    /// Cancelled when the client no longer needs the result (or the runtime shuts down).
     pub cancel: super::cancel::CancelToken,
     /// Where the runtime keeps large strings: an executor may put a large result there itself
     /// (as `exec` does) instead of returning it on the heap.
@@ -29,6 +26,17 @@ pub struct CallContext {
     /// Where an executor hands output as it is produced (a command's stdout and stderr), for
     /// live views (`RuntimeConfig.observer`). The result is unchanged by it.
     pub output: Option<Output>,
+}
+
+/// The instance that makes a call.
+#[derive(Debug, Clone, Default)]
+pub struct Client {
+    /// Its id in its run: a safe path component the runtime assigned, never derived from the name
+    /// (empty outside a run: the name, escaped, stands in). A machine's per-instance place is
+    /// named by it.
+    pub id: String,
+    /// Its name (`root/alice`).
+    pub name: String,
 }
 
 /// A sink for a call's output as it is produced (`CallContext.output`).
@@ -226,10 +234,10 @@ impl Exec {
 
 /// The calling instance's id: the one the runtime assigned, or (outside a run) its name escaped.
 fn instance_of(ctx: &CallContext) -> String {
-    if ctx.instance.is_empty() {
-        instance_component(&ctx.agent)
+    if ctx.client.id.is_empty() {
+        instance_component(&ctx.client.name)
     } else {
-        ctx.instance.clone()
+        ctx.client.id.clone()
     }
 }
 
@@ -371,7 +379,7 @@ impl Executor for Exec {
                     }
                 }
                 for path in read {
-                    let path = path.replace("{agent}", &instance_component(&ctx.agent));
+                    let path = path.replace("{client}", &instance_of(ctx));
                     c.args(["--ro-bind", &path, &path]);
                 }
                 c.args(["--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
@@ -732,11 +740,11 @@ impl Executor for CommandMachine {
         let owned = Arc::new(Mutex::new(process(child.id())));
         let weak = Arc::downgrade(&owned);
         ctx.cancel.on_cancel(move || terminate(weak, Duration::from_secs(5)));
-        // The command is deployment code: it keeps the runtime's environment and gets the agent's
+        // The command is deployment code: it keeps the runtime's environment and gets the client's
         // environ in the payload.
         // Written on its own thread (a large `stdin` must not wait on a command that writes first),
         // and a command that exits without reading is judged by its exit, not by the broken pipe.
-        let payload = json!({"agent": ctx.agent, "task": ctx.task, "env": ctx.env, "args": args}).to_string();
+        let payload = json!({"client": {"id": instance_of(ctx), "name": ctx.client.name}, "call": ctx.call, "env": ctx.env, "args": args}).to_string();
         let mut input = child.stdin.take().unwrap();
         std::thread::spawn(move || {
             let _ = input.write_all(payload.as_bytes());

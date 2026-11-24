@@ -261,9 +261,11 @@ fn real_executor_timeout_is_explicit_and_not_an_exit_code_guess() {
     let (mut a, mut j, cmds) = begin(&v, &e);
     let (task, _, args) = call(&cmds);
     let ctx = CallContext {
-        agent: "agent-0000".into(),
-        instance: String::new(),
-        task,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: "agent-0000".into(),
+        },
+        call: task,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),
         blobs: None,

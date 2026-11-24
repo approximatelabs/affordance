@@ -21,7 +21,7 @@ mod model_config;
 pub mod store;
 
 pub use cancel::CancelToken;
-pub use exec::{CallContext, CommandMachine, Exec, Executor, Output, Target};
+pub use exec::{CallContext, Client, CommandMachine, Exec, Executor, Output, Target};
 pub use host::{
     Control, Delivery, Ended, InstanceReport, InstanceSpec, Observed, Observer, Report, Runtime, RuntimeConfig,
 };

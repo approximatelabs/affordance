@@ -183,8 +183,8 @@ machine.
 | `local` | `home?`, `per_instance?` | `bash` on this host, with only the instance's environ, in `home` when given (with `per_instance`, each instance its own directory under it, `home/<instance id>`). |
 | `ssh` | `target`, `key?`, `control_dir?`, `known_hosts?` | `bash` on a VM over a shared SSH connection. A host's key is accepted the first time it is seen and checked from then on. The known-hosts file and the connection sockets are kept in `~/.config/affordance/ssh`, which only this user can enter, unless the deployment names other places. |
 | `docker` | `image`, `name?` (default `aff`) | `bash` in a container per instance, `<name>-<instance id>`, started on first use and kept. |
-| `bwrap` | `home`, `per_instance?`, `network?` (default false), `read?` | `bash` in a bubblewrap sandbox. The command sees the system's programs and libraries read-only (`/usr`, `/bin`, `/sbin`, `/lib*`, `/etc`, `/opt`), its `home` writable and a private /tmp. No other file on the host is there for it: not a home directory, not mounted data. `read` lists more paths to show read-only. Linux, where the kernel lets an ordinary user make a sandbox. |
-| `command` | `argv` | An external executor: JSON requests on stdin, JSON responses on stdout. |
+| `bwrap` | `home`, `per_instance?`, `network?` (default false), `read?` | `bash` in a bubblewrap sandbox. The command sees the system's programs and libraries read-only (`/usr`, `/bin`, `/sbin`, `/lib*`, `/etc`, `/opt`), its `home` writable and a private /tmp. No other file on the host is there for it: not a home directory, not mounted data. `read` lists more paths to show read-only (`{client}` in one is the calling instance's id). Linux, where the kernel lets an ordinary user make a sandbox. |
+| `command` | `argv` | An external executor: each call runs `argv` with `{client: {id, name}, call, env, args}` as JSON on stdin and reads a JSON result from stdout. `client` is the calling instance (its id and its name, `root/alice`) and `call` the call's number within it. |
 | `http` | `url`, `headers?`, `timeout_ms?`, byte limits | HTTP requests on a bound origin. Grant the role `http` for global `fetch(input, init)`. See [Fetch and MCP](HTTP_AND_MCP.md). |
 
 An instance's place on a machine is named by the id the runtime gave it, never by its name. An
@@ -338,7 +338,8 @@ to run it.
   printed with the instance id and byte counts.
 - **Restore.** `--restore` rebuilds every instance from its journal (same renders, same state) and
   resubmits its outstanding work. External work in flight at the crash is submitted again, so
-  machine commands with durable side effects should deduplicate by instance and task id.
+  a machine doing something that cannot be undone (a payment, an email) should remember the
+  `(client.id, call)` pairs it has done: a call sent again after a restore carries the same pair.
 
 ```yaml
 app:

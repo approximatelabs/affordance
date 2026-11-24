@@ -100,30 +100,30 @@ fn prompt_counted(req: &GenRequest, counted: Option<u64>) {
     if counted != req.ids.len() as u64 && req.diagnostics.0.token_mismatches.fetch_add(1, Ordering::Relaxed) < 5 {
         eprintln!(
             "affordance: {}: the prompt was laid out as {} tokens and the server counted {counted}. The model did not read the tokens that were laid out (a picture, clip or video whose size is wrong, or a server that tokenized the prompt again)",
-            req.agent,
+            req.client,
             req.ids.len()
         );
     }
 }
 
 /// The run's capture directory (`RuntimeConfig.capture_dir`): every request and response (and
-/// stream event) is written there, by agent.
+/// stream event) is written there, by client.
 /// `data` (the JSON of what is captured) is only built when capturing is on: a request body holds
 /// the whole prompt. A capture is diagnostics, like a browser's network log: a failed write (a
 /// full disk) never fails the call. It is counted, logged at the 1st, 2nd, 4th, ... failure, and
 /// leaves no file. Each capture is renamed into place (a reader never sees part of one) but not
 /// synced: a crash can lose the last captures, which a journal would need and a log does not.
 fn capture(req: &GenRequest, rid: &str, kind: &str, data: impl FnOnce() -> Vec<u8>) {
-    let agent = req.agent.as_str();
+    let client = req.client.as_str();
     let Some(root) = &req.diagnostics.0.capture_dir else {
         return;
     };
     // The instance's name, escaped into one path component: never a path of its own.
-    let dir = root.join(super::exec::instance_component(agent));
+    let dir = root.join(super::exec::instance_component(client));
     let path = dir.join(format!("{rid}.{kind}.json"));
     let temporary = path.with_extension("tmp");
     let written = std::fs::create_dir_all(&dir).and_then(|_| {
-        let head = json!({"at": chrono::Utc::now().timestamp_millis() as f64/1000.0,"request_id":rid,"agent":agent,"tag":req.tag}).to_string();
+        let head = json!({"at": chrono::Utc::now().timestamp_millis() as f64/1000.0,"request_id":rid,"client":client,"tag":req.tag}).to_string();
         let mut out = head.into_bytes();
         out.pop();
         out.extend_from_slice(b",\"data\":");
@@ -245,8 +245,8 @@ fn new_rid() -> String {
 #[derive(Debug, Clone)]
 /// One model call: a prompt's token ids and how to generate from them.
 pub struct GenRequest {
-    /// The instance that asks (for rank pinning, sessions and captures).
-    pub agent: String,
+    /// The instance that asks, by name (for rank pinning, sessions and captures).
+    pub client: String,
     /// The prompt.
     pub ids: std::sync::Arc<[u32]>,
     /// The most tokens to generate.
@@ -273,7 +273,7 @@ pub struct GenRequest {
 impl GenRequest {
     /// A request with no sampling overrides, tag or images.
     pub fn new(
-        agent: &str,
+        client: &str,
         ids: impl Into<std::sync::Arc<[u32]>>,
         max_new: usize,
         stop: Vec<u32>,
@@ -281,7 +281,7 @@ impl GenRequest {
         cancel: CancelToken,
     ) -> Self {
         GenRequest {
-            agent: agent.into(),
+            client: client.into(),
             ids: ids.into(),
             max_new,
             stop,
@@ -1025,7 +1025,7 @@ impl Sglang {
         };
         let old = {
             let mut open = sessions.open.lock().unwrap();
-            match open.get(&req.agent) {
+            match open.get(&req.client) {
                 Some(s)
                     if s.turns < sessions.turns && req.ids.len() > s.prompt.len() && req.ids.starts_with(&s.prompt) =>
                 {
@@ -1035,7 +1035,7 @@ impl Sglang {
                         offset: s.prompt.len(),
                     };
                 }
-                _ => open.remove(&req.agent),
+                _ => open.remove(&req.client),
             }
         };
         if let Some(old) = old {
@@ -1084,7 +1084,7 @@ impl Sglang {
         };
         if prompt_tokens != Some(req.ids.len() as u64) {
             sessions.off.store(true, Ordering::Relaxed);
-            sessions.open.lock().unwrap().remove(&req.agent);
+            sessions.open.lock().unwrap().remove(&req.client);
             self.close_session(id, headers);
             return Err(HttpError::transport(format!(
                 "sglang session: the server's prompt has {prompt_tokens:?} tokens, the agent's {}; sessions are now off for this model",
@@ -1093,7 +1093,7 @@ impl Sglang {
         }
         let mut open = sessions.open.lock().unwrap();
         let turns = match wire {
-            Wire::Continue { .. } => open.get(&req.agent).map_or(0, |s| s.turns),
+            Wire::Continue { .. } => open.get(&req.client).map_or(0, |s| s.turns),
             _ => 0,
         };
         // An agent that ended leaves its session here; the server has dropped any that idled
@@ -1101,7 +1101,7 @@ impl Sglang {
         let timeout = sessions.timeout;
         open.retain(|_, s| s.used.elapsed() < timeout);
         open.insert(
-            req.agent.clone(),
+            req.client.clone(),
             Session {
                 id: id.clone(),
                 rid: rid.into(),
@@ -1116,7 +1116,7 @@ impl Sglang {
     /// The session a request was sent on is gone (or refused it): forget it.
     fn lost(&self, req: &GenRequest, wire: &Wire, headers: &[(&str, String)]) {
         if let (Some(sessions), Wire::Open(id) | Wire::Continue { id, .. }) = (&self.sessions, wire) {
-            sessions.open.lock().unwrap().remove(&req.agent);
+            sessions.open.lock().unwrap().remove(&req.client);
             self.close_session(id, headers);
         }
     }
@@ -2057,7 +2057,7 @@ impl Chat {
             body["include"] = json!(["reasoning.encrypted_content"]);
             if body.get("prompt_cache_key").is_none() {
                 body["prompt_cache_key"] = json!(fingerprint(
-                    json!({"binding":self.binding_identity(), "agent":req.agent})
+                    json!({"binding":self.binding_identity(), "client":req.client})
                 ));
             }
         }
