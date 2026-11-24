@@ -476,8 +476,10 @@ fn fleet_runtime(
 fn six_agents_on_three_workers_message_each_other_and_resume_from_journals() {
     let dir = std::env::temp_dir().join(format!("aff-runtime-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
-    // A run interrupted mid-way (a crash, from the agents' point of view) ...
-    let first = fleet_runtime(&dir, 40, Some(std::time::Duration::from_millis(300)), false);
+    // A run interrupted mid-way (a crash, from the agents' point of view) ... Each model reply takes
+    // 200 ms, so five turns take at least a second, and the run ends at 600 ms: however fast the
+    // machine, no agent finishes, and the first turns do.
+    let first = fleet_runtime(&dir, 200, Some(std::time::Duration::from_millis(600)), false);
     assert!(!first.complete);
     let partial: Vec<u64> = first.instances.iter().map(|a| a.metrics.turns).collect();
     assert!(

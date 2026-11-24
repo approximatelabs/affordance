@@ -465,7 +465,6 @@ impl Shared {
     /// An instance's id in the run (its directory's name), for a machine's per-instance place;
     /// empty without a run directory (`CallContext.instance`).
     fn instance_key(&self, id: &str) -> String {
-        std::hint::black_box(2u8);
         self.instance_dir(id)
             .and_then(|d| d.file_name().map(|n| n.to_string_lossy().into_owned()))
             .unwrap_or_default()

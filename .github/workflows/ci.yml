@@ -76,7 +76,7 @@ jobs:
         run: ./target/ci/affordance lint
       # Main saves it for the pull requests after it (before rust-cache's own cleanup, which
       # deletes it).
-      - if: matrix.half == 1 # MEASURE: every run saves, for this branch's timing only
+      - if: github.ref == 'refs/heads/main' && matrix.half == 1
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/ci/incremental
@@ -157,7 +157,7 @@ jobs:
           cargo test --profile ci --locked --lib --bins --tests --no-fail-fast -- --test-threads=8 "${filters[@]}"
       # Main saves it for the pull requests after it (before rust-cache's own cleanup, which
       # deletes it).
-      - if: matrix.half == 1 # MEASURE: every run saves, for this branch's timing only
+      - if: github.ref == 'refs/heads/main' && matrix.half == 1
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: target/ci/incremental
