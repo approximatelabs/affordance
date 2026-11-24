@@ -604,7 +604,7 @@ where no name reaches them.
 
 | Path | Meaning |
 |---|---|
-| `run.json` | The run's own record: the directory holds a run. |
+| `run.json` | The run's stamp: the contract it was written under. A run directory belongs to the version that wrote it: a runtime refuses one stamped with another contract (or a version before stamps left: a lock and no stamp) before reading anything in it, and `--fresh` sets the whole directory aside under `retired/`. |
 | `instances/<id>/instance.json` | The instance's name, spec and pins. Secrets are removed. |
 | `instances/<id>/journal.jsonl` | Its inputs. **Sensitive:** tool outputs and messages are stored as they were. |
 | `commit.jsonl` | The journals' commits: each journal's committed length, by instance (§7). A restore truncates journals to the last one. |

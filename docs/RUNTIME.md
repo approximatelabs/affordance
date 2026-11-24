@@ -41,7 +41,9 @@ deployment is valid YAML too); unknown keys are errors.
   directory, so a deployment runs the same from anywhere.
 - **The journal directory** is `dir`, by default `.affordance/` beside the file. A run that
   finds an earlier run there stops and asks for `--restore` (continue it) or `--fresh` (start over;
-  the earlier run's instances move under `retired/`).
+  the earlier run's files move under `retired/`). A run directory belongs to the version of
+  Affordance that wrote it (`run.json` says which): a run of another version is refused, with what
+  to do (finish it with that version, or `--fresh`); nothing in it is read or converted.
 - **`affordance config`** prints the resolved deployment (same arguments as `run`), with the
   values of `secrets` hidden.
 

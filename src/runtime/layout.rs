@@ -11,8 +11,10 @@ use std::sync::Mutex;
 /// The directory of every instance, in a run directory.
 pub(crate) const INSTANCES: &str = "instances";
 const RETIRED: &str = "retired";
-/// The run's own record: it says the directory holds a run.
+/// The run's own record: it says the directory holds a run, and which contract wrote it.
 pub const RUN: &str = "run.json";
+/// The lock a runtime takes on its run directory (`host::durable::own`), in every version.
+const LOCK: &str = "runtime.lock";
 
 /// The instances of a run directory, by name.
 pub(crate) struct Layout {
@@ -102,9 +104,60 @@ pub(crate) fn scan(root: &Path) -> Vec<(String, PathBuf)> {
     found
 }
 
-/// Whether `root` holds a run (its record, or any instance).
-pub fn holds_a_run(root: &Path) -> bool {
-    root.join(RUN).is_file() || !scan(root).is_empty()
+/// What a run directory holds, as its stamp says: a run directory belongs to the version of
+/// Affordance that wrote it. A directory holds a run when it has the run's lock file (every version
+/// takes it when a run starts) or its stamp, `run.json`, which records the contract it was written
+/// under; nothing else in the directory is read to decide.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Holds {
+    /// No run (absent, no lock or stamp, or only runs set aside under `retired/`): one may start.
+    Nothing,
+    /// A run written by this version.
+    ThisVersion,
+}
+
+/// What `root` holds; an error when it holds a run of another version (another contract in its
+/// stamp, or files and no stamp, which only a version before stamps leaves). That run is
+/// finished with the version that wrote it, or set aside with `--fresh`; it is never read.
+pub fn holds(root: &Path, contract: u32) -> Result<Holds, String> {
+    if !root.join(LOCK).exists() && !root.join(RUN).exists() {
+        return Ok(Holds::Nothing);
+    }
+    let written = std::fs::read(root.join(RUN))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|v| v["contract"].as_u64());
+    match written {
+        Some(c) if c == contract as u64 => Ok(Holds::ThisVersion),
+        Some(c) => Err(format!(
+            "{} holds a run written by another version of Affordance (contract {c}; this one is contract {contract}): finish it with that version, or start over with --fresh (its files are kept under retired/)",
+            root.display()
+        )),
+        None => Err(format!(
+            "{} holds a run written by an earlier version of Affordance (before contract 9): finish it with that version, or start over with --fresh (its files are kept under retired/)",
+            root.display()
+        )),
+    }
+}
+
+/// Set everything in `root` aside, under `retired/<time>/`, whatever version wrote it: a fresh
+/// run starts in an empty directory, and nothing of the old one is lost.
+pub fn set_aside(root: &Path) -> Result<(), String> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Ok(());
+    };
+    let to = root
+        .join(RETIRED)
+        .join(chrono::Utc::now().format("%Y%m%dT%H%M%S%.3fZ").to_string());
+    for entry in entries.flatten() {
+        if entry.file_name() == RETIRED {
+            continue;
+        }
+        std::fs::create_dir_all(&to).map_err(|e| format!("{}: {e}", to.display()))?;
+        std::fs::rename(entry.path(), to.join(entry.file_name()))
+            .map_err(|e| format!("{}: {e}", entry.path().display()))?;
+    }
+    Ok(())
 }
 
 /// A UUIDv7: 48 bits of Unix milliseconds, then random bits (RFC 9562), as lowercase hex.

@@ -1127,18 +1127,19 @@ fn resume_pins_the_app_and_detects_a_changed_one() {
         after["pins"], pins["pins"],
         "the journal keeps the pins it was written against"
     );
-    // A journal of another contract is refused, not replayed.
-    let mut old = after.clone();
-    old["pins"]["contract"] = json!(1);
-    std::fs::write(
-        crate::shared::inst(&dir, "agent-0/instance.json"),
-        serde_json::to_string(&old).unwrap(),
-    )
-    .unwrap();
-    let refused = pinned_run(&dir, &original, true, false);
-    let err = refused.instances[0].error.clone().unwrap_or_default();
-    assert!(err.contains("restore refused") && err.contains("contract 1"), "{err}");
-    assert_eq!(refused.instances[0].metrics.turns, 0);
+    // A run directory of another contract is refused as a whole, before anything in it is read.
+    let journal = std::fs::read(crate::shared::inst(&dir, "agent-0/journal.jsonl")).unwrap();
+    std::fs::write(dir.join("run.json"), json!({"contract": 1}).to_string()).unwrap();
+    let mut cfg = RuntimeConfig::new(&original);
+    cfg.dir = Some(dir.clone());
+    let err = Runtime::restore(cfg, encoder(), scripted(encoder(), 0, |_, _| "unused".into()))
+        .err()
+        .expect("a run of another contract is refused");
+    assert!(err.contains("contract 1") && err.contains("--fresh"), "{err}");
+    assert_eq!(
+        std::fs::read(crate::shared::inst(&dir, "agent-0/journal.jsonl")).unwrap(),
+        journal
+    );
 }
 
 #[test]

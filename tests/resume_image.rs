@@ -38,8 +38,14 @@ fn run(dir: &Path, restore: bool, hang_at: Option<usize>) -> affordance::runtime
     let model = Arc::new(FnModel(move |req: &GenRequest| {
         let asst = model_enc.token_id("<|assistant|>").unwrap();
         let n = req.ids.iter().filter(|&&t| t == asst).count();
+        // A hung server: no answer until the call is cancelled (the run closing at max_wall),
+        // as a real model call is.
         if hang_at == Some(n) {
-            std::thread::sleep(Duration::from_secs(30));
+            let until = std::time::Instant::now() + Duration::from_secs(30);
+            while !req.cancel.is_cancelled() && std::time::Instant::now() < until {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            return Err("cancelled".into());
         }
         let text = if n % 3 == 0 {
             "Thinking.</think>Still working.".to_string()

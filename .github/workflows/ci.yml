@@ -19,8 +19,8 @@ env:
   CARGO_INCREMENTAL: "0"
 jobs:
   # Every test that needs no reference data beyond a few tokenizers, in five shards that run at
-  # the same time, each about the same length: shard 1 is the one long test file, shards 2 to 4
-  # groups of the slower files, shard 5 every other test (and the TSX lint of the shipped views).
+  # the same time, each about the same length: shards 1 to 4 groups of the slower files (shard 1
+  # also the TSX lint of the shipped views), shard 5 every other test.
   # The filters are name filters, so each test runs in exactly one shard. The tokenizers come
   # from this repository's own release (tools/fetch-test-tokenizers.sh), kept in the cache.
   test:
@@ -31,9 +31,9 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5]
     env:
-      SHARD_1: "resume_image::"
+      SHARD_1: "resume_image:: session_agent::"
       SHARD_2: "hardening:: group_commit::"
-      SHARD_3: "runtime:: session_agent:: page:: serve:: harness_consumer:: tool_traces::"
+      SHARD_3: "runtime:: page:: serve:: harness_consumer:: tool_traces:: agents_bin:: control:: http_connector:: spill::"
       SHARD_4: "runtime_http:: model_bindings:: features:: chat_render:: window:: pause_latency::"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,7 +68,7 @@ jobs:
             *) filters=(); for f in $SHARD_1 $SHARD_2 $SHARD_3 $SHARD_4; do filters+=(--skip "$f"); done ;;
           esac
           cargo test --profile ci --locked --features test-tokenizers --lib --bins --tests -- --test-threads=8 "${filters[@]}"
-      - if: matrix.shard == 5
+      - if: matrix.shard == 1
         run: cargo run --profile ci --locked --bin affordance -- lint
   # Clippy on every feature: the longest of the checks, so a job of its own.
   clippy:
@@ -133,7 +133,7 @@ jobs:
           shared-key: msrv
       - run: cargo check --locked --all-targets
   # macOS: the command builds and the tests that need no reference data at all pass (not the
-  # tokenizer tests, which Linux runs), in three shards. Every test binary runs even after one fails, so one run shows everything
+  # tokenizer tests, which Linux runs), in four shards. Every test binary runs even after one fails, so one run shows everything
   # that differs here.
   macos:
     runs-on: macos-15
@@ -141,10 +141,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     env:
       SHARD_1: "hardening:: group_commit::"
       SHARD_2: "runtime_http:: model_bindings::"
+      # The files that start processes and servers, slower here than on Linux.
+      SHARD_3: "runtime:: reliability:: control:: agents_bin:: cli_run:: serve:: abort::"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -168,6 +170,7 @@ jobs:
             # the same on every system; Linux runs it, and on macOS it alone is over a minute.
             1) filters=($SHARD_1 --skip hardening::bulk_allocations_throw_range_errors_instead_of_aborting) ;;
             2) filters=($SHARD_2) ;;
-            *) filters=(); for f in $SHARD_1 $SHARD_2; do filters+=(--skip "$f"); done ;;
+            3) filters=($SHARD_3) ;;
+            *) filters=(); for f in $SHARD_1 $SHARD_2 $SHARD_3; do filters+=(--skip "$f"); done ;;
           esac
           cargo test --profile ci --locked --lib --bins --tests --no-fail-fast -- --test-threads=8 "${filters[@]}"
