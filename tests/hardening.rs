@@ -191,9 +191,11 @@ fn local_instance_home_names_do_not_alias() {
         max_capture: 1024,
     };
     let context = |id: &str| CallContext {
-        agent: id.into(),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: id.into(),
+        },
+        call: 0,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),
         blobs: None,
@@ -504,24 +506,16 @@ fn bulk_allocations_throw_range_errors_instead_of_aborting() {
         ("{const a=many();a.push(...a);}", array),
         ("{const s=big();return s+s.slice(0,-24);}", "ok"),
     ];
-    // Each case copies hundreds of megabytes, so each renders on its own thread.
-    std::thread::scope(|scope| {
-        let runs: Vec<_> = cases
-            .iter()
-            .map(|(case, _)| {
-                scope.spawn(move || {
-                    render_on_worker_stack(&format!(
-                        "export default function Main(){{const big=()=>'x'.repeat(2**28);const many=()=>Array(1e7).fill(0);
-                        try{{(()=>{case})();return 'ok';}}catch(e){{return `${{e.name}}: ${{e.message}}`;}}}}"
-                    ))
-                    .unwrap()
-                })
-            })
-            .collect();
-        for (run, (case, expected)) in runs.into_iter().zip(cases) {
-            assert_eq!(run.join().unwrap(), expected, "{case}");
-        }
-    });
+    // Each case copies hundreds of megabytes, so they run one after another: at once they page in
+    // gigabytes and slow every other test on the machine.
+    for (case, expected) in cases {
+        let got = render_on_worker_stack(&format!(
+            "export default function Main(){{const big=()=>'x'.repeat(2**28);const many=()=>Array(1e7).fill(0);
+            try{{(()=>{case})();return 'ok';}}catch(e){{return `${{e.name}}: ${{e.message}}`;}}}}"
+        ))
+        .unwrap();
+        assert_eq!(got, expected, "{case}");
+    }
 }
 
 /// Values nest deeper than a native walk can recurse: dropping, parsing and splicing them as
@@ -624,9 +618,11 @@ fn docker_names_and_images_are_arguments_never_host_shell_source() {
     }
     let marker = std::env::var("AFFORDANCE_DOCKER_MARKER").unwrap();
     let ctx = CallContext {
-        agent: format!("root/child$(touch${{IFS}}{marker})"),
-        instance: String::new(),
-        task: 0,
+        client: affordance::runtime::Client {
+            id: String::new(),
+            name: format!("root/child$(touch${{IFS}}{marker})"),
+        },
+        call: 0,
         env: BTreeMap::new(),
         cancel: CancelToken::new(),
         blobs: None,
