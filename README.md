@@ -139,7 +139,7 @@ affordance host views/demo/host   # JSON lines: {"type":"event","name":"user","p
 
 ## Status
 
-v0.1 beta. Developed on Linux; macOS support is new and less exercised
+v0.2 beta. Developed on Linux; macOS support is new and less exercised
 ([platform evidence](docs/DEVELOPING.md#current-platform-evidence)).
 Template conformance is evidence from a finite test corpus, not a guarantee for arbitrary input.
 

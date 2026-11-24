@@ -1,6 +1,6 @@
 [package]
 name = "affordance"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 # The integration tests are one program (tests/suite.rs); each file under tests/ is a module of it.
 autotests = false
